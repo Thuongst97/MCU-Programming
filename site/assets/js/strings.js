@@ -1,0 +1,114 @@
+/* SPDX-License-Identifier: MIT
+   =========================================================================
+   MCU Academy — every user-visible UI string in one place (CLAUDE.md rule 25).
+   core.js, diagrams.js and engines read from window.MCU_STRINGS; content text
+   stays in the HTML. English only for now; a translation would replace this file.
+   ========================================================================= */
+window.MCU_STRINGS = {
+  brand: {
+    name: "MCU Academy",
+    tagline: "Automotive Firmware Handbook",
+    mark: "F1",
+    homeLabel: "MCU Academy home",
+  },
+  nav: {
+    home: "Home",
+    modules: "Modules",
+    openToc: "Open table of contents",
+    mainNav: "Main navigation",
+    // top-level links, shown only once their page is ready (status "ready" in SITE)
+    links: [
+      { id: "setup", label: "Setup" },
+      { id: "board", label: "Board" },
+      { id: "autosar-arch", label: "AUTOSAR" },
+      { id: "troubleshooting", label: "Troubleshooting" },
+      { id: "glossary", label: "Glossary" },
+    ],
+  },
+  search: {
+    placeholder: "Search: NVIC, CAN_BTR, Rte_Write…",
+    label: "Search the site",
+    shortcut: "Ctrl K",
+    noResults: (q) => `No results for “${q}”.`,
+    glossary: "Glossary",
+  },
+  theme: {
+    toLight: "Switch to light theme",
+    toDark: "Switch to dark theme",
+  },
+  sidebar: {
+    progress: "Reading progress",
+    filter: "Filter contents…",
+    filterLabel: "Filter table of contents",
+    filterInfo: (sec, pages) => `${sec} section(s) on this page · ${pages} other page(s)`,
+    toc: "Table of contents",
+    planned: "soon",
+    plannedTip: (phase) => `Planned for roadmap phase ${phase}`,
+  },
+  pager: { prev: "← Previous", next: "Next →", back: "← Back", home: "Home" },
+  status: {
+    planned: (phase) => `Phase ${phase}`,
+    ready: "Read module →",
+    soon: "Coming soon",
+    pageCount: (n) => `${n} ${n === 1 ? "page" : "pages"}`,
+  },
+  refs: {
+    title: "Official references",
+    intro: "Primary sources for the material on this page. Datasheets and manuals are revised over time — when in doubt, the current revision from the vendor is the final authority.",
+    community: "community",
+    rev: (r) => `Rev. ${r}`,
+    sec: (s) => `§${s}`,
+  },
+  code: {
+    copy: "Copy",
+    copied: "Copied ✓",
+    viewSource: "View source",
+    sourceTip: "Open this file in the repository",
+    linesTip: (a, b) => `Lines ${a}–${b} of the file in examples/`,
+  },
+  callout: {
+    analogy: "Analogy",
+    prod: "In production (R4.x)",
+  },
+  seq: {
+    reset: "⟲ Reset", resetTip: "Reset (R)",
+    prev: "◀ Prev", prevTip: "Previous step (←)",
+    next: "Next ▶", nextTip: "Next step (→)",
+    play: "▶ Auto", pause: "⏸ Pause", playTip: "Autoplay (Space)",
+    speed: "Speed", slow: "Slow", normal: "Normal", fast: "Fast",
+    keys: "Use the arrow keys to step through",
+    ready: "Ready",
+    intro: "Press <b>Next ▶</b> or <kbd>→</kbd> to begin.",
+    introSide: "Each step shows what runs, how it is triggered, the matching code and a real-world analogy.",
+    step: (n) => `Step ${n}`,
+    legend: { call: "Function call", irq: "Interrupt / exception", dma: "DMA transfer", bus: "Hardware / bus", rte: "RTE call", pdu: "PDU", ret: "Return / event back" },
+    ariaDefault: "Sequence diagram",
+  },
+  layered: {
+    hint: "Hover or focus a component to trace its connections",
+    boundary: "Boundary crossing",
+    ariaDefault: "Architecture diagram",
+    tones: { asw: "Application SWC", rte: "RTE", svc: "BSW services", ecual: "ECU abstraction", mcal: "MCAL", cdd: "Complex driver", hw: "Microcontroller · board", tool: "Toolchain · host" },
+    kinds: { call: "Function call", rte: "RTE port access", pdu: "PDU / bus frame", hw: "Hardware link", opt: "Optional · configuration" },
+  },
+  glossary: {
+    searchPlaceholder: "Search terms, e.g. NVIC, BRR, RTE…",
+    searchLabel: "Search terms",
+    filterLabel: "Filter by category",
+    count: (n, total) => `${n} of ${total} terms`,
+    total: (n) => `📖 ${n} terms`,
+    all: "All",
+    cats: {
+      core: "Cortex-M core", memory: "Memory & boot", toolchain: "Toolchain", debug: "Debug & simulation",
+      peripheral: "Peripherals", bus: "Buses", rtos: "RTOS", autosar: "AUTOSAR", diag: "Diagnostics",
+      safety: "Safety", quality: "Quality",
+    },
+  },
+  footer: {
+    about: "A learning handbook that takes software engineers from first principles to AUTOSAR-structured automotive firmware on an STM32F103C8T6 Blue Pill.",
+    disclaimer: "Educational content. Register names follow ST's RM0008; AUTOSAR material cites Classic Platform R25-11 and is teaching code, not a conformant implementation. CAN IDs, DIDs and DTCs in examples are hypothetical. Not affiliated with STMicroelectronics, Arm, AUTOSAR or MISRA.",
+    licence: "Code: MIT · Content: CC BY 4.0",
+    repo: "Source on GitHub",
+  },
+  tooltipSep: " — ",
+};
