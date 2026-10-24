@@ -120,6 +120,13 @@ should look or behave, do what that site does.
     `site/assets/js/strings.js` (`window.MCU_STRINGS`). `core.js` and engines never hard-code
     user-visible text. Don't build any other i18n machinery.
 
+### Pages
+26. Every page is an entry in `SITE` (core.js) with `status: "planned"` (shown greyed out with its roadmap
+    phase, **never linked**, its HTML file must not exist) or `"ready"` (file exists, linked everywhere).
+    `tools/new-module.py <id>` is the only way a page goes from planned to ready; check-site.py enforces both states.
+27. Engines that no published page uses yet must be exercised in `tests/site/fixtures/engines.html` so the
+    smoke test catches their runtime errors.
+
 ## Content style guide
 
 - **Language:** English. Audience: software engineers new to embedded/automotive (the author comes from
@@ -188,8 +195,9 @@ Run this for every AUTOSAR page (modules 18–23, 26) and every file in `autosar
 
 1. **Check PLAN.md §3**: the module's id, number, group, sections and design sheet row. If you need
    to deviate, update PLAN.md in the same change.
-2. Scaffold: `python3 tools/new-module.py <id>`. It creates `site/<id>.html` from the page template,
-   `site/assets/js/pages/<id>.js`, a `SITE` entry stub and a `REFS` stub in `core.js`.
+2. Scaffold: `python3 tools/new-module.py <id>`. It creates `site/<id>.html` (one TODO section per SITE
+   section) and `site/assets/js/pages/<id>.js` from `tools/templates/`, flips the SITE status to "ready" and
+   adds an empty `REFS` entry. check-site.py fails until every TODO is written and ≥ 3 primary refs exist.
 3. Fill the `SITE` entry: `num, group, title, short, icon, accent, desc`, and `sections` as
    `[id, title, search keywords]`. Keywords: lowercase, include register names and synonyms.
 4. Write the page: `header.page-hero` (crumbs, eyebrow "Module NN · <Group>", `h1`, `.lead`,
@@ -204,7 +212,7 @@ Run this for every AUTOSAR page (modules 18–23, 26) and every file in `autosar
 8. Glossary: add every new term to `glossary-data.js` (`{term, cat, full, desc}`); diagram tooltips
    pick them up automatically. New UI labels (buttons, engine labels) go into `strings.js`, not the engine.
 9. Run the local checks:
-   `python3 tools/embed-code.py --check && python3 tools/check-site.py && python3 tools/check-regs.py && node --test tests/site/ && npm --prefix tests/site run smoke`
+   `python3 tools/embed-code.py --check && python3 tools/check-site.py && python3 tools/check-regs.py && node --test tests/site/*.test.mjs && npm --prefix tests/site run smoke`
    and open the page through a local server (`python3 -m http.server -d site`) in both themes and at
    mobile width. Expect zero console errors. For AUTOSAR pages, also complete the self-review checklist above.
 10. Commit with a message like `module 05 gpio: sections model…swj, example 01 regions`.
@@ -221,17 +229,26 @@ Run this for every AUTOSAR page (modules 18–23, 26) and every file in `autosar
 3. Add the example to the catalog: `python3 tools/gen-catalog.py`.
 4. Validate it on real hardware before marking `tested_on`.
 
-## Local commands (once Phase 1–2 exist)
+## Local commands
+Available now (Phase 1):
 ```sh
-python3 -m http.server -d site 8000                      # preview the site
+python3 -m http.server -d site 8000                      # preview the site at http://localhost:8000
+python3 tools/check-site.py && python3 tools/embed-code.py --check && python3 tools/check-regs.py
+python3 tools/hero-art.py --write                        # regenerate the landing-page illustration
+python3 tools/update-third-party.py --check              # verify third_party/ (or <component> <tag> to update)
+python3 -m unittest discover -s tests/tools              # tool tests
+node --test tests/site/*.test.mjs                        # runtime unit tests
+npm ci --prefix tests/site && npm --prefix tests/site run smoke   # Playwright smoke test
+#   no Playwright browser download possible? PW_CHROMIUM=/path/to/chrome npm --prefix tests/site run smoke
+```
+From Phase 2 on (examples, Renode, SVD):
+```sh
 python3 tools/fetch-svd.py                               # SVD for Cortex-Debug → .cache/svd/ (not committed)
 cmake --preset bluepill-debug -S examples/00-bluepill-blink-uart/bare && cmake --build --preset bluepill-debug
 cmake --build build --target flash                       # OpenOCD + bluepill.cfg
 renode-test examples/00-bluepill-blink-uart/bare/test/00.robot
 cmake --preset host-tests && ctest --preset host-tests
-python3 tools/embed-code.py && python3 tools/check-site.py && python3 tools/check-regs.py
-npm ci --prefix tests/site && npm --prefix tests/site run smoke   # Playwright smoke test
-python3 tools/update-third-party.py freertos_kernel V11.3.2      # re-vendor a component
+python3 tools/update-third-party.py freertos_kernel V11.3.2      # vendor a new component (after adding it to versions.json)
 ```
 
 ## Git

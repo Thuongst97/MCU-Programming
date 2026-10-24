@@ -4,8 +4,8 @@
 > to AUTOSAR-structured automotive firmware, with every example running on one cheap board:
 > the **STM32F103C8T6 "Blue Pill"** programmed through an **ST-Link V2** over SWD.
 
-Status: **plan approved, all former open questions decided (§12.2).** No lesson content or example
-code yet; Phase 1 starts only when the owner says "go". Written and decided 2026-10-24.
+Status: **Phase 1 (site foundation) implemented 2026-10-24** (see §11.2). All former open questions are
+decided (§12.2). No lesson content or example firmware yet; that starts in Phase 2.
 Companion file: [`CLAUDE.md`](CLAUDE.md) (rules for future authoring sessions).
 
 ---
@@ -144,6 +144,7 @@ MCU-Programming/
 │   ├── board.html  troubleshooting.html  automotive-mcus.html  ll-drivers.html  glossary.html
 │   ├── assets/css/main.css
 │   ├── assets/js/strings.js      # every UI string in one place (window.MCU_STRINGS), loaded first
+│   ├── assets/js/lib/code.js     # pure tokenizer / «n» markers / line numbers (UMD: browser + node tests)
 │   ├── assets/js/core.js  diagrams.js  glossary-data.js
 │   ├── assets/js/engines/        # pinout.js regview.js clocktree.js waveform.js memmap.js
 │   │                             # statemachine.js compare.js checklist.js calc.js
@@ -189,9 +190,11 @@ MCU-Programming/
 │   ├── unity/                    # ThrowTheSwitch/Unity — src/ (MIT)
 │   └── cmock/                    # ThrowTheSwitch/CMock — added only when the first test needs mocks (MIT)
 ├── tests/site/                   # site tests (the only npm usage in the repo)
-│   ├── package.json  package-lock.json   # devDependency @playwright/test, exact version
-│   ├── *.test.mjs                # node --test: engine math (CRC-15, bit timing, clock tree, BRR)
-│   └── smoke.spec.mjs            # Playwright: every page loads, zero console errors, both themes
+│   ├── package.json  package-lock.json  playwright.config.mjs   # @playwright/test, exact version
+│   ├── *.test.mjs                # node --test: lib/code.js now; engine math (CRC-15, bit timing, clock tree, BRR) later
+│   ├── smoke.spec.mjs            # Playwright: every page loads, zero console errors, both themes, links, engines
+│   └── fixtures/engines.html     # test-only page rendering every engine with sample data (not deployed)
+├── tests/tools/test_tools.py     # unittest: embed-code, check-regs, check-site, new-module (incl. negative cases)
 ├── docs/                         # project docs, not deployed
 │   ├── spikes.md                 # Phase-0 findings
 │   ├── beta-feedback-template.md # §11.1
@@ -206,7 +209,9 @@ MCU-Programming/
     ├── fetch-svd.py              # downloads STM32F103.svd into .cache/svd/ for Cortex-Debug (not committed, §2.4)
     ├── update-third-party.py     # re-vendors one component at a tag: copies the subset, LICENSE, rewrites README + versions.json
     ├── gen-catalog.py            # examples/*/README front-matter → examples/README.md + site data
-    ├── new-module.py             # scaffold page html + page js + SITE stub + REFS stub
+    ├── new-module.py             # scaffold page html + page js from the SITE entry, flip status to "ready", add REFS stub
+    ├── templates/                # module.html, section.html, page.js used by new-module.py
+    ├── autosar-ids.txt           # every SWS_/SRS_ ID cited, with document · section · date read (§8.5)
     └── rte-gen/                  # (Phase 6, optional) tiny ARXML-subset → Rte_<Swc>.h generator
 ```
 
@@ -1262,7 +1267,7 @@ from linker symbols, with an overflow warning when `_Min_Stack_Size + .data + .b
 
 ### 9.10 Engine testing
 Pure functions (wave generators, CRC-15, bit-timing solver, clock-tree math, BRR) live in
-`engines/*.js` as UMD-lite modules and are tested with `node --test tests/site/` in CI. That adds no
+`engines/*.js` (and `lib/code.js`) as UMD-lite modules and are tested with `node --test tests/site/*.test.mjs` in CI. That adds no
 dependencies, since Node ships on GitHub runners. Rendering is smoke-tested with **Playwright** (D7):
 `tests/site/smoke.spec.mjs` opens every page from `SITE` plus `index.html` in Chromium, in both themes,
 and fails on any console error, uncaught page error or failed same-origin request. It also clicks
@@ -1282,7 +1287,7 @@ through each interactive engine once (next step, toggle a bit, change a select).
 | `static-analysis` | cppcheck 2.22 with `--addon=misra` on `examples/`, `autosar/`, `capstone/` (MISRA C:2012 numbering incl. amendments; no rule-texts file, so it outputs rule numbers only). Run `tools/check-autosar.py` and `clang-format --dry-run --Werror`. | Non-blocking until Phase 5, then blocking for `autosar/` and `capstone/stage3*` |
 | `third-party` | Every `third_party/*/` has LICENSE + README with URL, tag and SHA; versions match `tools/versions.json`; nothing outside `third_party/` vendors upstream code. | ✅ |
 | `browser-smoke` | `npm ci --prefix tests/site`, `npx playwright install --with-deps chromium`, serve `site/` with `python3 -m http.server`, run `smoke.spec.mjs` (§9.10). | ✅ |
-| `site-checks` | `tools/embed-code.py --check`; `tools/check-site.py` (SITE ↔ section ids both ways, REFS ≥ 3 primary, every `data-src` exists, engines referenced exist, no `TODO`/`lorem`, images ≤ 150 KB, page weight report); `node --test tests/site/`; `lychee --offline site/` (internal links + anchors). | ✅ |
+| `site-checks` | `tools/check-site.py` (SITE ↔ section ids, ready/planned pages, REFS ≥ 3 primary, local links + anchors, `?v=__BUILD__` on assets, no `TODO`/`lorem`, identical light-token blocks, `callout prod` has `data-doc`, images ≤ 150 KB, SPDX headers, SHA-pinned actions, AUTOSAR IDs listed); `tools/embed-code.py --check`; `tools/check-regs.py`; `tools/hero-art.py --check`; `tools/update-third-party.py --check`; `python3 -m unittest discover -s tests/tools`; `node --test tests/site/*.test.mjs`. Internal links are checked by check-site.py and again, after JavaScript renders, by the Playwright smoke test (no separate lychee offline run). | ✅ |
 
 ### 10.2 `pages.yml` (push to `main`)
 1. Checkout, then assemble `_site/` = `site/` + `examples/` (sources only, no build dirs) + `capstone/` + `autosar/`.
@@ -1308,7 +1313,7 @@ Effort is in focused author-days (one person + Claude sessions). The MVP is Phas
 | Phase | Deliverables | Exit criteria | Effort |
 |---|---|---|---|
 | **0. Verification & spikes** | Decisions are done (§12.2). Verify 📄 items against PDFs (DS5319 Table 5, RM0008 sections, ES096, UM1850). Pin st.com tool versions. Re-check the SVD licence on st.com (§2.4). Renode spike: RCC overlay, 20 KB SRAM, STMCAN + CANHub, GenericSpiFlash, ADC model, FLASH stub. CubeMX CMake generation check. Toolchain install dry-run on Windows/Linux/macOS. Buy a genuine-ST Blue Pill, a clone and two SN65HVD230. | `tools/versions.json` filled; spike notes in `docs/spikes.md`; every 📄 resolved | 2–3 |
-| **1. Site foundation** | `site/` with ported runtime (`window.MCU`, data-driven nav/footer, `strings.js`, new keys), consolidated CSS + new palette, C/asm/ld/cmake/console highlighting, upgraded references + `callout prod`, `embed-code.py`, `check-site.py`, `check-regs.py` skeleton, `LICENSE` (MIT) + `LICENSE-CONTENT` (CC BY 4.0), `third_party/` vendored (CMSIS core, cmsis-device-f1, Unity) + `update-third-party.py`, `ci.yml` (site-checks, third-party, browser-smoke), `pages.yml`, `dependabot.yml`, SHA-pinned actions, landing page (hero with Blue Pill subtitle, path, module grid, mental model, CTA), `tools/hero-art.py` Blue Pill concept, glossary page with first ~60 terms, `new-module.py` | Pages deploys; Playwright smoke green; Lighthouse a11y ≥ 95 | 4–5 |
+| **1. Site foundation** | `site/` with ported runtime (`window.MCU`, data-driven nav/footer, `strings.js`, new keys), consolidated CSS + new palette, C/asm/ld/cmake/console highlighting, upgraded references + `callout prod`, `embed-code.py`, `check-site.py`, `check-regs.py` skeleton, `LICENSE` (MIT) + `LICENSE-CONTENT` (CC BY 4.0), `third_party/` vendored (CMSIS core, cmsis-device-f1, Unity) + `update-third-party.py`, `ci.yml` (site-checks, third-party, browser-smoke), `pages.yml`, `dependabot.yml`, SHA-pinned actions, landing page (hero with Blue Pill subtitle, path, module grid, mental model, CTA), `tools/hero-art.py` Blue Pill concept, glossary page with first ~60 terms, `new-module.py` | Pages deploys; Playwright smoke green; Lighthouse a11y ≥ 95 (done: axe-core WCAG 2 A/AA + best-practice, 0 violations, both themes) | 4–5 |
 | **2. MVP: Setup module** | `examples/common/*` (toolchain file, linker, C startup, OpenOCD cfgs, Renode overlay); `fetch-svd.py`; examples **00 (bare + hal), 01, 02** with README, wiring, expected output, Robot tests; `setup.html` complete (all 15 sections incl. "What CMake generates under the hood", 3 OS tabs); `troubleshooting.html`; `board.html`; engines **Pinout v1, Register v1 (hand-authored data + check-regs), MemoryMap v1, Checklist**; CI jobs examples/renode/memmap green | The author, following only the site on a clean machine, reaches "Hello from Blue Pill" on hardware **and** in Renode on ≥ 2 OSes | 7–9 |
 | **2b. Beta round 1** (non-blocking) | 2–3 junior engineers work through Module 02 using `docs/beta-feedback-template.md` (§11.1). Findings become issues labelled `beta`. | Feedback collected; fixes scheduled. **Releases don't wait for it.** | 1 (author time) |
 | **3. From reset to main** | Modules 01, 03–07; examples 03 + 04 (+ host tests); engines ClockTree, Waveform (uart, pwm), Calc (BRR, PSC/ARR), StateMachine | All sections filled, every module with diagram + annotated code + analogy + sources | 8–10 |
@@ -1329,6 +1334,26 @@ got stuck** (section id + what you tried); **what was unclear** (quote the sente
 (copy/paste); "I had to search elsewhere for…"; clarity 1–5 per section; one thing to remove, one to
 add. Results are summarised in an issue per round. Rounds run after the MVP (2b) and in Phase 8, and
 **never block a release**.
+
+### 11.2 Progress log
+
+**Phase 1 — site foundation (2026-10-24).** Started at the owner's request before Phase 0, so Phase 0's
+hardware and PDF verifications are still open (they don't block the site foundation).
+- Built: `site/` runtime ported to `window.MCU` (`strings.js`, `lib/code.js`, `core.js`, `diagrams.js`),
+  consolidated `main.css` with the copper/signal palette, landing page with the Blue Pill hero art
+  (`tools/hero-art.py --write`), glossary page with 79 terms, all 31 SITE entries (`status: "planned"` pages
+  are shown with their phase and never linked), licences, `third_party/` (CMSIS 6 core, cmsis-device-f1,
+  Unity) with `update-third-party.py`, `embed-code.py`, `check-site.py`, `check-regs.py` (header self-test:
+  12 RM0008 facts reproduced from `stm32f103xb.h`, including the `FLASH_ACR_LATENCY_2` trap), `new-module.py`,
+  CI (`ci.yml`, `pages.yml`, `links-weekly.yml`, `dependabot.yml`), all actions SHA-pinned.
+- Verified locally: check-site, embed-code, check-regs, hero-art, third-party checks; 10 Python tool tests;
+  6 Node runtime tests; 7 Playwright smoke tests; axe-core 0 violations on both pages in both themes.
+  Lighthouse itself was not run (axe-core is the engine behind its accessibility score).
+- Deviation from §9: the generic `MCU.StateMachine` and other engines are Phase 2+ as planned; the reference's
+  cabin-topology component was dropped. Engines that no page uses yet are exercised by
+  `tests/site/fixtures/engines.html`.
+- Publishing: Pages deploys from `main` via `pages.yml`; the repository owner must set
+  Settings → Pages → Source = "GitHub Actions" once.
 
 ---
 
