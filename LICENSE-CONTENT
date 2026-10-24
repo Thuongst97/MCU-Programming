@@ -1,0 +1,27 @@
+MCU Academy — content licence
+
+Copyright (c) 2026 Thuongst97 and MCU Academy contributors
+
+The prose, diagrams, illustrations and images of the MCU Academy site (the
+HTML pages under site/ and the files under site/assets/img/) are licensed under
+the Creative Commons Attribution 4.0 International licence (CC BY 4.0).
+
+You are free to share (copy and redistribute the material in any medium or
+format) and adapt (remix, transform and build upon the material) for any
+purpose, even commercially, provided you give appropriate credit, provide a
+link to the licence, and indicate if changes were made.
+
+Suggested attribution:
+  "MCU Academy" by Thuongst97 and contributors, https://github.com/Thuongst97/MCU-Programming,
+  licensed under CC BY 4.0.
+
+Full legal code: https://creativecommons.org/licenses/by/4.0/legalcode
+Human-readable summary: https://creativecommons.org/licenses/by/4.0/
+
+Not covered by this licence:
+- Code (examples/, autosar/, capstone/, tools/, tests/, site JavaScript and
+  CSS): MIT, see LICENSE.
+- Third-party code under third_party/: its own upstream licence.
+- Names and trademarks (STMicroelectronics, STM32, Arm, Cortex, AUTOSAR,
+  MISRA and others) belong to their owners. MISRA and AUTOSAR documents are
+  cited by number only and are not reproduced.

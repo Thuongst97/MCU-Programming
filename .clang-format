@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT
+# Firmware style (CLAUDE.md rule 18). Not applied to third_party/.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+BreakBeforeBraces: Allman
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AlignConsecutiveMacros: Consecutive
+AlignTrailingComments: true
+PointerAlignment: Right
+SortIncludes: Never
+SpaceAfterCStyleCast: false
