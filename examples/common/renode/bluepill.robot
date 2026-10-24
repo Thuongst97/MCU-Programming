@@ -22,3 +22,9 @@ Create Blue Pill
 Add Button
     [Arguments]    ${port}    ${pin}    ${name}=button
     Execute Command    machine LoadPlatformDescriptionFromString "${name}: Miscellaneous.Button @ gpioPort${port} ${pin} { invert: true; -> gpioPort${port}@${pin} }"
+
+Run Virtual Time
+    [Documentation]    Pause, advance virtual time by ${seconds}, stay paused (testers restart it).
+    [Arguments]    ${seconds}
+    Execute Command    pause
+    Execute Command    emulation RunFor "${seconds}"

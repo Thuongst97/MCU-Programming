@@ -1,0 +1,142 @@
+{
+ "name": "00-bluepill-blink-uart",
+ "elf": "00-bluepill-blink-uart.elf",
+ "toolchain": "arm-none-eabi-gcc (xPack GNU Arm Embedded GCC x86_64) 15.2.1 20251203",
+ "regions": [
+  {
+   "name": "FLASH",
+   "origin": 134217728,
+   "length": 65536
+  },
+  {
+   "name": "RAM",
+   "origin": 536870912,
+   "length": 20480
+  }
+ ],
+ "sections": [
+  {
+   "name": ".isr_vector",
+   "vma": 134217728,
+   "lma": 134217728,
+   "size": 236,
+   "load": true
+  },
+  {
+   "name": ".text",
+   "vma": 134217964,
+   "lma": 134217964,
+   "size": 1424,
+   "load": true
+  },
+  {
+   "name": ".data",
+   "vma": 536870912,
+   "lma": 134219388,
+   "size": 4,
+   "load": true
+  },
+  {
+   "name": ".bss",
+   "vma": 536870916,
+   "lma": 134219392,
+   "size": 4,
+   "load": false
+  },
+  {
+   "name": "._user_heap_stack",
+   "vma": 536870920,
+   "lma": 134219392,
+   "size": 1024,
+   "load": false
+  }
+ ],
+ "symbols": [
+  {
+   "name": "g_vector_table",
+   "value": 134217728
+  },
+  {
+   "name": "main",
+   "value": 134218852
+  },
+  {
+   "name": "Reset_Handler",
+   "value": 134219164
+  },
+  {
+   "name": "_etext",
+   "value": 134219388
+  },
+  {
+   "name": "_sidata",
+   "value": 134219388
+  },
+  {
+   "name": "SystemCoreClock",
+   "value": 536870912
+  },
+  {
+   "name": "_sdata",
+   "value": 536870912
+  },
+  {
+   "name": "_edata",
+   "value": 536870916
+  },
+  {
+   "name": "_sbss",
+   "value": 536870916
+  },
+  {
+   "name": "_ebss",
+   "value": 536870920
+  },
+  {
+   "name": "_estack",
+   "value": 536891392
+  }
+ ],
+ "largest_functions": [
+  {
+   "name": "main",
+   "value": 134218852,
+   "size": 312
+  },
+  {
+   "name": "clock_72mhz",
+   "value": 134218320,
+   "size": 168
+  },
+  {
+   "name": "uart_put_dec",
+   "value": 134218708,
+   "size": 116
+  },
+  {
+   "name": "Reset_Handler",
+   "value": 134219164,
+   "size": 104
+  },
+  {
+   "name": "uart_init",
+   "value": 134218488,
+   "size": 92
+  },
+  {
+   "name": "__NVIC_SetPriority",
+   "value": 134217964,
+   "size": 84
+  },
+  {
+   "name": "SysTick_Config",
+   "value": 134218048,
+   "size": 68
+  },
+  {
+   "name": "uart_putc",
+   "value": 134218580,
+   "size": 68
+  }
+ ]
+}

@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Example 01 in Renode, with a push button on PA0. In the monitor:  gpioPortA.button PressAndRelease
+$name?="blue-pill-01"
+include $ORIGIN/../../common/renode/bluepill.resc
+machine LoadPlatformDescriptionFromString "button: Miscellaneous.Button @ gpioPortA 0 { invert: true; -> gpioPortA@0 }"
+start

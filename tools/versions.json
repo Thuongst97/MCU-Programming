@@ -7,7 +7,9 @@
       "version": "15.2.Rel1",
       "alt": "xPack arm-none-eabi-gcc 15.2.1-1.1",
       "url": "https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads",
-      "verified": false
+      "verified": false,
+      "linux_x64_url": "https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v15.2.1-1.1/xpack-arm-none-eabi-gcc-15.2.1-1.1-linux-x64.tar.gz",
+      "linux_x64_dir": "xpack-arm-none-eabi-gcc-15.2.1-1.1/bin"
     },
     "cmake": {
       "name": "CMake",
@@ -64,7 +66,16 @@
       "name": "Renode",
       "version": "1.17.0",
       "url": "https://github.com/renode/renode/releases",
-      "verified": true
+      "verified": true,
+      "linux_x64_url": "https://github.com/renode/renode/releases/download/v1.17.0/renode-1.17.0.linux-portable.tar.gz",
+      "linux_x64_dir": "renode_1.17.0-portable",
+      "python_requirements": [
+        "robotframework==6.1",
+        "robotframework-retryfailed==0.2.0",
+        "psutil",
+        "pyyaml",
+        "telnetlib3==2.0.*"
+      ]
     },
     "cppcheck": {
       "name": "Cppcheck (Ubuntu 24.04 package in CI)",
@@ -117,8 +128,8 @@
         "url": "https://raw.githubusercontent.com/modm-io/cmsis-svd-stm32/e79021accd49bf19bd0b16065f5471fb073ff3ac/stm32f1/STM32F103.svd"
       }
     ],
-    "sha256": null,
-    "_note": "Not committed: licence unclear (PLAN.md section 2.4). sha256 is pinned when tools/fetch-svd.py is added in Phase 2."
+    "sha256": "ff632bd0d75d0bc807d787967cdf62512d6438be53d6a77d2d78ab8ba2110015",
+    "_note": "Not committed: licence unclear (PLAN.md section 2.4). Downloaded by tools/fetch-svd.py and verified against sha256."
   },
   "third_party": {
     "cmsis_core": {
