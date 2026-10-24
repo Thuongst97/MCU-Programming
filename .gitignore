@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+build/
+.cache/
+node_modules/
+tests/site/test-results/
+tests/site/playwright-report/
+__pycache__/
+*.pyc
+_site/
+.DS_Store
