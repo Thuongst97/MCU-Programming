@@ -1,0 +1,254 @@
+// SPDX-License-Identifier: MIT
+// Renode platform for the STM32F103C8T6 "Blue Pill" (medium density: 64 KB flash, 20 KB SRAM).
+// Adapted from Renode's platforms/cpus/stm32f103.repl (Antmicro, MIT licence) with the changes
+// listed in PLAN.md §7.3:
+//   * real memory sizes, flash at 0x08000000 (DS5319 memory map)
+//   * only the peripherals a C8 has: TIM1-4, USART1-3, I2C1-2, SPI1-2, DMA1, ADC1, bxCAN, IWDG
+//   * an RCC model (Python) so clock-switch code works; no SVD download at load time
+//   * Cortex-M3 bit-band aliases and a flash-interface register model (both used by ST's HAL)
+//   * the on-board LED on PC13 (active-low)
+// Not modelled (see each example's "Simulation fidelity"): clock frequencies (SysTick and timers
+// run at fixed rates), analog values, power modes, USB, flash programming timing.
+
+cpu: CPU.CortexM @ sysbus
+    cpuType: "cortex-m3"
+    nvic: nvic
+
+nvic: IRQControllers.NVIC @ sysbus 0xE000E000
+    priorityMask: 0xF0          // 4 priority bits implemented (stm32f103xb.h: __NVIC_PRIO_BITS 4)
+    systickFrequency: 72000000  // fixed: Renode does not derive it from RCC
+    IRQ -> cpu@0
+
+flash: Memory.MappedMemory @ sysbus 0x08000000
+    size: 0x10000               // 64 KB
+
+sram: Memory.MappedMemory @ sysbus 0x20000000
+    size: 0x5000                // 20 KB
+
+// Cortex-M3 bit-band aliases (PM0056 section 2.2.5): one 32-bit word per bit of SRAM and of the
+// peripheral region. ST's HAL uses them (e.g. __HAL_RCC_PLL_ENABLE writes 0x42420060 = RCC_CR.PLLON);
+// Renode's stock stm32f103.repl did not map them, so those writes were silently lost.
+bitbandPeripherals: Miscellaneous.BitBanding @ sysbus <0x42000000, +0x2000000>
+    peripheralBase: 0x40000000
+
+bitbandSram: Miscellaneous.BitBanding @ sysbus <0x22000000, +0x200000>
+    peripheralBase: 0x20000000
+
+// RCC (RM0008 chapter 7): a small Python model that mirrors HSERDY/PLLRDY/SWS.
+rcc: Python.PythonPeripheral @ sysbus 0x40021000
+    size: 0x400
+    initable: true
+    script: '''
+# Minimal STM32F1 RCC model for Renode (PLAN.md §7.3). Renode's stock stm32f103.repl has no RCC:
+# reads of RCC_CFGR return 0, so SWS never reports the PLL and a correct clock switch would hang.
+# This model keeps every register as written and mirrors the hardware "ready/status" bits:
+#   CR:   HSIRDY = HSION, HSERDY = HSEON, PLLRDY = PLLON           (RM0008 section 7.3.1)
+#   CFGR: SWS (bits 3:2) = SW (bits 1:0)                           (RM0008 section 7.3.2)
+#   CSR:  reset flags read as "pin reset" after power-up            (RM0008 section 7.3.10)
+# It does NOT model clock frequencies: Renode's timers and SysTick run at fixed rates.
+if request.IsInit:
+    regs = {0x00: 0x00000083, 0x04: 0x00000000, 0x24: 0x0C000000}
+elif request.IsRead:
+    off = request.Offset & 0x3FC
+    val = regs.get(off, 0)
+    if off == 0x00:
+        val &= ~((1 << 1) | (1 << 17) | (1 << 25))
+        if val & (1 << 0):
+            val |= (1 << 1)
+        if val & (1 << 16):
+            val |= (1 << 17)
+        if val & (1 << 24):
+            val |= (1 << 25)
+    elif off == 0x04:
+        val = (val & ~0xC) | ((val & 0x3) << 2)
+    request.Value = val
+elif request.IsWrite:
+    off = request.Offset & 0x3FC
+    if off == 0x24 and (request.Value & (1 << 24)):
+        regs[0x24] = 0          # RMVF clears the reset flags
+    else:
+        regs[off] = request.Value
+'''
+
+// Flash interface registers (RM0008 section 3.3.3 + PM0075): Renode does not model them, so reads
+// of FLASH_ACR returned 0 and HAL_RCC_ClockConfig(), which reads the latency back, failed. This
+// model stores ACR, keeps CR.LOCK until the two-key unlock sequence, and never reports BSY.
+// It does not erase or program the flash array (writes to flash memory always succeed in Renode).
+flash_if: Python.PythonPeripheral @ sysbus 0x40022000
+    size: 0x400
+    initable: true
+    script: '''
+if request.IsInit:
+    regs = {0x00: 0x30, 0x10: 0x80, 0x1C: 0x03FFFFFC, 0x20: 0xFFFFFFFF}
+    keys = []
+elif request.IsRead:
+    off = request.Offset & 0x3FC
+    request.Value = regs.get(off, 0)
+elif request.IsWrite:
+    off = request.Offset & 0x3FC
+    if off == 0x04:
+        keys.append(request.Value)
+        keys[:] = keys[-2:]
+        if keys == [0x45670123, 0xCDEF89AB]:
+            regs[0x10] = regs[0x10] & ~0x80
+    elif off == 0x0C:
+        regs[0x0C] = regs.get(0x0C, 0) & ~(request.Value & 0x34)
+    elif off == 0x10:
+        regs[0x10] = (request.Value & ~0x40) | (regs[0x10] & 0x80) | (request.Value & 0x80)
+        if request.Value & 0x40:
+            regs[0x0C] = regs.get(0x0C, 0) | 0x20
+    elif off == 0x00:
+        regs[0x00] = (request.Value & 0x1F) | ((request.Value & 0x10) << 1)
+    else:
+        regs[off] = request.Value
+'''
+
+exti: IRQControllers.STM32F4_EXTI @ sysbus 0x40010400
+    numberOfOutputLines: 19
+    [0-4] -> nvic@[6-10]
+    [5-9] -> nvicInput23@[0-4]
+    [10-15] -> nvicInput40@[0-5]
+
+nvicInput23: Miscellaneous.CombinedInput @ none
+    numberOfInputs: 5
+    -> nvic@23
+
+nvicInput40: Miscellaneous.CombinedInput @ none
+    numberOfInputs: 6
+    -> nvic@40
+
+gpioPortA: GPIOPort.STM32F1GPIOPort @ sysbus <0x40010800, +0x400>
+    invertedAFPins: [[7, 1]]
+
+gpioPortB: GPIOPort.STM32F1GPIOPort @ sysbus <0x40010C00, +0x400>
+    invertedAFPins: [[13, 1], [14, 1], [15, 1], [0, 1], [1, 1]]
+
+gpioPortC: GPIOPort.STM32F1GPIOPort @ sysbus <0x40011000, +0x400>
+
+gpioPortD: GPIOPort.STM32F1GPIOPort @ sysbus <0x40011400, +0x400>
+
+// Ports E-G do not exist on the 48-pin C8; they are declared only because Renode's AFIO model
+// expects all seven F1 ports.
+gpioPortE: GPIOPort.STM32F1GPIOPort @ sysbus <0x40011800, +0x400>
+
+gpioPortF: GPIOPort.STM32F1GPIOPort @ sysbus <0x40011C00, +0x400>
+
+gpioPortG: GPIOPort.STM32F1GPIOPort @ sysbus <0x40012000, +0x400>
+
+afio: GPIOPort.STM32F1AFIO @ sysbus 0x40010000
+    gpioPorts: [gpioPortA, gpioPortB, gpioPortC, gpioPortD, gpioPortE, gpioPortF, gpioPortG]
+    [0-15] -> exti@[0-15]
+
+usart1: UART.STM32_UART @ sysbus <0x40013800, +0x100>
+    -> nvic@37
+    DMARequest -> dma1@4 | dma1@5
+
+usart2: UART.STM32_UART @ sysbus <0x40004400, +0x100>
+    -> nvic@38
+    DMARequest -> dma1@6 | dma1@7
+
+usart3: UART.STM32_UART @ sysbus <0x40004800, +0x100>
+    -> nvic@39
+    DMARequest -> dma1@2 | dma1@3
+
+i2c1: I2C.STM32F1_I2C @ sysbus 0x40005400
+    EventInterrupt -> nvic@31
+    ErrorInterrupt -> nvic@32
+    TxDMARequest -> dma1@6
+    RxDMARequest -> dma1@7
+
+i2c2: I2C.STM32F1_I2C @ sysbus 0x40005800
+    EventInterrupt -> nvic@33
+    ErrorInterrupt -> nvic@34
+    TxDMARequest -> dma1@4
+    RxDMARequest -> dma1@5
+
+dma1: DMA.STM32G0DMA @ sysbus 0x40020000
+    numberOfChannels: 7
+    [0-6] -> nvic@[11-17]
+
+timer1: Timers.STM32_Timer @ sysbus 0x40012c00
+    BreakInterrupt -> nvic@24
+    UpdateInterrupt -> nvic@25 | dma1@5
+    TriggerInterrupt -> nvic@26 | dma1@4
+    CommutationInterrupt -> nvic@26 | dma1@4
+    CaptureCompareInterrupt -> nvic@27 | dma1@2
+    frequency: 72000000
+    initialLimit: 0xFFFF
+
+timer2: Timers.STM32_Timer @ sysbus 0x40000000
+    IRQ -> nvic@28
+    UpdateInterrupt -> dma1@2
+    frequency: 72000000
+    initialLimit: 0xFFFF
+
+timer3: Timers.STM32_Timer @ sysbus 0x40000400
+    IRQ -> nvic@29
+    UpdateInterrupt -> dma1@3
+    TriggerInterrupt -> dma1@6
+    frequency: 72000000
+    initialLimit: 0xFFFF
+
+timer4: Timers.STM32_Timer @ sysbus 0x40000800
+    IRQ -> nvic@30
+    UpdateInterrupt -> dma1@7
+    frequency: 72000000
+    initialLimit: 0xFFFF
+
+// Timer outputs drive their alternate-function pins (from the stock description).
+timer1:
+    0 -> gpioPortA#08@01
+    1 -> gpioPortA#09@01
+    2 -> gpioPortA#10@01
+    3 -> gpioPortA#11@01
+
+timer2:
+    0 -> gpioPortA#00@02 | gpioPortA#15@02
+    1 -> gpioPortA#01@02 | gpioPortB#03@02
+    2 -> gpioPortA#02@02 | gpioPortB#10@02
+    3 -> gpioPortA#03@02 | gpioPortB#11@02
+
+timer3:
+    0 -> gpioPortA#06@03 | gpioPortB#04@03
+    1 -> gpioPortA#07@03 | gpioPortB#05@03
+    2 -> gpioPortB#00@03
+    3 -> gpioPortB#01@03
+
+timer4:
+    0 -> gpioPortB#06@04
+    1 -> gpioPortB#07@04
+    2 -> gpioPortB#08@04
+    3 -> gpioPortB#09@04
+
+gpioPortA:
+    0 -> timer2@00
+    1 -> timer2@01
+    2 -> timer2@02
+    3 -> timer2@03
+    6 -> timer3@00
+    7 -> timer3@01
+    8 -> timer1@00
+    9 -> timer1@01
+    10 -> timer1@02
+    11 -> timer1@03
+    15 -> timer2@00
+
+gpioPortB:
+    0 -> timer3@02
+    1 -> timer3@03
+    3 -> timer2@01
+    4 -> timer3@00
+    5 -> timer3@01
+    6 -> timer4@00
+    7 -> timer4@01
+    8 -> timer4@02
+    9 -> timer4@03
+    10 -> timer2@02
+    11 -> timer2@03
+
+// The on-board LED: PC13 drives its cathode, so the LED is lit when the pin is LOW.
+led: Miscellaneous.LED @ gpioPortC 13
+    invert: true
+
+gpioPortC:
+    13 -> led@0

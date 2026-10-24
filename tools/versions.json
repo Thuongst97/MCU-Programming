@@ -54,9 +54,10 @@
       "verified": false
     },
     "stm32cubef1": {
-      "name": "STM32CubeF1 (HAL, used only by examples/00/hal)",
-      "version": "v1.8.7",
-      "url": "https://github.com/STMicroelectronics/STM32CubeF1",
+      "name": "STM32F1 HAL/LL drivers (examples/00 hal + ll variants only)",
+      "version": "stm32f1xx-hal-driver v1.1.10",
+      "url": "https://github.com/STMicroelectronics/stm32f1xx-hal-driver",
+      "commit": "77fbb30b7a1d02533980400083e48c559aae5a4f",
       "verified": true
     },
     "renode": {
@@ -66,8 +67,8 @@
       "verified": true
     },
     "cppcheck": {
-      "name": "Cppcheck",
-      "version": "2.22.0",
+      "name": "Cppcheck (Ubuntu 24.04 package in CI)",
+      "version": "2.13",
       "url": "https://cppcheck.sourceforge.io/",
       "verified": true
     },
@@ -88,6 +89,12 @@
       "version": ">= V2J24",
       "url": "https://www.st.com/en/development-tools/stsw-link007.html",
       "verified": false
+    },
+    "robotframework": {
+      "name": "Robot Framework (Renode tests)",
+      "version": "6.1",
+      "url": "https://robotframework.org/",
+      "verified": true
     }
   },
   "specs": {
@@ -151,17 +158,23 @@
       "commit": "8a76309ed1250d817e9c888c4417171d2ba3ba63",
       "licence": "Apache-2.0",
       "licence_file": "License.md",
-      "base": "Include",
+      "base": ".",
       "files": [
-        "stm32f1xx.h",
-        "stm32f103xb.h",
-        "system_stm32f1xx.h"
+        "Include/stm32f1xx.h",
+        "Include/stm32f103xb.h",
+        "Include/system_stm32f1xx.h",
+        "Source/Templates/gcc/startup_stm32f103xb.s",
+        "Source/Templates/gcc/linker/STM32F103XB_FLASH.ld",
+        "Source/Templates/system_stm32f1xx.c"
       ],
-      "dest": "Include",
+      "dest": ".",
       "sha256": {
-        "stm32f1xx.h": "05e93fa3ddefb2e83d762b9ca4de36e3bba9cd8e9690400fe9f2c11fc0a3cef5",
-        "stm32f103xb.h": "d9c7c613d9fea74220892b4fbc3e80617493acad82a04bafadab2b4a7198399c",
-        "system_stm32f1xx.h": "a54dfbb3480c672f532d472a6e84bcf34df6551771d2e9966c5a3503c676b6ab"
+        "Include/stm32f1xx.h": "05e93fa3ddefb2e83d762b9ca4de36e3bba9cd8e9690400fe9f2c11fc0a3cef5",
+        "Include/stm32f103xb.h": "d9c7c613d9fea74220892b4fbc3e80617493acad82a04bafadab2b4a7198399c",
+        "Include/system_stm32f1xx.h": "a54dfbb3480c672f532d472a6e84bcf34df6551771d2e9966c5a3503c676b6ab",
+        "Source/Templates/gcc/startup_stm32f103xb.s": "a9a5fc7ed5ff617527dd98b3092830f4d17ed4bf57c99eac2c53bdb514ce138c",
+        "Source/Templates/gcc/linker/STM32F103XB_FLASH.ld": "ab4ff980794c0f9ea8935a4a3e0c20a9102c7f2ccbc33cad4deab159703563e9",
+        "Source/Templates/system_stm32f1xx.c": "6f13b57054f33b4dcb8f3f23fa05b2942d9dca8abd9a2a08ecde6f99693505a5"
       }
     },
     "unity": {
