@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Engine fixture — MCU Academy tests</title>
+  <link rel="stylesheet" href="../../../site/assets/css/main.css">
+</head>
+<!-- Test-only page (not deployed): renders every engine with sample data so the smoke test
+     catches runtime errors in engines that no published page uses yet. -->
+<body data-page="fixture">
+  <div id="site-header"></div>
+  <main class="content-inner" id="main">
+    <h1>Engine fixture</h1>
+    <div class="callout prod" data-doc="AUTOSAR_SWS_DIODriver R4.4.0"><div class="ci">🏭</div><div><span class="ct">In production (R4.x)</span><p>Sample.</p></div></div>
+    <script type="text/plain" data-code data-lang="c" data-file="main.c" data-src="examples/demo/main.c" data-start="10" data-end="13" data-skip="11">
+RCC->APB2ENR |= RCC_APB2ENR_IOPCEN; // «1»
+GPIOC->BSRR = GPIO_BSRR_BR13;
+    </script>
+    <div class="lang-switch">
+      <script type="text/plain" data-code data-lang="c" data-label="Registers">GPIOC->BSRR = GPIO_BSRR_BS13;</script>
+      <script type="text/plain" data-code data-lang="c" data-label="HAL">HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);</script>
+    </div>
+    <div data-tabs data-remember="mcu-os" data-detect="os">
+      <div class="tab-list" role="tablist"><button data-tab="windows">Windows</button><button data-tab="linux">Linux</button><button data-tab="macos">macOS</button></div>
+      <div class="tab-panel" data-panel="windows">W</div><div class="tab-panel" data-panel="linux">L</div><div class="tab-panel" data-panel="macos">M</div>
+    </div>
+    <script type="text/plain" id="src-demo" data-lang="c" data-file="led.c" data-src="examples/demo/led.c" data-start="20" data-end="22">
+GPIOC->BSRR = GPIO_BSRR_BR13; // «1»
+GPIOC->BSRR = GPIO_BSRR_BS13; // «2»
+    </script>
+    <div id="explorer"></div>
+    <div id="seq-demo"></div>
+    <div id="lg-demo"></div>
+  </main>
+  <div id="site-footer"></div>
+  <script src="../../../site/assets/js/strings.js"></script>
+  <script src="../../../site/assets/js/lib/code.js"></script>
+  <script src="../../../site/assets/js/glossary-data.js"></script>
+  <script src="../../../site/assets/js/core.js"></script>
+  <script src="../../../site/assets/js/diagrams.js"></script>
+  <script src="fixture.js"></script>
+</body>
+</html>

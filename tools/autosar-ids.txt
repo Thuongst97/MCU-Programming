@@ -1,0 +1,4 @@
+# AUTOSAR requirement IDs cited anywhere on the site or in autosar/ (CLAUDE.md rule 13b).
+# One ID per line, copied from the PDF, followed by: document · section/page · date read.
+# Example format (not a real entry):  SWS_Dio_nnnnn  AUTOSAR_CP_SWS_DIODriver R25-11 §8.3.1 p.42  2027-01-15
+# tools/check-site.py rejects any SWS_/SRS_ ID that is not listed here.
