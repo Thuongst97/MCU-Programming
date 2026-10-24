@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: MIT
+# Checks for every change (PLAN.md §10.1). Also called by pages.yml before each deploy.
+# Example builds, Renode tests, host unit tests and static analysis join in Phase 2+.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]   # main is checked by pages.yml, which calls this workflow
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  site-checks:
+    name: Site & tool checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Site consistency (SITE ↔ pages, refs, links, tokens, SPDX, pinned actions)
+        run: python3 tools/check-site.py
+      - name: Embedded code matches its sources
+        run: python3 tools/embed-code.py --check
+      - name: Register data matches the CMSIS header
+        run: python3 tools/check-regs.py
+      - name: Hero art is up to date
+        run: python3 tools/hero-art.py --check
+      - name: Vendored third-party code is intact
+        run: python3 tools/update-third-party.py --check
+      - name: Tool unit tests
+        run: python3 -m unittest discover -s tests/tools -v
+      - name: Runtime unit tests (lib/code.js)
+        run: node --test tests/site/*.test.mjs
+
+  browser-smoke:
+    name: Browser smoke test (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tests/site/package-lock.json
+      - name: Install Playwright
+        working-directory: tests/site
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Every page loads with zero console errors; links and engines work
+        working-directory: tests/site
+        run: npm run smoke
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: tests/site/playwright-report
+          retention-days: 7

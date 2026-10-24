@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+# Keeps SHA-pinned GitHub Actions and the Playwright test dependency current (PLAN.md D9).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+  - package-ecosystem: npm
+    directory: /tests/site
+    schedule: { interval: weekly }
