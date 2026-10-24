@@ -25,8 +25,9 @@ should look or behave, do what that site does.
    documents, ISO summaries, tool manuals. Cite the **document ID + section** in the `R` entry.
    Community sources (forums, vendor schematics) get `kind: "community"` and their claims are
    phrased as "on most boards; check yours".
-4. Pinned versions live **only** in `tools/versions.json`. Pages render them from there. Never type
-   a version number into prose.
+4. Pinned tool and library versions live **only** in `tools/versions.json`. Pages render them from
+   there. Never type a tool version number into prose. (Spec editions are fixed decisions and may be
+   written out: AUTOSAR CP **R25-11**, **MISRA C:2012** numbering.)
 5. Simulation honesty: every example page has a "Simulation fidelity" callout (✅ / ⚠️ / ❌). Never
    imply that Renode reproduces timing, analog values, power, OLED pixels or CAN bit timing.
 6. Known traps that must be taught correctly wherever they come up:
@@ -41,14 +42,27 @@ should look or behave, do what that site does.
 ### Copyright
 7. **MISRA C / AUTOSAR C++14 guidelines are copyrighted.** Cite rule numbers ("MISRA C:2012
    Rule 10.4") and paraphrase the intent in your own words. Never reproduce rule headlines or
-   amplification text. The cppcheck MISRA addon runs without a rule-texts file.
+   amplification text. The cppcheck MISRA addon runs without a rule-texts file. Use **MISRA C:2012
+   numbering including its amendments** everywhere. The newer consolidated edition is mentioned only
+   in the one note on `quality.html#misra`.
 8. AUTOSAR specs: cite document name + requirement ID (`[SWS_Dio_nnnnn]`, copied from the PDF and
    added to `tools/autosar-ids.txt`). Short API signatures are fine. Don't copy prose passages or
    figures; draw our own diagrams.
 9. ST/Arm manuals: no copied figures, tables or long text. Redraw and paraphrase. Register field
    descriptions are written in our words with the RM0008 section cited.
-10. Vendored third-party code (`examples/third_party/`) keeps its licence file and is never edited
-    in place. Record the version in `tools/versions.json`.
+10. Third-party code is **vendored into `third_party/<component>/`**: only the needed subset, the
+    upstream LICENSE unchanged, and a README with the upstream URL, tag, full commit SHA and update
+    command. Never edit it in place; update only with `python3 tools/update-third-party.py <component> <tag>`,
+    which also updates `tools/versions.json`. **No git submodules, no CMake FetchContent**, so a ZIP
+    download builds offline. The only exception is the CubeMX-generated HAL inside
+    `examples/00-bluepill-blink-uart/hal/`.
+10a. **The STM32F103 SVD is not committed** (licence unclear, PLAN.md §2.4). Cortex-Debug uses
+    `.cache/svd/STM32F103.svd` from `tools/fetch-svd.py`. Register-viewer data
+    (`site/assets/js/data/regs-stm32f103.js`) is hand-authored from RM0008, in our own words, and
+    `tools/check-regs.py` must pass (addresses and bit fields match `stm32f103xb.h`).
+10b. Licences: code is **MIT**. Every new code file (C, H, S, ld, CMake, Python, JS, CSS) starts with
+    `SPDX-License-Identifier: MIT`. Prose and diagrams are **CC BY 4.0** (`LICENSE-CONTENT`, stated in
+    the footer).
 
 ### AUTOSAR honesty
 11. Our MCAL/RTE/BSW is **teaching code, not AUTOSAR-conformant**. Every file in `autosar/` and
@@ -58,7 +72,17 @@ should look or behave, do what that site does.
     `<Ma>_ConfigType` + `<Ma>_Init`, MemMap START/STOP pairs, compiler abstraction macros, DET
     for development errors, DEM for production errors, version macros, `MainFunction`s scheduled
     and not called from ISRs, SWCs never include MCAL headers). `tools/check-autosar.py` must pass.
-13. The FreeRTOS-based `Os-shim` is always labelled as **not an AUTOSAR OS**.
+13. The OS used by the AUTOSAR stage is `autosar/os_shim`: an OSEK/AUTOSAR-OS-like API (`ActivateTask`,
+    `TerminateTask`, `SetRelAlarm`, `SetEvent`, `WaitEvent`, `GetResource`, …) over FreeRTOS. It is
+    always labelled **"not a real AUTOSAR OS"**, and its differences table (PLAN.md §8.2) stays
+    accurate. Trampoline is backlog only.
+13a. **AUTOSAR R25-11 is the only release cited.** Where real ECUs (R4.x) differ in an API, file layout,
+    configuration class or behaviour, add an "In production (R4.x)" box:
+    `<div class="callout prod" data-doc="AUTOSAR_SWS_DIODriver R4.4.0">…</div>`. Never re-pin to a new
+    release in passing; that is the separate "R26-11 review" milestone (PLAN.md §11).
+13b. No requirement ID, no claim: every AUTOSAR rule, API, type, error code or behaviour on the site or in
+    `autosar/` cites `AUTOSAR_CP_SWS_*`/`_SRS_*` + requirement ID, listed in `tools/autosar-ids.txt` and
+    logged in `docs/autosar-self-review.md`. Use the AUTOSAR self-review checklist below.
 
 ### Code shown on the site
 14. **Never hand-paste code into a page.** Use
@@ -69,9 +93,32 @@ should look or behave, do what that site does.
     `/* «3» */` (ld), `# «3»` (CMake/tcl/robot). Notes go in the page script as
     `NOTES = { 3: ["Title", "html explanation"] }`.
 17. "Bad" code in bad-vs-good comparisons must also compile (warnings allowed only where noted).
-18. Firmware style: C11, `-Wall -Wextra -Werror` for our code, `.clang-format` in repo, CMSIS device
-    header names (`RCC->CFGR`, `RCC_CFGR_SW_PLL`), no dynamic allocation, no recursion, fixed-width
-    types (`uint32_t`) outside AUTOSAR BSW (which uses `uint32` etc.).
+18. Firmware style: C11, `-Wall -Wextra -Werror` for our code, `.clang-format` in repo, no dynamic
+    allocation, no recursion, fixed-width types (`uint32_t`) outside AUTOSAR BSW (which uses `uint32` etc.).
+19. **Plain registers through the CMSIS device header** (`stm32f103xb.h` from `third_party/cmsis_device_f1`)
+    are the main style: `RCC->CFGR`, `RCC_CFGR_SW_PLL`, `(2U << FLASH_ACR_LATENCY_Pos)`. **Never hand-type
+    a peripheral address or a magic bit value** in firmware. Teaching snippets that show the raw address
+    are labelled "what the macro expands to".
+20. HAL appears **only** in `setup.html` (path A, side-by-side comparison, `examples/00-…/hal/`). LL appears
+    **only** in Appendix D (`ll-drivers.html`, `examples/00-…/ll/`). Neither becomes a parallel track.
+21. Startup code is **C** (`startup.c` / `examples/common/startup/startup_stm32f103.c`). ST's assembly
+    startup is shown once, on `boot.html#c-vs-asm`, as a comparison.
+22. Build system: **CMake + Ninja only**. No Makefiles anywhere. What CMake generates is explained once,
+    on `setup.html#cmake-under-hood`.
+23. Tests: **Unity** (+ **CMock** only when a test needs mocks) driven by **CMake/CTest**. No Ceedling, so no
+    Ruby in CI (the CMock generator may need Ruby on the author's machine; commit the generated mocks).
+    The Playwright smoke test (`tests/site/smoke.spec.mjs`) must pass: every page loads with zero
+    console errors.
+
+### CI
+24. Every GitHub Action is pinned by **full commit SHA with the version as a comment**
+    (`uses: actions/checkout@<sha> # v4.2.2`). Dependabot (`.github/dependabot.yml`) proposes updates;
+    never replace a SHA with a tag.
+
+### UI text
+25. English only. **All UI strings** (nav, placeholders, buttons, pager, footer, engine labels) live in
+    `site/assets/js/strings.js` (`window.MCU_STRINGS`). `core.js` and engines never hard-code
+    user-visible text. Don't build any other i18n machinery.
 
 ## Content style guide
 
@@ -88,7 +135,8 @@ should look or behave, do what that site does.
   5. **official references** via `REFS[pageId]`, with at least 3 primary sources;
   6. for hands-on modules, a **"You are done when…"** checklist.
 - **Callouts:** `analogy` (🎭 or a fitting icon), `note` (background/new info), `tip`
-  (practical shortcut), `warn` (can damage hardware, lock you out, or silently break).
+  (practical shortcut), `warn` (can damage hardware, lock you out, or silently break), `prod`
+  (🏭 "In production (R4.x)", AUTOSAR pages only, needs `data-doc`).
 - **Numbers:** always with units and the condition (`36 MHz max on APB1`, `~3 mA sink on PC13`).
   Hex in C style (`0x40021004`), registers in `code`.
 - **Hypothetical data** (CAN IDs, DIDs, DTCs) is marked "hypothetical" in text and in the footer
@@ -115,6 +163,27 @@ should look or behave, do what that site does.
 | Images | `site/assets/img/<page-id>-<what>.webp`, ≤ 150 KB, with `alt` text | `setup-swd-wiring.webp` |
 | Reference keys (`R`) | camelCase, doc-oriented | `rm0008Rcc`, `ds5319Pins`, `swsDio` |
 
+## AUTOSAR self-review checklist
+Run this for every AUTOSAR page (modules 18–23, 26) and every file in `autosar/` and
+`capstone/turnlight/stage3-autosar/` before the change is merged. Record the result in
+`docs/autosar-self-review.md`.
+
+- [ ] Every rule, API signature, type, error code, config parameter and behaviour has a citation:
+      `AUTOSAR_CP_SWS_<Module>` / `_SRS_<Name>` (R25-11) + requirement ID copied from the PDF.
+- [ ] Every cited ID is in `tools/autosar-ids.txt` with document, section/page and the date it was read.
+- [ ] API names, parameter order, parameter types and return types match the SWS exactly
+      (`Std_ReturnType`, `const <Ma>_ConfigType*`, …). Unsupported APIs are listed as such, never stubbed silently.
+- [ ] Module ID, vendor ID and AR release version macros are present and consistent with the BSW module list.
+- [ ] DET error IDs and API IDs use the SWS values; production errors go to DEM, not DET.
+- [ ] MemMap START/STOP pairs are balanced and section names follow SWS_MemoryMapping.
+- [ ] Compiler abstraction macros are used in BSW signatures as defined for R25-11.
+- [ ] SWCs include only `Rte_<Swc>.h`, never BSW or MCAL headers; RTE API names follow SWS_RTE.
+- [ ] The file banner states the spec reference and GENERATED / VENDOR-SUPPLIED / HAND-WRITTEN in production.
+- [ ] Anything simplified ("-lite") says what was left out and why.
+- [ ] Where R4.x differs, an "In production (R4.x)" box names the R4.x document.
+- [ ] `tools/check-autosar.py` and the cppcheck MISRA job pass, and every suppression references a deviation record.
+- [ ] No sentence or figure is copied from an AUTOSAR document (paraphrase; our own diagrams).
+
 ## How to add a new module
 
 1. **Check PLAN.md §3**: the module's id, number, group, sections and design sheet row. If you need
@@ -133,11 +202,11 @@ should look or behave, do what that site does.
    one planned; otherwise propose it in PLAN.md first.
 7. References: add `R` entries (`{ t, url, doc, rev, sec, kind }`) and list them in `REFS[<id>]`.
 8. Glossary: add every new term to `glossary-data.js` (`{term, cat, full, desc}`); diagram tooltips
-   pick them up automatically.
+   pick them up automatically. New UI labels (buttons, engine labels) go into `strings.js`, not the engine.
 9. Run the local checks:
-   `python3 tools/embed-code.py --check && python3 tools/check-site.py && node --test tests/site/`
+   `python3 tools/embed-code.py --check && python3 tools/check-site.py && python3 tools/check-regs.py && node --test tests/site/ && npm --prefix tests/site run smoke`
    and open the page through a local server (`python3 -m http.server -d site`) in both themes and at
-   mobile width. Expect zero console errors.
+   mobile width. Expect zero console errors. For AUTOSAR pages, also complete the self-review checklist above.
 10. Commit with a message like `module 05 gpio: sections model…swj, example 01 regions`.
 
 ## How to add a new example
@@ -146,18 +215,23 @@ should look or behave, do what that site does.
    `wiring.svg` (export from the pinout engine), `renode/NN.resc` + `test/NN.robot` if simulatable,
    `test/` host tests if there is pure logic.
 2. Use `examples/common/` (startup, linker, BSP, OpenOCD cfgs, Renode overlay). Don't copy them,
-   except example 00, which owns its startup + linker on purpose for teaching.
+   except example 00, which owns its startup + linker on purpose for teaching. Include third-party code
+   only from `third_party/` via the shared CMake helpers. If a new component is needed, vendor it with
+   `tools/update-third-party.py` first.
 3. Add the example to the catalog: `python3 tools/gen-catalog.py`.
 4. Validate it on real hardware before marking `tested_on`.
 
 ## Local commands (once Phase 1–2 exist)
 ```sh
 python3 -m http.server -d site 8000                      # preview the site
+python3 tools/fetch-svd.py                               # SVD for Cortex-Debug → .cache/svd/ (not committed)
 cmake --preset bluepill-debug -S examples/00-bluepill-blink-uart/bare && cmake --build --preset bluepill-debug
 cmake --build build --target flash                       # OpenOCD + bluepill.cfg
 renode-test examples/00-bluepill-blink-uart/bare/test/00.robot
 cmake --preset host-tests && ctest --preset host-tests
-python3 tools/embed-code.py && python3 tools/check-site.py
+python3 tools/embed-code.py && python3 tools/check-site.py && python3 tools/check-regs.py
+npm ci --prefix tests/site && npm --prefix tests/site run smoke   # Playwright smoke test
+python3 tools/update-third-party.py freertos_kernel V11.3.2      # re-vendor a component
 ```
 
 ## Git

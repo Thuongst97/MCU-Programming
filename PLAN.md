@@ -4,7 +4,8 @@
 > to AUTOSAR-structured automotive firmware, with every example running on one cheap board:
 > the **STM32F103C8T6 "Blue Pill"** programmed through an **ST-Link V2** over SWD.
 
-Status: **plan only** (no lesson content or example code yet). Written 2026-10-24.
+Status: **plan approved, all former open questions decided (§12.2).** No lesson content or example
+code yet; Phase 1 starts only when the owner says "go". Written and decided 2026-10-24.
 Companion file: [`CLAUDE.md`](CLAUDE.md) (rules for future authoring sessions).
 
 ---
@@ -20,15 +21,19 @@ Companion file: [`CLAUDE.md`](CLAUDE.md) (rules for future authoring sessions).
   signal-flow walkthrough reuse the existing layered renderer and sequence engine.
 - **Code on the site is never hand-pasted.** It lives in `examples/`, compiles in CI, and gets
   inlined into pages by `tools/embed-code.py`. CI fails if a page drifts from the source.
-- **26 modules in 6 groups + 4 reference pages.** MVP = landing page + Module 02 "Setting Up and
+- **26 modules in 6 groups + 5 reference pages** (incl. a short LL-drivers appendix). MVP = landing page + Module 02 "Setting Up and
   Running a Program on STM32F103C8T6 Blue Pill" + Troubleshooting + Board reference, with examples
   00–02 building in CI and running in Renode.
 - **AUTOSAR honestly:** AUTOSAR Classic **R25-11** (latest release; R24-11 is superseded) is the
-  pinned spec. MCAL, RTE and BSW-lite are hand-written to SWS API signatures. Every file is labelled
-  *generated-in-production* or *hand-written-in-production*.
+  pinned spec for every citation. MCAL, RTE and BSW-lite are hand-written to SWS API signatures. Every
+  file is labelled *generated-in-production* or *hand-written-in-production*. An "In production (R4.x)"
+  box appears wherever real ECUs differ. R26-11 becomes a review milestone, not an automatic re-pin.
 - **Simulator:** Renode 1.17.0 is the only viable no-hardware path. It needs a project-owned
   platform overlay, because the stock `stm32f103.repl` has no RCC model. That would hang a naive
   PLL-switch loop. QEMU is not an option (see §7.4).
+- **Decided stack (§12.2):** plain registers through the CMSIS device header, C startup, CMake + Ninja
+  only, Unity (+ CMock) on CTest, a Playwright smoke test in CI, MIT for code and CC BY 4.0 for prose,
+  Actions pinned by SHA with Dependabot, and third-party code vendored into `third_party/`.
 
 ---
 
@@ -97,7 +102,7 @@ I studied `aaos14-academy/` at commit `0ac7026`. It has 13 pages, `assets/css/ma
 
 | Area | Reuse as-is | Adapt | New |
 |---|---|---|---|
-| Layout runtime (header, sidebar, pager, footer, search, scrollspy, tabs, tooltips, soft breaks) | ✅ logic | Namespace `window.AAOS` → `window.MCU`. Nav links + footer from a `NAV` config. Brand "MCU Academy · Automotive Firmware Handbook", mark "F1". Search placeholder "Search: NVIC, CAN_BTR, Rte_Write…". | — |
+| Layout runtime (header, sidebar, pager, footer, search, scrollspy, tabs, tooltips, soft breaks) | ✅ logic | Namespace `window.AAOS` → `window.MCU`. Nav links + footer from a `NAV` config. Brand "MCU Academy · Automotive Firmware Handbook", mark "F1". Search placeholder "Search: NVIC, CAN_BTR, Rte_Write…". | **`strings.js`**: every UI string (nav labels, placeholders, button labels, pager, footer, engine labels) lives in one `window.MCU_STRINGS` object, so a translation is possible later without i18n infrastructure (D10). |
 | Theme | ✅ mechanism | Storage keys `mcu-theme`, `mcu-code-lang`. New accent palette (§2.2). | — |
 | References (`R` / `REFS`) | ✅ | Each entry gains a doc ID + revision + section: `[title, url, {doc:"RM0008", rev:"21", sec:"7.3.2"}]`, rendered as a badge. | Source kinds: `st`, `arm`, `autosar`, `iso`, `tool`, `community` (community sources get a visible "community" badge). |
 | Highlighter | ✅ tokenizer | — | Languages `c`, `asm` (GNU as, Thumb-2), `ld`, `cmake`, `sh`/`console`, `tcl` (OpenOCD), `resc`/`repl` (Renode), `robot`, `arxml` (= xml), `yaml`, `json`. |
@@ -106,7 +111,7 @@ I studied `aaos14-academy/` at commit `0ac7026`. It has 13 pages, `assets/css/ma
 | Layered renderer `D.layered` | ✅ | The "Treble" band type generalises to a "boundary band" (used for the **RTE** line and the **MCAL ↔ hardware** line). Tone map for AUTOSAR layers. | AUTOSAR BSW explorer spec (§9.6). |
 | Cabin topology | ✗ drop | — | Replaced by the Blue Pill board viewer. |
 | Glossary | ✅ | Categories: `core, memory, toolchain, debug, peripheral, bus, rtos, autosar, diag, safety, quality`. | — |
-| Landing pattern | ✅ | Hero stack = the 5 AUTOSAR-ish layers (App SWC · RTE · BSW services · ECU abstraction · MCAL), each linking into a module. | 30-second model: "reset → vector table → `Reset_Handler` → `main` → peripherals via registers". |
+| Landing pattern | ✅ | Hero title stays board-agnostic ("MCU Academy"); the **hero subtitle states the focus**: "Every example runs on an STM32F103C8T6 Blue Pill and a ST-Link V2" (D1). Hero stack = the 5 AUTOSAR-ish layers (App SWC · RTE · BSW services · ECU abstraction · MCAL), each linking into a module. | 30-second model: "reset → vector table → `Reset_Handler` → `main` → peripherals via registers". |
 | Hero art | concept only | `tools/hero-art.py` re-written with the same iso helpers (`P`, `plane`, `box`). | **Concept:** an isometric Blue Pill PCB (yellow BOOT jumpers, PC13 LED glowing, 4-pin SWD header with an ST-Link cable) with translucent panes above it for the software layers, and a light column rising from the MCU die through MCAL → RTE → SWC. A second Blue Pill sits behind it, linked by a twisted-pair CAN cable through two SN65HVD230 modules. |
 | CI | ✅ stamping step | Artifact root `site/`. Examples copied to `_site/examples/`. | Build, host tests, Renode tests, static analysis, embed check, link check (§10). |
 
@@ -118,13 +123,16 @@ I studied `aaos14-academy/` at commit `0ac7026`. It has 13 pages, `assets/css/ma
 MCU-Programming/
 ├── README.md                     # what this is, how to preview locally, how to build examples
 ├── PLAN.md  CLAUDE.md
-├── LICENSE                       # see open question Q12 (code vs content licensing)
+├── LICENSE                       # MIT: all code (examples/, autosar/, capstone/, tools/, tests/, site JS/CSS)
+├── LICENSE-CONTENT               # CC BY 4.0: prose and diagrams on the site (D9)
 ├── CMakePresets.json             # presets: bluepill-debug, bluepill-release, host-tests
-├── .clang-format  .editorconfig
-├── .github/workflows/
-│   ├── ci.yml                    # PR + push: examples, host tests, renode tests, site checks
-│   ├── pages.yml                 # push to main: stamp __BUILD__, assemble _site, deploy
-│   └── links-weekly.yml          # scheduled external link check (non-blocking)
+├── .clang-format  .editorconfig  .gitignore   # .gitignore: build/, .cache/ (downloaded SVD), node_modules/
+├── .github/
+│   ├── dependabot.yml            # weekly: github-actions + npm (tests/site) (D9)
+│   └── workflows/                # every action pinned by full commit SHA + "# vX.Y.Z" comment
+│       ├── ci.yml                # PR + push: examples, host tests, renode, static analysis, site checks, browser smoke
+│       ├── pages.yml             # push to main: stamp __BUILD__, assemble _site, deploy
+│       └── links-weekly.yml      # scheduled external link check (non-blocking)
 ├── site/                         # ← deployed to GitHub Pages (artifact root)
 │   ├── index.html
 │   ├── fundamentals.html  setup.html  boot.html  clocks.html  gpio.html  interrupts.html
@@ -133,12 +141,13 @@ MCU-Programming/
 │   ├── autosar-arch.html  autosar-swc.html  autosar-mcal.html  autosar-os-com.html
 │   ├── autosar-diag-nvm.html  autosar-review.html
 │   ├── capstone-baremetal.html  capstone-rtos.html  capstone-autosar.html
-│   ├── glossary.html  troubleshooting.html  board.html  automotive-mcus.html
+│   ├── board.html  troubleshooting.html  automotive-mcus.html  ll-drivers.html  glossary.html
 │   ├── assets/css/main.css
+│   ├── assets/js/strings.js      # every UI string in one place (window.MCU_STRINGS), loaded first
 │   ├── assets/js/core.js  diagrams.js  glossary-data.js
 │   ├── assets/js/engines/        # pinout.js regview.js clocktree.js waveform.js memmap.js
 │   │                             # statemachine.js compare.js checklist.js calc.js
-│   ├── assets/js/data/           # bluepill-pins.js regs-stm32f103.js autosar-bsw.js
+│   ├── assets/js/data/           # bluepill-pins.js, regs-stm32f103.js (hand-authored from RM0008, §2.4), autosar-bsw.js
 │   ├── assets/js/pages/          # one file per page that needs custom wiring
 │   ├── assets/data/memmap/       # generated per-example memory maps (committed, CI-checked)
 │   └── assets/img/               # photos of real wiring (WebP, ≤150 KB each), favicon
@@ -153,19 +162,13 @@ MCU-Programming/
 │   │   ├── openocd/bluepill.cfg           # interface stlink + target stm32f1x + FLASH_SIZE 0x10000
 │   │   ├── openocd/bluepill-clone.cfg     # same + CPUTAPID 0x2ba01477
 │   │   └── renode/bluepill.repl           # overlay on platforms/cpus/stm32f103.repl (§7.3)
-│   ├── third_party/              # vendored, pinned (see tools/versions.json)
-│   │   ├── cmsis_core/           # ARM-software/CMSIS_6 v6.4.0 — Core/Include only (Apache-2.0)
-│   │   ├── cmsis_device_f1/      # STMicroelectronics/cmsis-device-f1 v4.3.5 (Apache-2.0)
-│   │   ├── stm32f1xx_hal/        # from STM32CubeF1 v1.8.7 (BSD-3-Clause) — used only by 00/hal
-│   │   ├── freertos_kernel/      # FreeRTOS-Kernel V11.3.x (MIT) — used from example 10 on
-│   │   ├── unity/                # ThrowTheSwitch/Unity v2.7.0 (MIT) — host tests
-│   │   └── svd/STM32F103.svd     # for Cortex-Debug + tools/svd2js.py (licence: Q11)
 │   ├── 00-bluepill-blink-uart/
 │   │   ├── README.md  wiring.svg  expected-output.txt
-│   │   ├── bare/                 # CMakeLists.txt, src/main.c, src/startup.c, ld/…, renode/00.resc, test/00.robot
-│   │   └── hal/                  # CubeMX .ioc + generated CMake project (committed, CI-built)
+│   │   ├── bare/                 # CMakeLists.txt, src/main.c, src/startup.c (C), ld/…, renode/00.resc, test/00.robot
+│   │   ├── hal/                  # CubeMX .ioc + generated CMake project incl. its Drivers/ (HAL, BSD-3, licence files kept)
+│   │   └── ll/                   # tiny LL variant for Appendix D; reuses hal/Drivers LL headers
 │   ├── 01-exti-button-debounce/ …  12-uart-bootloader/   (catalog §5)
-│   └── 13-lin-two-nodes/         # optional, see Q8
+│   └── 13-lin-two-nodes/         # optional, late phase (Phase 8), not part of the MVP (D6)
 ├── capstone/turnlight/
 │   ├── docs/requirements.md  architecture.md  can-matrix.md  acceptance-tests.md
 │   ├── stage1-baremetal/  stage2-freertos/  stage3-autosar/
@@ -175,15 +178,33 @@ MCU-Programming/
 │   ├── mcal/{Mcu,Port,Dio,Pwm,Adc,Gpt,Wdg,Can}/      # each: <Ma>.h <Ma>.c <Ma>_Cfg.h <Ma>_PBcfg.c
 │   ├── ecual/{IoHwAb,CanIf,WdgIf}/
 │   ├── services/{Det,Dem,Com,PduR,EcuM,WdgM,NvM,Fee,Dcm}/   # deliberately reduced ("-lite"), labelled
+│   ├── os_shim/                  # OSEK/AUTOSAR-OS-like API over FreeRTOS: NOT an AUTOSAR OS (§8.2)
 │   ├── rte/                      # hand-written RTE that mirrors generated code
 │   └── arxml/                    # minimal SWC/interface descriptions used by tools/rte-gen (Phase 6+)
+├── third_party/                  # vendored, pinned, never edited in place; no submodules (§2.3, D12)
+│   ├── README.md                 # table: component · version · upstream URL · commit · licence · update command
+│   ├── cmsis_core/               # ARM-software/CMSIS_6 — CMSIS/Core/Include only (Apache-2.0)
+│   ├── cmsis_device_f1/          # STMicroelectronics/cmsis-device-f1 — Include/ only (Apache-2.0)
+│   ├── freertos_kernel/          # FreeRTOS/FreeRTOS-Kernel — core + portable/GCC/ARM_CM3 + MemMang/heap_4 (MIT)
+│   ├── unity/                    # ThrowTheSwitch/Unity — src/ (MIT)
+│   └── cmock/                    # ThrowTheSwitch/CMock — added only when the first test needs mocks (MIT)
+├── tests/site/                   # site tests (the only npm usage in the repo)
+│   ├── package.json  package-lock.json   # devDependency @playwright/test, exact version
+│   ├── *.test.mjs                # node --test: engine math (CRC-15, bit timing, clock tree, BRR)
+│   └── smoke.spec.mjs            # Playwright: every page loads, zero console errors, both themes
+├── docs/                         # project docs, not deployed
+│   ├── spikes.md                 # Phase-0 findings
+│   ├── beta-feedback-template.md # §11.1
+│   └── autosar-self-review.md    # Phase-6 log: one row per AUTOSAR rule/API shown on the site (§8.5)
 └── tools/
     ├── versions.json             # single source of truth for every pinned tool version (§6.1)
     ├── hero-art.py               # iso hero SVG (paste into site/index.html, as in the reference)
     ├── embed-code.py             # inline examples/ sources into site pages; --check mode for CI
     ├── check-site.py             # SITE ↔ HTML ids, REFS completeness, assets exist, no TODO, sizes
     ├── elf2memmap.py             # ELF → site/assets/data/memmap/<example>.json (uses arm-none-eabi-readelf/nm)
-    ├── svd2js.py                 # SVD subset → site/assets/js/data/regs-stm32f103.js
+    ├── check-regs.py             # cross-checks hand-authored register data against third_party/cmsis_device_f1 (_Pos/_Msk, base addresses)
+    ├── fetch-svd.py              # downloads STM32F103.svd into .cache/svd/ for Cortex-Debug (not committed, §2.4)
+    ├── update-third-party.py     # re-vendors one component at a tag: copies the subset, LICENSE, rewrites README + versions.json
     ├── gen-catalog.py            # examples/*/README front-matter → examples/README.md + site data
     ├── new-module.py             # scaffold page html + page js + SITE stub + REFS stub
     └── rte-gen/                  # (Phase 6, optional) tiny ARXML-subset → Rte_<Swc>.h generator
@@ -193,8 +214,7 @@ MCU-Programming/
 
 A neutral folder name keeps URLs short (`…github.io/MCU-Programming/setup.html`). It also leaves
 room for `examples/`, `autosar/` and `capstone/` beside it. `pages.yml` copies `site/` to `_site/`
-and adds `examples/` so pages can link to raw sources and downloadable folders. (Open question Q1
-covers the name.)
+and adds `examples/` so pages can link to raw sources and downloadable folders. (Decided: D1.)
 
 ### 2.2 Visual identity (adapt)
 
@@ -208,6 +228,45 @@ covers the name.)
 - Consolidation rule: one `:root` dark block, one `:root[data-theme="light"]` block, and one
   `@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {…} }` block. No other
   file may redefine tokens.
+
+### 2.3 Third-party code policy (D12)
+
+- Everything the firmware or tests compile from outside this repo is **vendored** into `third_party/`,
+  so a GitHub ZIP download builds offline with no extra steps. There are no git submodules and no
+  CMake `FetchContent`.
+- Each component folder holds the upstream **LICENSE** file unchanged and a `README.md` with the upstream
+  URL, tag, full commit SHA, the subset copied, and the update command.
+- Only the needed subset is vendored (headers for CMSIS; `portable/GCC/ARM_CM3` + `MemMang/heap_4.c` for
+  FreeRTOS; `src/` for Unity). Files are never edited in place. Project-specific config
+  (`FreeRTOSConfig.h`, `unity_config.h`) lives next to the example that uses it.
+- `tools/update-third-party.py <component> <tag>` re-vendors a component, rewrites its README and
+  `tools/versions.json`, and prints the diff summary. CI checks that every folder has LICENSE + README
+  and that versions match `versions.json`.
+- Exception: the HAL used by `00-bluepill-blink-uart/hal/` stays inside that folder exactly as CubeMX
+  generated it, with ST's licence files, because the point of that path is to show what the vendor
+  tool produces.
+
+### 2.4 SVD and register data (D8)
+
+Licence check (2026-10-24, from the two public GitHub copies; st.com itself was not reachable):
+
+| Source | Licence found | Notes |
+|---|---|---|
+| `cmsis-svd/cmsis-svd-data` → `data/STMicro/STM32F103xx.svd` (SVD v1.3) | **ST "End User License Agreement" (Version 1.0)** in `data/STMicro/License.html`: non-transferable licence to use and copy only for developing development tools or for "derivative representations" to develop and debug software for ST devices | Restrictive and purpose-limited |
+| `modm-io/cmsis-svd-stm32` → `stm32f1/STM32F103.svd` (SVD v1.1, F1 package v1.2) | Repo README says the SVDs are "licensed as Apache-2.0", downloaded from ST's homepage; repo `LICENSE.md` is Apache-2.0 | The SVD file itself has **no licence header**, and the claim contradicts the ST EULA above |
+| ST CMSIS pack (`Keil.STM32F1xx_DFP`) / st.com download | not checked (st.com blocked by this session's network policy) | |
+
+**Result: unclear, so the SVD is not committed.** Instead:
+1. `tools/fetch-svd.py` downloads it in the setup step into `.cache/svd/STM32F103.svd` (gitignored),
+   with a checksum pinned in `tools/versions.json`. It tries ST's download first and the modm-io copy at a
+   pinned commit as a fallback. The setup page tells learners to run it and why it isn't in the repo.
+   Cortex-Debug's `svdFile` points there.
+2. The site's register viewer data (`regs-stm32f103.js`) is **hand-authored from RM0008** for only the
+   registers we actually teach, with field descriptions in our own words and RM0008 section numbers.
+   `tools/check-regs.py` verifies every address, bit position and width against the Apache-2.0
+   `stm32f103xb.h` from cmsis-device-f1, so the hand-authored data can't drift from ST's headers.
+3. Revisit if ST's own download page states Apache-2.0 for the F1 SVD. Then vendor it into
+   `third_party/svd/` with attribution and keep the hand-authored descriptions.
 
 ---
 
@@ -243,6 +302,7 @@ const SITE = [
       ["paths", "Two build paths compared", "stm32cubeide cubemx hal bare metal cmake registers"],
       ["path-cube", "Path A: STM32CubeIDE + HAL", "cubemx ioc hal_gpio_togglepin generated code"],
       ["path-bare", "Path B: bare-metal CMake from scratch", "startup vector table linker script systeminit reset_handler"],
+      ["cmake-under-hood", "What CMake generates under the hood", "cmake ninja build.ninja toolchain file compile_commands.json gcc flags"],
       ["blink", "Blink PC13 (active-low)", "pc13 led active low gpioc crh odr bsrr"],
       ["clock-72", "From HSI 8 MHz to PLL 72 MHz", "hse pll x9 flash latency wait states rcc_cfgr sws"],
       ["uart-hello", "\"Hello from Blue Pill\" over USART1", "usart1 pa9 pa10 brr 115200 usb uart"],
@@ -565,7 +625,15 @@ const SITE = [
       ["mapping", "Lesson mapping table", "s32k aurix rh850 mapping"],
       ["vendor-mcal", "Vendor MCAL and tools", "rtd mcal tresos davinci"],
     ] },
-  { id: "glossary", file: "glossary.html", num: "D", group: "Reference",
+  { id: "ll-drivers", file: "ll-drivers.html", num: "D", group: "Reference",
+    title: "Appendix: ST's LL Drivers", short: "LL Drivers", icon: "📚", accent: "#94a3b8",
+    desc: "What ST's Low-Layer drivers are, how they map onto the registers you already know, and when a team picks registers, LL or HAL.",
+    sections: [
+      ["what-ll", "What LL is (and isn't)", "ll low layer drivers stm32f1xx_ll inline functions"],
+      ["side-by-side", "Registers vs LL side by side", "ll_gpio_setpinmode ll_rcc ll_usart registers comparison"],
+      ["choosing", "Registers, LL or HAL?", "hal ll registers trade-off portability code size"],
+    ] },
+  { id: "glossary", file: "glossary.html", num: "E", group: "Reference",
     title: "Glossary", short: "Glossary", icon: "📖", accent: "#94a3b8",
     desc: "Quick reference for MCU, toolchain, bus and AUTOSAR terms.",
     sections: [["glossary", "Glossary of terms", "glossary terms"]] },
@@ -599,7 +667,7 @@ re-checked against the current PDF revisions in Phase 0 (📄).
 | 14 FreeRTOS | Decide bare-metal vs RTOS; explain PendSV switch; use queues/mutexes; respect `configMAX_SYSCALL_INTERRUPT_PRIORITY` | 06, 13 | Task-state machine; context-switch sequence diagram; scheduler timeline | 12-freertos | RTOS = **air-traffic control** for many planes sharing one runway | FreeRTOS kernel docs (RTOS-Cortex-M3-M4 page); PM0056 §2.3.3 PendSV |
 | 15 Faults & debug | Decode CFSR/HFSR; recover the faulting PC; log across reset | 06 | Register viewer (`SCB_CFSR` with UFSR/BFSR/MMFSR breakdown); fault escalation diagram | 09-iwdg-fault | Fault handler = **flight data recorder** | PM0056 §4.4.10–4.4.15; DDI 0403 B1.5.6 |
 | 16 Bootloaders | Use the system bootloader; split flash; relocate VTOR; jump safely | 03, 06 | Flash-partition memmap; jump sequence | 13-uart-bootloader | Bootloader = **airport transfer desk** that checks your ticket (CRC) before letting you board (jump) | AN2606 (system memory boot mode); AN3155 (USART bootloader protocol); PM0075 (STM32F10xxx flash programming manual); PM0056 §4.4.4 VTOR |
-| 17 Quality | Write host tests; add a link seam; run cppcheck+MISRA addon; write a deviation | 08 | Bad-vs-good comparisons; test-pyramid diagram | tests in 04, 05; static analysis in CI | MISRA = **traffic code**: most rules prevent the crashes people really had | Unity docs; Cppcheck manual (MISRA addon); MISRA C:2012 (cite rule numbers only) |
+| 17 Quality | Write host tests (Unity, CMock when mocks are needed); add a link seam; run cppcheck+MISRA addon; write a deviation | 08 | Bad-vs-good comparisons; test-pyramid diagram | tests in 04, 05; static analysis in CI | MISRA = **traffic code**: most rules prevent the crashes people really had | Unity + CMock docs; Cppcheck manual (MISRA addon); MISRA C:2012 incl. Amendments (rule numbers only) + one note on the newer consolidated edition (D10) |
 | 18 AUTOSAR arch | Name every layer and what lives there; explain methodology & ARXML; separate generated vs hand-written | 14, 17 | **AUTOSAR layered explorer** (`D.layered`), methodology flow | none (reading) | AUTOSAR = **standardised shipping containers**: any crane (ECU vendor) can lift any box (SWC) | AUTOSAR_CP_EXP_LayeredSoftwareArchitecture; AUTOSAR_CP_TR_Methodology; AUTOSAR_CP_TR_BSWModuleList (all R25-11) |
 | 19 SWCs & RTE | Model a SWC with ports & runnables; read RTE contract headers | 18 | Port/interface diagram; RTE call sequence | capstone stage 3 (SWC + RTE parts) | RTE = **switchboard operator** connecting extensions without callers knowing where the other phone is | AUTOSAR_CP_SWS_RTE; AUTOSAR_CP_TPS_SoftwareComponentTemplate |
 | 20 MCAL | Write a module that follows SWS naming, types, config, MemMap, DET | 18, 05–12 | Bad-vs-good gallery; module file anatomy; DET call sequence | `autosar/mcal/*` | MCAL = **universal power adapter**: same plug on top, chip-specific pins underneath | AUTOSAR_CP_SWS_DIODriver, _PortDriver, _PWMDriver, _ADCDriver, _GPTDriver, _WatchdogDriver, _CANDriver, _StandardTypes, _PlatformTypes, _CompilerAbstraction, _MemoryMapping, _DefaultErrorTracer |
@@ -610,6 +678,7 @@ re-checked against the current PDF revisions in Phase 0 (📄).
 | A Board | Read pinout; know quirks | — | **Pinout viewer** (all modes) | — | — | DS5319; RM0008; community schematic (labelled) |
 | B Troubleshooting | Fix the top-10 failures | — | decision tree (simple click-through) | — | — | OpenOCD manual; AN2606; DS5319 |
 | C Automotive MCUs | Map lessons to S32K1/AURIX/RH850 | 18 | mapping table | — | — | vendor product pages / reference manuals (titles only) |
+| D LL drivers | Read LL code and map it to registers; know the trade-offs | 05, 08 | Registers ⇄ LL tabs (lang-switch) | 00 `ll/` | LL = **a thin glove**: you still feel every register, but you don't touch the bits bare-handed | UM1850 (STM32F1 HAL and LL drivers user manual) 📄; STM32CubeF1 sources |
 
 ---
 
@@ -742,7 +811,7 @@ it. Low power comes before FreeRTOS so bare metal finishes first. The bootloader
 
 | # | Folder | Modules | Peripherals | Flavor | Hardware beyond Blue Pill + ST-Link | Learner observes | Renode |
 |---|---|---|---|---|---|---|---|
-| 00 | `00-bluepill-blink-uart` (`bare/`, `hal/`) | 02, 03, 04, 05 | GPIOC, RCC, FLASH, USART1 | bare + HAL | USB-UART (3.3 V) | PC13 blinks at 1 Hz on HSI, then visibly faster after switching to 72 MHz with the same delay loop; then a SysTick-based 1 Hz blink; `Hello from Blue Pill @ 72 MHz` at 115200 | ✅ UART text + LED state via Robot. ⚠️ The **speed-up is not reproduced**: Renode's SysTick frequency and instruction rate don't follow RCC |
+| 00 | `00-bluepill-blink-uart` (`bare/`, `hal/`, `ll/`) | 02, 03, 04, 05, D | GPIOC, RCC, FLASH, USART1 | bare + HAL (+ LL for Appendix D) | USB-UART (3.3 V) | PC13 blinks at 1 Hz on HSI, then visibly faster after switching to 72 MHz with the same delay loop; then a SysTick-based 1 Hz blink; `Hello from Blue Pill @ 72 MHz` at 115200 | ✅ UART text + LED state via Robot. ⚠️ The **speed-up is not reproduced**: Renode's SysTick frequency and instruction rate don't follow RCC |
 | 01 | `01-exti-button-debounce` | 05, 06 | GPIO, AFIO, EXTI, NVIC | bare | button on PA0 → GND | press toggles LED; bounce counter printed raw vs debounced | ✅ `Button` peripheral pressed from Robot; bounce not simulated |
 | 02 | `02-systick-scheduler` | 06 | SysTick | bare | — | 3 tasks at 10/100/500 ms; load % printed | ✅ timing in virtual time |
 | 03 | `03-tim-pwm-dimming` | 07 | TIM2 CH1 (PA0) / TIM3 CH1 (PA6) | bare | LED + 330 Ω on PA6 | breathing LED; duty printed | ⚠️ timer registers yes, PWM pin waveform only via GPIO state logs |
@@ -755,7 +824,7 @@ it. Low power comes before FreeRTOS so bare metal finishes first. The bootloader
 | 10 | `10-freertos-basics` | 14 | SysTick, PendSV, USART1 | RTOS | — | 3 tasks, queue, mutex-protected UART, stack high-water marks | ✅ |
 | 11 | `11-can-two-nodes` | 12 | bxCAN (PB8/PB9 remap) | bare | 2× SN65HVD230, 2nd Blue Pill, twisted pair, 120 Ω ×2 | loopback first; then node A button → node B LED; error counters printed when the bus is unplugged | ⚠️ `STMCAN` + Renode `CANHub` between two machines: frame level only. **No bit timing, no transceiver, no error frames** |
 | 12 | `12-uart-bootloader` | 16 | FLASH, USART1, SCB VTOR | bare | USB-UART | bootloader at 0x08000000 (16 KB), app at 0x08004000; upload via a Python script; CRC check; jump | ✅ flash writes need an F1 FLASH controller stub (spike) |
-| 13 | `13-lin-two-nodes` *(optional, Q8)* | 08, 12 | USART LIN mode | bare | 2nd Blue Pill, diode + 1 kΩ pull-up "logic-level LIN" (no 12 V transceiver) | master schedule table, slave response, break detection | ⚠️ UART-level only |
+| 13 | `13-lin-two-nodes` *(optional, Phase 8)* | 08, 12 | USART LIN mode | bare | 2nd Blue Pill, diode + 1 kΩ pull-up "logic-level LIN" (no 12 V transceiver) | master schedule table, slave response, break detection | ⚠️ UART-level only |
 
 **Capstone `capstone/turnlight/`.** Board(s): 2 Blue Pills (ECU node + cluster node), 3 buttons,
 2 LEDs (or LED + 2N7002 for "lamps"), pot (lamp-current simulation), SSD1306 on the cluster node,
@@ -805,10 +874,11 @@ same black-box behaviour), plus stack high-water and CPU-load numbers documented
  ┌ MCAL (hand-written to SWS APIs over STM32F1 registers) ┐
  │ Mcu Port Dio Pwm Adc Gpt Wdg Can Fls                    │
  └─────────────────────────────────────────────────────────┘
-   OS: "Os-shim" over FreeRTOS (cyclic tasks 5/10/100 ms) — labelled NOT an AUTOSAR OS
+   OS: autosar/os_shim, an OSEK/AUTOSAR-OS-like API over FreeRTOS: labelled NOT an AUTOSAR OS
 ```
 
-Folder: `stage3-autosar/{asw/TurnLight/, asw/LampMonitor/, rte/, cfg/ (all *_Cfg.h/*_PBcfg.c as "generated" files with a header banner), integration/main.c, os_shim/}`.
+Folder: `stage3-autosar/{asw/TurnLight/, asw/LampMonitor/, rte/, cfg/ (all *_Cfg.h/*_PBcfg.c and Os_Cfg.c as "generated" files with a header banner), integration/main.c}`.
+The OS shim is described in §8.2.
 **Acceptance:** the same Robot suite passes. `tools/check-autosar.py` (§8.3) passes. cppcheck MISRA
 reports zero unjustified violations in `asw/` and `autosar/mcal/`. Every deviation has a record in
 `docs/deviations.md`.
@@ -836,7 +906,10 @@ in Phase 0). CI reads this file, the setup page renders it, and only this file m
 | CMSIS 6 (Core) | **v6.4.0** | Apache-2.0 |
 | FreeRTOS-Kernel | **V11.3.x** (tags up to V11.3.2 seen) | MIT |
 | Renode | **1.17.0** | tag v1.17.0 |
-| Unity | **v2.7.0** | |
+| Unity | **v2.7.0** | host tests via CMake/CTest (no Ceedling, so no Ruby) |
+| CMock | **v2.7.0** | vendored only when the first test needs mocks; mocks generated by its script (needs Ruby only on the author's machine), generated mocks committed |
+| Playwright (`@playwright/test`) | **1.64.x** | browser smoke test; exact version in `tests/site/package-lock.json` |
+| STM32F103 SVD | checksum pinned | downloaded by `tools/fetch-svd.py`, not committed (§2.4) |
 | Cppcheck | **2.22.0** | MISRA addon |
 | stm32flash | latest distro package 📄 | |
 | lychee (link check) | 0.15.x | |
@@ -883,7 +956,8 @@ Each step has **"Verify"** (command + expected output, shown as a `console` code
 ### 6.3 Debugger configuration
 - `.vscode/launch.json` per example (committed): `"servertype": "openocd"`,
   `"configFiles": ["examples/common/openocd/bluepill.cfg"]`,
-  `"svdFile": "examples/third_party/svd/STM32F103.svd"`, `"runToEntryPoint": "main"`.
+  `"svdFile": "${workspaceFolder}/.cache/svd/STM32F103.svd"` (fetched by `python3 tools/fetch-svd.py`,
+  a step on `setup.html#install` with a "Verify" check), `"runToEntryPoint": "main"`.
   A second configuration covers clone chips. A third, `"servertype": "external"`, attaches to Renode's GDB
   server (`machine StartGdbServer 3333`).
 - Learners practise breakpoint, step over/into, watch `SystemCoreClock`, peripheral view `RCC → CFGR`,
@@ -947,8 +1021,12 @@ EXTI, GPIO A–G (`STM32F1GPIOPort`), AFIO, TIM1–14, DMA1/2, and an SVD applie
   AUTOSAR_CP_SWS_DIODriver, R25-11" (the number copied from the PDF). In Phase 6 the author copies IDs from the PDF and never makes
   them up. `check-site.py` rejects `SWS_` or `SRS_` IDs that aren't listed in
   `tools/autosar-ids.txt`, which the author fills while reading the spec.
-- A "Production reality" callout points out that many current production ECUs still run on **R4.x**
-  (4.3.1/4.4.0), and that APIs mostly stay stable across releases.
+- **R25-11 is the only release cited** (D4). Many production ECUs still run on **R4.x** (4.3.1/4.4.0),
+  so a recurring **"In production (R4.x)"** box (`callout prod`, icon 🏭) appears wherever an API,
+  file layout, configuration class or behaviour that learners will meet in real ECUs differs from R25-11.
+  Each box names the R4.x document it compares against.
+- **No automatic re-pin.** When R26-11 is published, a separate **"R26-11 review" milestone** (§11)
+  diffs the cited documents and requirement IDs. Re-pinning is a deliberate decision recorded in this file.
 
 ### 8.2 Conceptual vs hands-on
 
@@ -959,12 +1037,28 @@ EXTI, GPIO A–G (`STM32F1GPIOPort`), AFIO, TIM1–14, DMA1/2, and an SVD applie
 | MCAL: Mcu, Port, Dio, Pwm, Adc, Gpt, Wdg, Can, Fls | ✅ | ✅ full SWS signatures for the subset we use; unsupported APIs are listed, not stubbed silently |
 | ECUAL: IoHwAb, CanIf, WdgIf | ✅ | ✅ "-lite" |
 | Services: EcuM, BswM | ✅ | EcuM-lite (init sequence only); BswM concept only |
-| OS | ✅ OSEK concepts, scalability classes, alarms | ⚠️ `Os-shim` over FreeRTOS, **labelled as not AUTOSAR OS**. Trampoline (open-source OSEK/AUTOSAR OS) is mentioned as further reading (Q7) |
+| OS | ✅ OSEK concepts, scalability classes, alarms | ⚠️ `autosar/os_shim` over FreeRTOS with an OSEK/AUTOSAR-OS-like API (tasks, alarms, events), **labelled "not a real AUTOSAR OS"** (see below). Trampoline is backlog: an optional advanced appendix, not in the core path (D5) |
 | COM stack: Com, PduR, CanIf, Can | ✅ signal-flow walkthrough | ✅ "-lite": static signal packing, one CAN channel, no gateways |
 | Diagnostics: DCM, DEM, UDS, ISO-TP | ✅ | DEM-lite (events, debouncing, status byte); DCM-lite (0x10, 0x22, 0x19 subset over single-frame ISO-TP), stretch goal |
 | NvM / MemIf / Fee / Fls | ✅ | NvM-lite + Fee over 2 × 1 KB F1 flash pages (stretch goal) |
 | WdgM | ✅ alive/deadline supervision | WdgM-lite alive supervision |
 | Safety (ISO 26262), E2E, SecOC | ✅ overview only | ❌ |
+
+**OS shim design (D5).** It exists so the SWC/BSW code looks like code written against a real
+AUTOSAR OS:
+- API subset (OSEK OS 2.2.3 / ISO 17356-3 names, as reused by AUTOSAR_CP_SWS_OS): `StartOS`,
+  `ShutdownOS`, `ActivateTask`, `TerminateTask`, `ChainTask`, `SetRelAlarm`, `SetAbsAlarm`,
+  `CancelAlarm`, `SetEvent`, `ClearEvent`, `GetEvent`, `WaitEvent`, `GetResource`, `ReleaseResource`,
+  with `TASK(Name)` / `ALARMCALLBACK` / `DeclareTask` macros and `StatusType` return codes (`E_OK`,
+  `E_OS_LIMIT`, …).
+- Static configuration in `cfg/Os_Cfg.c` (task table, priorities, alarms, counter = FreeRTOS tick),
+  labelled as "generated by the OS configurator in production".
+- Mapping: basic task → FreeRTOS task blocked on a task notification; extended task → FreeRTOS task +
+  event group; alarm → FreeRTOS software timer that activates a task or sets an event; resource → mutex.
+- **Documented differences** (shown on `autosar-os-com.html#os-concepts` as a table): no conformance
+  classes, activation limit 1, resources use priority inheritance instead of the OSEK priority ceiling,
+  no protection hooks, timing protection, OS-Applications or IOC, and no OSEK `Schedule()` semantics for
+  non-preemptive tasks.
 
 Labelling: every file in `autosar/` and `capstone/turnlight/stage3-autosar/` starts with a banner:
 
@@ -1002,6 +1096,19 @@ Labelling: every file in `autosar/` and `capstone/turnlight/stage3-autosar/` sta
 bad-vs-good engine): GPIO write in the logic → `Rte_Write_TurnIndicator_LeftLamp` →
 `IoHwAb_SetLamp` → `Pwm_SetDutyCycle`. It ends with a self-review against §8.3, and the
 signal-flow walkthrough on `autosar-os-com.html#signal-flow` uses the capstone's real function names.
+
+### 8.5 Self-review process (D11)
+No AUTOSAR practitioner is confirmed, so Phase 6 is a **self-review** with hard evidence rules:
+1. Every AUTOSAR rule, API signature, type, error code or behaviour shown on the site cites its
+   document (`AUTOSAR_CP_SWS_*` / `_SRS_*`, R25-11) **and** requirement ID copied from the PDF.
+2. Each ID goes into `tools/autosar-ids.txt` (ID · document · page/section · date read). `check-site.py`
+   rejects any `SWS_`/`SRS_` ID on the site or in `autosar/` that isn't listed there.
+3. `docs/autosar-self-review.md` logs one row per item: where it appears, the citation, "checked against
+   PDF" (date), and whether an "In production (R4.x)" box is needed.
+4. The reviewer works through the AUTOSAR self-review checklist in `CLAUDE.md` for every page and
+   module before the phase closes.
+5. **Optional external expert review:** a slot is kept open (any time after Phase 6), but it
+   **doesn't block release**. Findings come in as issues labelled `autosar-review`.
 
 ---
 
@@ -1048,8 +1155,8 @@ Interaction: click/focus a pin → side panel with alternate functions, remap op
 
 ### 9.3 Register / bit-field viewer: `MCU.Register(host, opts)`
 ```js
-// data: site/assets/js/data/regs-stm32f103.js — generated by tools/svd2js.py from STM32F103.svd (subset),
-// then enriched by hand: meaning per enum value, RM0008 section, "taught in" links.
+// data: site/assets/js/data/regs-stm32f103.js — HAND-AUTHORED from RM0008 for the registers we teach (§2.4);
+// addresses, bit positions and widths verified by tools/check-regs.py against third_party/cmsis_device_f1.
 window.MCU_DATA.regs = {
   RCC_CFGR: { addr: 0x40021004, reset: 0x00000000, ref: "RM0008 §7.3.2", fields: [
     { name: "SW", bits: [1,0], access: "rw", desc: "System clock switch",
@@ -1066,8 +1173,7 @@ r.set(0x001D0402); r.value;            // two-way binding with the clock-tree an
 Renders 32 bit cells grouped by field. Clicking a bit toggles it (respecting `access`). Field
 dropdowns pick enum values. Shows hex, binary and the C expression
 (`RCC_CFGR_PLLMULL9 | RCC_CFGR_PLLSRC | RCC_CFGR_PPRE1_DIV2 | RCC_CFGR_SW_PLL`), and reserved bits
-are hatched. Field descriptions are **rewritten in our words** with the RM0008 section cited; SVD
-description text is not copied wholesale (Q11).
+are hatched. Field descriptions are written in our own words with the RM0008 section cited.
 
 ### 9.4 Clock-tree configurator: `MCU.ClockTree(host, opts)`
 An SVG of the F1 tree (HSI 8 MHz, HSE 4–16 MHz with 8 MHz default, PLLSRC with HSI/2, PLLMUL ×2–×16,
@@ -1147,14 +1253,20 @@ from linker symbols, with an overflow warning when `_Min_Stack_Size + .data + .b
 - **References upgrade:** `R` entries become `{ t, url, doc, rev, sec, kind }`. The page renders doc ID
   + revision badges, and `kind: "community"` gets a visible badge. `check-site.py` requires every
   page to have ≥ 3 primary (non-community) sources.
+- **`callout prod`**: new callout kind (🏭 "In production (R4.x)") for §8.1. It needs a `doc`
+  attribute naming the R4.x document it compares against, and `check-site.py` enforces that.
+- **UI strings:** engines and `core.js` never hard-code user-visible text; they read
+  `MCU_STRINGS.<engine>.<key>`. Content text stays in the HTML.
 - **OS tabs** for setup steps: reuse `data-tabs`, remember the choice (`mcu-os`), and auto-select from
   `navigator.userAgentData?.platform || navigator.platform` on first visit.
 
 ### 9.10 Engine testing
 Pure functions (wave generators, CRC-15, bit-timing solver, clock-tree math, BRR) live in
 `engines/*.js` as UMD-lite modules and are tested with `node --test tests/site/` in CI. That adds no
-dependencies, since Node ships on GitHub runners. Rendering is smoke-tested with a headless check
-(Playwright, optional Q10) that loads each page and asserts zero console errors.
+dependencies, since Node ships on GitHub runners. Rendering is smoke-tested with **Playwright** (D7):
+`tests/site/smoke.spec.mjs` opens every page from `SITE` plus `index.html` in Chromium, in both themes,
+and fails on any console error, uncaught page error or failed same-origin request. It also clicks
+through each interactive engine once (next step, toggle a bit, change a select).
 
 ---
 
@@ -1167,14 +1279,19 @@ dependencies, since Node ships on GitHub runners. Rendering is smoke-tested with
 | `memmap-check` | Run `tools/elf2memmap.py` on the built ELFs and diff against `site/assets/data/memmap/`. | ✅ |
 | `renode-tests` | Install Renode 1.17.0 (pinned package; or `antmicro/renode-test-action` pinned by commit SHA). Run every `examples/*/test/*.robot` with the built ELFs. | ✅ |
 | `host-tests` | `cmake --preset host-tests`, then `ctest --output-on-failure` (Unity). Optional gcovr summary in the job log. | ✅ |
-| `static-analysis` | cppcheck 2.22 with `--addon=misra` on `examples/`, `autosar/`, `capstone/` (no rule texts file, so it outputs rule numbers only). Run `tools/check-autosar.py` and `clang-format --dry-run --Werror`. | Non-blocking until Phase 5, then blocking for `autosar/` and `capstone/stage3*` |
+| `static-analysis` | cppcheck 2.22 with `--addon=misra` on `examples/`, `autosar/`, `capstone/` (MISRA C:2012 numbering incl. amendments; no rule-texts file, so it outputs rule numbers only). Run `tools/check-autosar.py` and `clang-format --dry-run --Werror`. | Non-blocking until Phase 5, then blocking for `autosar/` and `capstone/stage3*` |
+| `third-party` | Every `third_party/*/` has LICENSE + README with URL, tag and SHA; versions match `tools/versions.json`; nothing outside `third_party/` vendors upstream code. | ✅ |
+| `browser-smoke` | `npm ci --prefix tests/site`, `npx playwright install --with-deps chromium`, serve `site/` with `python3 -m http.server`, run `smoke.spec.mjs` (§9.10). | ✅ |
 | `site-checks` | `tools/embed-code.py --check`; `tools/check-site.py` (SITE ↔ section ids both ways, REFS ≥ 3 primary, every `data-src` exists, engines referenced exist, no `TODO`/`lorem`, images ≤ 150 KB, page weight report); `node --test tests/site/`; `lychee --offline site/` (internal links + anchors). | ✅ |
 
 ### 10.2 `pages.yml` (push to `main`)
 1. Checkout, then assemble `_site/` = `site/` + `examples/` (sources only, no build dirs) + `capstone/` + `autosar/`.
 2. Stamp `__BUILD__` in `_site/*.html` (same `sed` + guard as the reference).
-3. `actions/configure-pages`, `upload-pages-artifact` (path `_site`), `deploy-pages`. All actions
-   pinned to major versions as in the reference, or by SHA (Q13).
+3. `actions/configure-pages`, `upload-pages-artifact` (path `_site`), `deploy-pages`.
+   **Every action in every workflow is pinned by full commit SHA with the version as a comment**
+   (`uses: actions/checkout@<40-hex-sha> # v4.2.2`). `.github/dependabot.yml` (ecosystems
+   `github-actions` and `npm` in `/tests/site`, weekly, grouped) proposes the bumps, and `check-site.py`
+   rejects a `uses:` line without a SHA (D9).
 4. `needs:` the `ci.yml` checks via `workflow_run`, or by repeating the `site-checks` job, so a red
    build never deploys.
 
@@ -1190,69 +1307,108 @@ Effort is in focused author-days (one person + Claude sessions). The MVP is Phas
 
 | Phase | Deliverables | Exit criteria | Effort |
 |---|---|---|---|
-| **0. Decisions & spikes** | Answers to §12. Verify 📄 items against PDFs (DS5319 Table 5, RM0008 sections, ES096). Pin st.com tool versions. Renode spike: RCC overlay, 20 KB SRAM, STMCAN + CANHub, GenericSpiFlash, ADC model, FLASH stub. CubeMX CMake generation check. Toolchain install dry-run on Windows/Linux/macOS. Buy a genuine-ST Blue Pill, a clone and two SN65HVD230. | `tools/versions.json` filled; spike notes in `docs/spikes.md`; every 📄 resolved | 2–3 |
-| **1. Site foundation** | `site/` with ported runtime (`window.MCU`, data-driven nav/footer, new keys), consolidated CSS + new palette, C/asm/ld/cmake/console highlighting, upgraded references, `embed-code.py`, `check-site.py`, `ci.yml` (site-checks), `pages.yml`, landing page (hero, path, module grid, mental model, CTA), `tools/hero-art.py` Blue Pill concept, glossary page with first ~60 terms, `new-module.py` | Pages deploys; Lighthouse a11y ≥ 95; zero console errors | 4–5 |
-| **2. MVP: Setup module** | `examples/common/*` (toolchain file, linker, OpenOCD cfgs, Renode overlay); examples **00 (bare + hal), 01, 02** with README, wiring, expected output, Robot tests; `setup.html` complete (all 14 sections, 3 OS tabs); `troubleshooting.html`; `board.html`; engines **Pinout v1, Register v1, MemoryMap v1, Checklist**; CI jobs examples/renode/memmap green | A new learner, following only the site on a clean machine, reaches "Hello from Blue Pill" on hardware **and** in Renode. Tested on ≥ 2 OSes by someone other than the author. | 7–9 |
+| **0. Verification & spikes** | Decisions are done (§12.2). Verify 📄 items against PDFs (DS5319 Table 5, RM0008 sections, ES096, UM1850). Pin st.com tool versions. Re-check the SVD licence on st.com (§2.4). Renode spike: RCC overlay, 20 KB SRAM, STMCAN + CANHub, GenericSpiFlash, ADC model, FLASH stub. CubeMX CMake generation check. Toolchain install dry-run on Windows/Linux/macOS. Buy a genuine-ST Blue Pill, a clone and two SN65HVD230. | `tools/versions.json` filled; spike notes in `docs/spikes.md`; every 📄 resolved | 2–3 |
+| **1. Site foundation** | `site/` with ported runtime (`window.MCU`, data-driven nav/footer, `strings.js`, new keys), consolidated CSS + new palette, C/asm/ld/cmake/console highlighting, upgraded references + `callout prod`, `embed-code.py`, `check-site.py`, `check-regs.py` skeleton, `LICENSE` (MIT) + `LICENSE-CONTENT` (CC BY 4.0), `third_party/` vendored (CMSIS core, cmsis-device-f1, Unity) + `update-third-party.py`, `ci.yml` (site-checks, third-party, browser-smoke), `pages.yml`, `dependabot.yml`, SHA-pinned actions, landing page (hero with Blue Pill subtitle, path, module grid, mental model, CTA), `tools/hero-art.py` Blue Pill concept, glossary page with first ~60 terms, `new-module.py` | Pages deploys; Playwright smoke green; Lighthouse a11y ≥ 95 | 4–5 |
+| **2. MVP: Setup module** | `examples/common/*` (toolchain file, linker, C startup, OpenOCD cfgs, Renode overlay); `fetch-svd.py`; examples **00 (bare + hal), 01, 02** with README, wiring, expected output, Robot tests; `setup.html` complete (all 15 sections incl. "What CMake generates under the hood", 3 OS tabs); `troubleshooting.html`; `board.html`; engines **Pinout v1, Register v1 (hand-authored data + check-regs), MemoryMap v1, Checklist**; CI jobs examples/renode/memmap green | The author, following only the site on a clean machine, reaches "Hello from Blue Pill" on hardware **and** in Renode on ≥ 2 OSes | 7–9 |
+| **2b. Beta round 1** (non-blocking) | 2–3 junior engineers work through Module 02 using `docs/beta-feedback-template.md` (§11.1). Findings become issues labelled `beta`. | Feedback collected; fixes scheduled. **Releases don't wait for it.** | 1 (author time) |
 | **3. From reset to main** | Modules 01, 03–07; examples 03 + 04 (+ host tests); engines ClockTree, Waveform (uart, pwm), Calc (BRR, PSC/ARR), StateMachine | All sections filled, every module with diagram + annotated code + analogy + sources | 8–10 |
 | **4. Peripherals** | Modules 08–13; examples 05–09, 11 (two-node CAN on hardware + Renode CANHub); Waveform (i2c, spi, can); CAN bit-timing calculator | CAN demo works between 2 physical boards | 10–12 |
-| **5. Embedded engineering** | Modules 14–17; examples 10, 12; `host-tests` + `static-analysis` jobs; bad-vs-good gallery v1; deviation template | cppcheck MISRA job blocking for new code | 8–10 |
-| **6. AUTOSAR track** | Modules 18–23; `autosar/` library (Std/Platform types, Compiler, MemMap, Det, Mcu, Port, Dio, Pwm, Adc, Gpt, Wdg, Can, CanIf-lite, PduR-lite, Com-lite, Dem-lite, EcuM-lite, WdgM-lite); AUTOSAR explorer + overlays; signal-flow walkthrough; `check-autosar.py`; `autosar-ids.txt`; optional `tools/rte-gen` | Review by someone with OEM/Tier-1 AUTOSAR experience (Q14) | 12–15 |
+| **5. Embedded engineering** | Modules 14–17; examples 10, 12; `third_party/freertos_kernel`; `host-tests` + `static-analysis` jobs; CMock if a test needs it; bad-vs-good gallery v1; deviation template | cppcheck MISRA job blocking for new code | 8–10 |
+| **6. AUTOSAR track** | Modules 18–23; `autosar/` library (Std/Platform types, Compiler, MemMap, Det, Mcu, Port, Dio, Pwm, Adc, Gpt, Wdg, Can, CanIf-lite, PduR-lite, Com-lite, Dem-lite, EcuM-lite, WdgM-lite, `os_shim`); AUTOSAR explorer + overlays; signal-flow walkthrough; "In production (R4.x)" boxes; `check-autosar.py`; `autosar-ids.txt`; optional `tools/rte-gen` | **Self-review complete (§8.5):** every AUTOSAR item cited with document + requirement ID, `docs/autosar-self-review.md` fully ticked, CLAUDE.md AUTOSAR checklist passed for every page | 12–15 |
+| **6b. External expert review** (optional, non-blocking) | Slot for an OEM/Tier-1 practitioner to review modules 18–23 + `autosar/`; findings as `autosar-review` issues | — (doesn't gate release) | 1–2 (if it happens) |
 | **7. Capstone** | `capstone/turnlight` stages 1–3 + cluster node; requirements, architecture, CAN matrix, acceptance tests; modules 24–26 | Same Robot suite passes for all three stages; hardware checklist signed off | 10–12 |
-| **8. Polish** | Appendix C (automotive MCUs), glossary completion (~200 terms), accessibility + mobile pass, performance budget (each page ≤ 400 KB excluding fonts), proofreading, contributor docs | External beta readers (2–3 juniors) complete Module 02 + one peripheral module without help | 4–5 |
-| **Total** | | | **≈ 65–80 days** (MVP ≈ 13–17) |
+| **8. Polish & extras** | Appendix C (automotive MCUs), Appendix D (LL drivers, with `00/ll`), optional example **13 LIN two nodes** + its `can.html#lin` link, glossary completion (~200 terms), accessibility + mobile pass, performance budget (each page ≤ 400 KB excluding fonts), proofreading, contributor docs; beta round 2 (non-blocking) on one peripheral module + one AUTOSAR module | Checks green; beta-2 feedback triaged | 5–6 |
+| **M. R26-11 review** (milestone, when R26-11 is published) | Diff every cited R25-11 document against R26-11; list changed requirement IDs/APIs in `docs/autosar-r26-11-review.md`; decide whether to re-pin. **No automatic re-pin** (D4). | Decision recorded in PLAN.md §8.1 | 1–2 |
+| **Backlog** | Trampoline (open-source OSEK/AUTOSAR OS) as an optional advanced appendix; contributing `STM32F1_RCC` upstream to Renode | — | — |
+| **Total (core phases 0–8)** | | | **≈ 66–82 days** (MVP = phases 0–2 ≈ 13–17) |
+
+### 11.1 Beta feedback template (`docs/beta-feedback-template.md`)
+One copy per participant per module, with these fields: participant background (years of C, embedded
+yes/no), OS, hardware (genuine/clone Blue Pill, ST-Link type); **time spent per section**; **where you
+got stuck** (section id + what you tried); **what was unclear** (quote the sentence); errors seen
+(copy/paste); "I had to search elsewhere for…"; clarity 1–5 per section; one thing to remove, one to
+add. Results are summarised in an issue per round. Rounds run after the MVP (2b) and in Phase 8, and
+**never block a release**.
 
 ---
 
-## 12. Risks & open questions
+## 12. Risks, decisions and remaining questions
 
 ### 12.1 Risks
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Clone chips behave differently (flash, ADC, I2C) | Learners think the course is wrong | "Tested on" table per example; genuine-ST board as reference; clone notes on `board.html` |
 | Renode gaps (RCC, ADC, flash controller) need more custom modelling than planned | MVP slips | Phase-0 spike first; fall back to "hardware only" labels instead of half-correct simulation |
-| Tool download sites (developer.arm.com, st.com) change URLs or block CI | CI red for reasons that aren't code | Cache toolchain tarballs as workflow cache; prefer xPack mirrors on GitHub releases |
-| AUTOSAR content judged "not real AUTOSAR" by practitioners | Credibility | Banners + honest generated/hand-written labels; cite SWS IDs; external review in Phase 6 |
+| Tool download sites (developer.arm.com, st.com) change URLs or block CI | CI red for reasons that aren't code | Cache toolchain tarballs as workflow cache; prefer xPack mirrors on GitHub releases; SVD fetch has a pinned fallback mirror |
+| AUTOSAR content judged "not real AUTOSAR" by practitioners | Credibility | Banners + honest generated/hand-written labels; every item cited with SWS/SRS ID; self-review log (§8.5); optional external review slot |
+| No external AUTOSAR reviewer (D11) | Subtle mistakes survive | Evidence rule (no ID, no claim), `autosar-ids.txt` check in CI, issue label for reader reports |
+| SVD licence stays unclear | Cortex-Debug setup has one extra step | `fetch-svd.py` step with a "Verify" check; register viewer doesn't depend on the SVD |
 | Copyright: MISRA rule texts, AUTOSAR text, ST manual figures | Takedown | Paraphrase only; cite numbers; draw our own diagrams; never embed vendor PDFs or figures |
 | Scope creep (26 modules) | Never finishes | Strict phase gates; MVP published first; modules can ship with `🚧` badge only after the MVP |
 | Hardware-dependent claims (R10, LED, pins) differ per board vendor | Wrong instructions | "Measure yours" steps; community sources labelled |
 | CSS consolidation regresses the look inherited from the reference | Rework | Do it once in Phase 1 with screenshot comparison of 3 reference pages |
 
-### 12.2 Open questions for you (each has a recommendation)
-- **Q1. Site folder name:** `site/` (recommended) or `mcu-academy/` (mirrors `aaos14-academy/`)?
-- **Q2. Site title/brand:** "MCU Academy" with subtitle "Automotive Firmware Handbook" and brand mark "F1"
-  (recommended), or something tied to the board ("Blue Pill Academy")?
-- **Q3. Main programming style:** pure registers via the CMSIS device header (recommended; HAL only
-  in Module 02 path A and as optional "Registers ⇄ HAL" tabs), vs LL drivers, vs HAL throughout.
-- **Q4. Startup file:** C startup (recommended for teaching, with ST's assembly shown for comparison)
-  vs ST's `startup_stm32f103xb.s`.
-- **Q5. Build system:** CMake + Ninja only (recommended; a raw-`gcc` three-command build is shown once to
-  demystify it), or also maintain Makefiles?
-- **Q6. AUTOSAR release:** R25-11 (recommended: latest, free) vs R24-11 vs R4.4.0 (closer to many
-  production ECUs). R26-11 may appear in Nov 2026. Do we re-pin when it does?
-- **Q7. OS in AUTOSAR stage:** FreeRTOS-based `Os-shim` clearly labelled (recommended), or port
-  **Trampoline** (open-source OSEK/AUTOSAR OS, more authentic, more work, Cortex-M3 support to verify)?
-- **Q8. LIN:** theory only (default), or add optional example 13 with logic-level LIN between two Blue
-  Pills (no 12 V transceiver, since the allowed module list doesn't include one)?
-- **Q9. Unit-test framework:** Unity + CMake/CTest (recommended: C-native, no Ruby) vs
-  Ceedling (needs Ruby) vs GoogleTest (C++, common at some Tier-1s).
-- **Q10. Headless browser smoke tests** (Playwright) in CI: adopt in Phase 1 (adds one dev dependency,
-  catches broken pages), or keep the site check purely static?
-- **Q11. SVD and register text:** may we vendor `STM32F103.svd` (check the licence of the source we
-  take it from, e.g. ST's CMSIS-Pack) and derive register data from it? If not, the register data is
-  hand-written from RM0008 (more work, still fine).
-- **Q12. Licences:** suggest **MIT** for code (`examples/`, `autosar/`, `tools/`, site JS) and
-  **CC BY-SA 4.0** for prose content. Vendored third-party code keeps its own licences
-  (Apache-2.0, BSD-3, MIT).
-- **Q13. GitHub Actions pinning:** major tags like the reference (simpler), or commit SHAs (safer)?
-- **Q14. Reviewers:** do you have access to an AUTOSAR practitioner for the Phase-6 review, and one or two
-  juniors for the Phase-8 beta?
-- **Q15. MISRA edition:** reference MISRA C:2012 (as briefed; cppcheck's addon targets its numbering)
-  or the newer consolidated editions (MISRA C:2023 / MISRA C:2025)? Recommended: teach with 2012 rule
-  numbers and add a note on the later editions. Needs your confirmation that we only cite numbers.
-- **Q16. Vietnamese audience:** English only (as briefed), or reserve `lang` hooks for a later Vietnamese
-  translation (cheap now: per-page `lang` attribute + strings in one place)?
-- **Q17. Third-party code:** vendor copies under `examples/third_party/` (recommended: offline,
-  browsable, reproducible) or git submodules / CMake FetchContent?
+### 12.2 Decisions (2026-10-24)
+Each decision lists what was decided, why, and where the plan applies it. The former open questions
+are mapped as (Qn).
+
+- **D1. Folder and branding** (Q1, Q2): `site/` and **"MCU Academy"**. *Why:* the name is
+  board-agnostic, so it still fits if an automotive-grade MCU track is added later. The Blue Pill focus
+  is stated in the hero subtitle. *Applied:* §1.3, §2.
+- **D2. Coding style and startup** (Q3, Q4): **plain registers** as the main style, with every register
+  definition from the CMSIS device header `stm32f103xb.h` (no hand-typed addresses or bit values in
+  firmware). HAL appears only in the setup module's side-by-side comparison. **LL gets one short
+  appendix page** (`ll-drivers.html`, Appendix D), not a parallel track. Startup is **written in C**, and
+  ST's assembly startup is shown once for comparison (`boot.html#c-vs-asm`). *Why:* registers are what
+  every later layer (MCAL!) is built on, and the C startup is readable and teachable. *Applied:* §3
+  (`setup`, `boot`, `ll-drivers`), §5 (`00/ll`), CLAUDE.md.
+- **D3. Build** (Q5): **CMake + Ninja only, no Makefiles.** One short section,
+  `setup.html#cmake-under-hood`, shows what CMake generates (`build.ninja`, `compile_commands.json`,
+  the resulting `arm-none-eabi-gcc` command lines). *Why:* one build system to maintain and debug.
+  *Applied:* §3, CLAUDE.md.
+- **D4. AUTOSAR release** (Q6): **R25-11 for all spec citations.** A recurring "In production (R4.x)"
+  box appears wherever an API or behaviour differs from what learners meet in real ECUs. **No automatic
+  re-pin** when R26-11 is released; it becomes the separate review milestone "M". *Why:* a stable
+  citation base, with the production gap shown openly. *Applied:* §0, §8.1, §9.9, §11.
+- **D5. OS for the AUTOSAR stage** (Q7): a **FreeRTOS shim with an OSEK/AUTOSAR-OS-like API** (tasks,
+  alarms, events), clearly labelled "not a real AUTOSAR OS". **Trampoline is backlog**: an optional
+  advanced appendix, not in the core path. *Why:* the SWC/BSW code reads like real OS-based code
+  without porting a second RTOS. *Applied:* §2 (`autosar/os_shim`), §5.2, §8.2, §11.
+- **D6. LIN** (Q8): **theory in the core path** (`uart.html#lin-mode`, `can.html#lin`). The optional
+  two-Blue-Pill logic-level example 13 is scheduled late (Phase 8) and is not part of the MVP.
+  *Applied:* §2, §5.1, §11.
+- **D7. Tests** (Q9, Q10): **Unity (+ CMock when mocks are needed), driven by CMake/CTest. No Ceedling**,
+  to avoid a Ruby dependency in CI. **Playwright smoke test in CI**: every page loads with zero console
+  errors, plus the link check. *Applied:* §2, §6.1, §9.10, §10.1.
+- **D8. SVD** (Q11): checked (§2.4). The licence is **unclear** (ST EULA in one copy, an Apache-2.0
+  claim in another, no header in the file), so the SVD is **not committed**. `tools/fetch-svd.py`
+  downloads it in the setup step, and the register viewer data is **hand-authored from RM0008** for the
+  registers we teach, checked against the Apache-2.0 CMSIS header. *Applied:* §2, §2.4, §6.1, §6.3, §9.3.
+- **D9. Licences and CI pinning** (Q12, Q13): **MIT** for code (`examples/`, `autosar/`, `capstone/`,
+  `tools/`, `tests/`, site JS/CSS); **CC BY 4.0** for prose and diagrams. Vendored code keeps its own
+  licence. GitHub Actions are **pinned by full commit SHA with the version as a comment**, and
+  **Dependabot** is enabled for actions (and for the npm test dependency). *Applied:* §2, §10.2.
+- **D10. MISRA and language** (Q15, Q16): **MISRA C:2012 rule numbering, including its amendments**,
+  since that's what industry and the cppcheck addon use. One note (on `quality.html#misra`) explains
+  that the later consolidated edition folds the 2012 amendments into one document and keeps the
+  Dir/Rule numbering scheme. That note lists any rule we cite whose number or category differs there,
+  checked against the edition's own mapping. **Content is English only.** There's no i18n
+  infrastructure, but all UI strings live in `site/assets/js/strings.js`, so a Vietnamese version stays
+  possible. *Applied:* §1.3, §2, §3.1, §9.9, §10.1.
+- **D11. Review and beta** (Q14): no dedicated AUTOSAR practitioner is confirmed, so **Phase 6 is a
+  self-review** (§8.5): every AUTOSAR rule or API cites its SWS/SRS document and requirement ID, and
+  CLAUDE.md has a checklist for it. An **optional external expert review** slot (6b) never blocks
+  release. A **small beta** (2–3 junior engineers) runs after the MVP (2b) with a feedback template
+  (§11.1), and it doesn't block releases either. *Applied:* §8.5, §11, CLAUDE.md.
+- **D12. Third-party code** (Q17): **vendored into `third_party/`** (CMSIS core + device headers,
+  FreeRTOS kernel, Unity, and CMock later), each with a pinned version, its LICENSE and a README with the
+  source URL. A small script updates them. **No submodules**, so a ZIP download builds without extra
+  steps. *Applied:* §2, §2.3, §10.1.
+
+### 12.3 Remaining questions (none block Phase 1)
+- Does ST's own download page or CMSIS pack state a licence for the F1 SVD? Checked in Phase 0 from
+  a network that can reach st.com. If it's permissive, vendor it per §2.4 step 3.
+- The exact edition and mapping for the MISRA note in D10 is confirmed when `quality.html` is written (Phase 5).
 
 ---
 
@@ -1264,6 +1420,8 @@ Effort is in focused author-days (one person + Claude sessions). The MVP is Phas
 - STMicroelectronics `cmsis-device-f1` v4.3.5: `Include/stm32f103xb.h`, `Source/Templates/gcc/linker/STM32F103XB_FLASH.ld`, `License.md`.
 - xPack QEMU Arm release notes v7.1.0-1 (2022) and v9.2.4-1 (2025-10-09).
 - Upstream tags (`git ls-remote`, 2026-10-24) for Renode, OpenOCD, xPack GCC/OpenOCD/QEMU, FreeRTOS-Kernel, STM32CubeF1, CMSIS 6, Unity, CMake, Ninja, Cppcheck, pyOCD, GoogleTest, lychee.
+- SVD licence check (§2.4): `cmsis-svd/cmsis-svd-data` (`data/STMicro/License.html`, `STM32F103xx.svd`) and `modm-io/cmsis-svd-stm32` (`README.md`, `LICENSE.md`, `stm32f1/STM32F103.svd`), both read 2026-10-24.
+- Tags for CMock (v2.7.0) and Playwright (1.64.1, npm registry), 2026-10-24.
 - AUTOSAR CP R25-11 Release Overview (autosar.org, 2025-11-27) and release-event page.
 - Community reports on CKS32/CS32 IDCODE `0x2ba01477` (PlatformIO forum, EEVblog) and the R10 USB pull-up (Hackaday.io, mikrocontroller.net, Arduino forum). Used only for the "community" claims above.
 - To verify in Phase 0 (st.com unreachable from this session): DS5319, RM0008, PM0056, PM0075, ES096, AN2606, AN3155.
