@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Software Components, Ports and the RTE — MCU Academy</title>
+  <meta name="description" content="Atomic SWCs, sender-receiver and client-server interfaces, runnables and events, and the RTE API a SWC actually calls.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="autosar-swc">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 19</span><span>/</span><span>SWCs &amp; RTE</span></nav>
+          <div class="eyebrow">Module 19 · AUTOSAR Classic</div>
+          <h1>Software Components, Ports and the RTE</h1>
+          <p class="lead">An AUTOSAR application is a set of software components that never call each other directly. Each one declares ports, implements runnables, and talks through the RTE, a layer generated for each ECU. This module builds the TurnLight capstone's two SWCs from the outside in: components, ports and interfaces, runnables and events, then the RTE API and what the generated code behind it looks like.</p>
+          <div class="page-meta"><span>⏱ 45 min read</span><span>🎯 Intermediate</span><span>📂 capstone/turnlight/stage3-autosar/asw, rte</span></div>
+        </header>
+
+        <section class="doc-section" id="swc-types" data-title="SWC types">
+          <div class="sec-head"><h2><span class="sec-num">19.1</span>SWC types</h2></div>
+          <div class="callout warn"><div class="ci">🔎</div><div><span class="ct">Verification status</span><p>Every API, type and rule on this page names its AUTOSAR R25-11 document. The requirement IDs and exact values are still being checked against the R25-11 PDFs; until then they come from the R4.x-era specifications, and no requirement ID is quoted, because the course never makes one up. Progress is tracked in <a href="https://github.com/Thuongst97/MCU-Programming/blob/main/docs/autosar-self-review.md">the self-review log</a>.</p></div></div>
+          <p>A <b>software component</b> (SWC) is a unit of application software with a formal description: its ports, its data types and its internal behaviour. The description is ARXML; the implementation is C.</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Type</th><th>What it does</th><th>In the capstone</th></tr></thead>
+            <tbody>
+              <tr><td><b>Application SWC</b></td><td>vehicle function, hardware-independent</td><td><code>TurnLight</code>, <code>LampMonitor</code></td></tr>
+              <tr><td><b>Sensor/actuator SWC</b></td><td>turns physical signals into application values and back; depends on the ECU's I/O</td><td>the job IoHwAb does here, behind client-server ports</td></tr>
+              <tr><td><b>Service SWC / ECU abstraction</b></td><td>BSW seen through ports (Dem, WdgM, NvM, IoHwAb)</td><td><code>Rte_Call_…_SetEventStatus</code>, <code>Rte_Call_Alive_CheckpointReached</code></td></tr>
+              <tr><td><b>Composition</b></td><td>a group of SWCs and their connections, used to structure large systems</td><td>(not needed for two SWCs)</td></tr>
+            </tbody>
+          </table></div>
+          <p>An <b>atomic</b> SWC cannot be split across ECUs; a composition can. Because SWCs only use their ports, the same <code>TurnLight</code> could move to another ECU: only the RTE and the configuration change.</p>
+        </section>
+
+        <section class="doc-section" id="interfaces" data-title="Ports and interfaces">
+          <div class="sec-head"><h2><span class="sec-num">19.2</span>Ports and interfaces</h2></div>
+          <p>A <b>port</b> is a typed connection point, provided (P) or required (R). Its <b>interface</b> says what flows through it:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Interface</th><th>Semantics</th><th>TurnLight example</th></tr></thead>
+            <tbody>
+              <tr><td><b>Sender-receiver</b></td><td>data elements, last value wins (or a queue); one sender, many receivers</td><td><code>LampState</code> to LampMonitor, <code>TurnStatus</code> to the bus</td></tr>
+              <tr><td><b>Client-server</b></td><td>operations with arguments and a return code; synchronous or asynchronous</td><td><code>StalkLeft.Get</code>, <code>LampLeft.Set</code> on IoHwAb</td></tr>
+              <tr><td><b>Mode switch</b></td><td>mode changes (start-up, run, sleep) that can trigger runnables</td><td>(not used)</td></tr>
+              <tr><td>Parameter, NV data, trigger</td><td>calibration values, non-volatile data, triggers</td><td>(not used)</td></tr>
+            </tbody>
+          </table></div>
+          <p>Click through a 10 ms cycle to see who talks to whom:</p>
+          <div id="seq-ports"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The RTE is a switchboard operator. A caller asks for "the lamp" without knowing which extension, building or even city it is in; the operator connects the line. Moving the lamp to another building changes the switchboard, not the caller.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="runnables" data-title="Runnables and RTE events">
+          <div class="sec-head"><h2><span class="sec-num">19.3</span>Runnables and RTE events</h2></div>
+          <p>An SWC's code is a set of <b>runnables</b>: C functions without parameters that the RTE calls when an <b>RTE event</b> fires.</p>
+          <ul>
+            <li><b>Timing event</b>: periodically, for example every 10 ms. Both capstone runnables use one.</li>
+            <li><b>Init event</b>: once at start-up (<code>RE_TurnLight_Init</code>).</li>
+            <li><b>Data received event</b>: when new data arrives on a port.</li>
+            <li><b>Operation invoked event</b>: a server runnable called by a client.</li>
+            <li><b>Mode switch event</b>, background event, and others.</li>
+          </ul>
+          <p>The RTE generator maps each runnable to an OS task (module 21). The runnable of TurnLight, using only its ports:</p>
+          <script type="text/plain" id="src-swc-tl" data-src="capstone/turnlight/stage3-autosar/asw/TurnLight/TurnLight.c" data-region="runnable" data-lang="c" data-file="asw/TurnLight/TurnLight.c" data-start="38" data-end="80" data-sha="a6d13e30ed98">
+FUNC(void, TURNLIGHT_CODE) RE_TurnLight_10ms(void)
+{
+    boolean left = FALSE;
+    boolean right = FALSE;
+    boolean hazard = FALSE;
+    boolean failedL = FALSE;
+    boolean failedR = FALSE;
+    (void)Rte_Call_StalkLeft_Get(&left);                                      /* client-server to IoHwAb */   // «1»
+    (void)Rte_Call_StalkRight_Get(&right);
+    (void)Rte_Call_HazardSwitch_Get(&hazard);
+    (void)Rte_Read_LampFailed_Left(&failedL);                                 /* sender-receiver from LampMonitor */   // «2»
+    (void)Rte_Read_LampFailed_Right(&failedR);
+
+    tl_inputs_t in;
+    in.stalk[TL_LEFT] = (left == TRUE);
+    in.stalk[TL_RIGHT] = (right == TRUE);
+    in.hazard_pressed = (hazard == TRUE) && (TurnLight_PrevHazard == FALSE);   /* edge */
+    in.lamp_failed[TL_LEFT] = (failedL == TRUE);
+    in.lamp_failed[TL_RIGHT] = (failedR == TRUE);
+    TurnLight_PrevHazard = hazard;
+    (void)tl_step(&TurnLight_Sm, &in, 10U, &TurnLight_Out);   // «3»
+
+    const boolean lampL = TurnLight_Out.lamp[TL_LEFT] ? TRUE : FALSE;
+    const boolean lampR = TurnLight_Out.lamp[TL_RIGHT] ? TRUE : FALSE;
+    (void)Rte_Call_LampLeft_Set(lampL);                                       /* to IoHwAb -> Pwm */   // «4»
+    (void)Rte_Call_LampRight_Set(lampR);
+    (void)Rte_Write_LampState_Left(lampL);                                    /* to LampMonitor (and Com) */   // «5»
+    (void)Rte_Write_LampState_Right(lampR);
+    (void)Rte_Write_TurnStatus_IndLeft(TurnLight_Out.indicating[TL_LEFT] ? TRUE : FALSE);
+    (void)Rte_Write_TurnStatus_IndRight(TurnLight_Out.indicating[TL_RIGHT] ? TRUE : FALSE);
+    (void)Rte_Write_TurnStatus_Hazard(TurnLight_Out.hazard ? TRUE : FALSE);
+
+    uint8 alive = 0U;
+    const Std_ReturnType ack = Rte_Read_ClusterAck_Alive(&alive);              /* TL-REQ-007 */   // «6»
+    const boolean lost = ((ack & RTE_E_MAX_AGE_EXCEEDED) != 0U) ? TRUE : FALSE;
+    if (lost != TurnLight_ClusterLost)
+    {
+        TurnLight_ClusterLost = lost;
+        (void)Rte_Write_TurnStatus_ClusterLost(lost);
+        (void)Rte_Call_EvClusterLost_SetEventStatus((lost == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);   // «7»
+    }
+    (void)Rte_Call_Alive_CheckpointReached(0U);                               /* WdgM alive supervision */   // «8»
+}
+</script>
+          <div id="ex-swc-tl"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">No hardware in an SWC</span><p>The moment an application SWC includes <code>Dio.h</code> or touches <code>GPIOB-&gt;IDR</code>, it is tied to one ECU and can no longer be tested against a simulated RTE. <code>tools/check-autosar.py</code> fails the build if an SWC includes anything but its <code>Rte_&lt;Swc&gt;.h</code>, its MemMap header and declared application libraries.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="rte-api" data-title="The RTE API">
+          <div class="sec-head"><h2><span class="sec-num">19.4</span>The RTE API</h2></div>
+          <p>The SWC calls a small set of generated APIs. Their names are built from the port and the data element or operation (AUTOSAR_CP_SWS_RTE):</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>API</th><th>Use</th><th>Returns</th></tr></thead>
+            <tbody>
+              <tr><td><code>Rte_Read_&lt;port&gt;_&lt;element&gt;(&amp;data)</code></td><td>explicit read of the last received value</td><td><code>Std_ReturnType</code> with status flags</td></tr>
+              <tr><td><code>Rte_Write_&lt;port&gt;_&lt;element&gt;(data)</code></td><td>explicit write, visible to receivers at once</td><td><code>Std_ReturnType</code></td></tr>
+              <tr><td><code>Rte_IRead_&lt;runnable&gt;_&lt;port&gt;_&lt;element&gt;()</code></td><td>implicit read: a copy taken before the runnable starts, stable during it</td><td>the value</td></tr>
+              <tr><td><code>Rte_IWrite_…(data)</code></td><td>implicit write, published after the runnable ends</td><td>—</td></tr>
+              <tr><td><code>Rte_Call_&lt;port&gt;_&lt;operation&gt;(args)</code></td><td>client-server call</td><td>the operation's return code</td></tr>
+            </tbody>
+          </table></div>
+          <p>The contract header maps these names to the RTE's functions:</p>
+          <script type="text/plain" id="src-rte-api" data-src="capstone/turnlight/stage3-autosar/rte/Rte_TurnLight.h" data-region="api" data-lang="c" data-file="rte/Rte_TurnLight.h" data-start="14" data-end="32" data-sha="3a968bc1c018">
+/* The API the SWC calls is a set of names; the generator maps them to RTE functions or inlines */
+#define Rte_Call_StalkLeft_Get                    Rte_Call_TurnLight_StalkLeft_Get   // «1»
+#define Rte_Call_StalkRight_Get                   Rte_Call_TurnLight_StalkRight_Get
+#define Rte_Call_HazardSwitch_Get                 Rte_Call_TurnLight_HazardSwitch_Get
+#define Rte_Read_LampFailed_Left                  Rte_Read_TurnLight_LampFailed_Left   // «2»
+#define Rte_Read_LampFailed_Right                 Rte_Read_TurnLight_LampFailed_Right
+#define Rte_Call_LampLeft_Set                     Rte_Call_TurnLight_LampLeft_Set
+#define Rte_Call_LampRight_Set                    Rte_Call_TurnLight_LampRight_Set
+#define Rte_Write_LampState_Left                  Rte_Write_TurnLight_LampState_Left   // «3»
+#define Rte_Write_LampState_Right                 Rte_Write_TurnLight_LampState_Right
+#define Rte_Write_TurnStatus_IndLeft              Rte_Write_TurnLight_TurnStatus_IndLeft
+#define Rte_Write_TurnStatus_IndRight             Rte_Write_TurnLight_TurnStatus_IndRight
+#define Rte_Write_TurnStatus_Hazard               Rte_Write_TurnLight_TurnStatus_Hazard
+#define Rte_Write_TurnStatus_ClusterLost          Rte_Write_TurnLight_TurnStatus_ClusterLost
+#define Rte_Write_TurnStatus_ResetCause           Rte_Write_TurnLight_TurnStatus_ResetCause
+#define Rte_Read_ClusterAck_Alive                 Rte_Read_TurnLight_ClusterAck_Alive
+#define Rte_Call_EvClusterLost_SetEventStatus     Rte_Call_TurnLight_EvClusterLost_SetEventStatus
+#define Rte_Call_Alive_CheckpointReached          Rte_Call_TurnLight_Alive_CheckpointReached
+#define Rte_Call_ResetReason_Get                  Rte_Call_TurnLight_ResetReason_Get
+</script>
+          <div id="ex-rte-api"></div>
+          <p>A read returns more than the value. Com's deadline monitoring for <code>ClusterAck</code> reaches the SWC as a flag in the return code, which is how TurnLight detects a missing cluster without any timer of its own.</p>
+        </section>
+
+        <section class="doc-section" id="rte-code" data-title="What generated RTE code looks like">
+          <div class="sec-head"><h2><span class="sec-num">19.5</span>What generated RTE code looks like</h2></div>
+          <p>What does the generator produce behind those names? For SWCs on the same ECU and task, a buffer; for data that leaves the ECU, a Com call; for a client-server call to a BSW service, a direct function call. The capstone's RTE is hand-written but follows that pattern:</p>
+          <script type="text/plain" id="src-rte-sr" data-src="capstone/turnlight/stage3-autosar/rte/Rte.c" data-region="sr" data-lang="c" data-file="rte/Rte.c" data-start="77" data-end="90" data-sha="4044a3b95628">
+FUNC(Std_ReturnType, RTE_CODE) Rte_Write_TurnLight_LampState_Left(boolean data)
+{
+#if (RTE_VFB_TRACE == STD_ON)
+    Rte_WriteHook_TurnLight_LampState_Left_Start(data);                  /* observe the VFB */   // «1»
+#endif
+    Rte_LampState[0] = data;                                              /* intra-ECU: a buffer */   // «2»
+    return Rte_SendBool(ComConf_ComSignal_LampLeft, data);                /* inter-ECU: a Com signal */   // «3»
+}
+
+FUNC(Std_ReturnType, RTE_CODE) Rte_Read_LampMonitor_LampState_Left(P2VAR(boolean, AUTOMATIC, RTE_APPL_DATA) data)
+{
+    *data = Rte_LampState[0];                                             /* same task: no lock needed */   // «4»
+    return RTE_E_OK;
+}
+</script>
+          <div id="ex-rte-sr"></div>
+          <script type="text/plain" id="src-rte-age" data-src="capstone/turnlight/stage3-autosar/rte/Rte.c" data-region="age" data-lang="c" data-file="rte/Rte.c" data-start="162" data-end="176" data-sha="4044a3b95628">
+FUNC(Std_ReturnType, RTE_CODE) Rte_Read_TurnLight_ClusterAck_Alive(P2VAR(uint8, AUTOMATIC, RTE_APPL_DATA) data)
+{
+    const Std_ReturnType ret = (Com_ReceiveSignal(ComConf_ComSignal_AckAlive, data) == E_OK) ? RTE_E_OK : E_NOT_OK;
+    return (Rte_ClusterAckTimedOut == TRUE) ? (Std_ReturnType)(ret | RTE_E_MAX_AGE_EXCEEDED) : ret;   /* the value plus its age */   // «5»
+}
+
+FUNC(void, RTE_CODE) Rte_COMCbkTOut_ClusterAck(void)
+{
+    Rte_ClusterAckTimedOut = TRUE;   // «6»
+}
+
+FUNC(void, RTE_CODE) Rte_COMCbk_ClusterAck(void)
+{
+    Rte_ClusterAckTimedOut = FALSE;
+}
+</script>
+          <div id="ex-rte-age"></div>
+          <script type="text/plain" id="src-rte-cs" data-src="capstone/turnlight/stage3-autosar/rte/Rte.c" data-region="cs" data-lang="c" data-file="rte/Rte.c" data-start="49" data-end="52" data-sha="4044a3b95628">
+FUNC(Std_ReturnType, RTE_CODE) Rte_Call_TurnLight_StalkLeft_Get(P2VAR(boolean, AUTOMATIC, RTE_APPL_DATA) value)
+{
+    return IoHwAb_Digital_Get(IoHwAbConf_Signal_StalkLeft, value);       /* a direct call: same ECU, same task */   // «7»
+}
+</script>
+          <div id="ex-rte-cs"></div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">Why so many tiny functions?</span><p>Real generators inline most of them as macros when sender and receiver run in the same task; when they run in different tasks or on different cores, the same API turns into a protected copy or an inter-core transfer. The SWC never notices, which is the point.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="mini-gen" data-title="A tiny RTE generator">
+          <div class="sec-head"><h2><span class="sec-num">19.6</span>A tiny RTE generator</h2></div>
+          <p>A generator is mechanical: from a port description it derives names, types and the mapping. Try it: describe a port and see the names the RTE would generate for it.</p>
+          <div id="rte-gen" class="calc-host glass"></div>
+          <p>A full generator also creates the task bodies, the data buffers with their protection, the COM callbacks and the VFB trace hooks, all from ARXML. The capstone's <code>rte/</code> folder shows each of these once, by hand.</p>
+          <div id="ck-swc"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/autosar-swc.js?v=__BUILD__"></script>
+</body>
+</html>

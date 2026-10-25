@@ -1045,3 +1045,6 @@ table.t.arb tr.arb-bus td { font-weight: 700; color: var(--copper); border-top: 
 .fb-bytes .sof { border-color: var(--copper); } .fb-bytes .cmd { border-color: var(--green); }
 .fb-bytes .len { border-color: var(--text-3, var(--border-hi)); } .fb-bytes .pay { border-color: var(--blue); }
 .fb-bytes .crc { border-color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+
+/* code shows the characters you type: no ">=" -> "≥" ligatures */
+code, pre, kbd, .code-block, .code-block * { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }

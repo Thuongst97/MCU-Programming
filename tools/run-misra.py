@@ -53,7 +53,7 @@ INCLUDES = [
 def sources():
     out = []
     for pat in SOURCES:
-        out += [p for p in sorted(ROOT.glob(pat)) if "/test/" not in p.as_posix() and "third_party" not in p.parts]
+        out += [p for p in sorted(ROOT.glob(pat)) if "/test/" not in p.as_posix() and "third_party" not in p.parts and "gallery" not in p.parts]
     return sorted(set(out))
 
 

@@ -42,10 +42,10 @@ FUNC(void, TURNLIGHT_CODE) RE_TurnLight_10ms(void)
     boolean hazard = FALSE;
     boolean failedL = FALSE;
     boolean failedR = FALSE;
-    (void)Rte_Call_StalkLeft_Get(&left);                                      /* client-server to IoHwAb */
+    (void)Rte_Call_StalkLeft_Get(&left);                                      /* client-server to IoHwAb */   // «1»
     (void)Rte_Call_StalkRight_Get(&right);
     (void)Rte_Call_HazardSwitch_Get(&hazard);
-    (void)Rte_Read_LampFailed_Left(&failedL);                                 /* sender-receiver from LampMonitor */
+    (void)Rte_Read_LampFailed_Left(&failedL);                                 /* sender-receiver from LampMonitor */   // «2»
     (void)Rte_Read_LampFailed_Right(&failedR);
 
     tl_inputs_t in;
@@ -55,28 +55,28 @@ FUNC(void, TURNLIGHT_CODE) RE_TurnLight_10ms(void)
     in.lamp_failed[TL_LEFT] = (failedL == TRUE);
     in.lamp_failed[TL_RIGHT] = (failedR == TRUE);
     TurnLight_PrevHazard = hazard;
-    (void)tl_step(&TurnLight_Sm, &in, 10U, &TurnLight_Out);
+    (void)tl_step(&TurnLight_Sm, &in, 10U, &TurnLight_Out);   // «3»
 
     const boolean lampL = TurnLight_Out.lamp[TL_LEFT] ? TRUE : FALSE;
     const boolean lampR = TurnLight_Out.lamp[TL_RIGHT] ? TRUE : FALSE;
-    (void)Rte_Call_LampLeft_Set(lampL);                                       /* to IoHwAb -> Pwm */
+    (void)Rte_Call_LampLeft_Set(lampL);                                       /* to IoHwAb -> Pwm */   // «4»
     (void)Rte_Call_LampRight_Set(lampR);
-    (void)Rte_Write_LampState_Left(lampL);                                    /* to LampMonitor (and Com) */
+    (void)Rte_Write_LampState_Left(lampL);                                    /* to LampMonitor (and Com) */   // «5»
     (void)Rte_Write_LampState_Right(lampR);
     (void)Rte_Write_TurnStatus_IndLeft(TurnLight_Out.indicating[TL_LEFT] ? TRUE : FALSE);
     (void)Rte_Write_TurnStatus_IndRight(TurnLight_Out.indicating[TL_RIGHT] ? TRUE : FALSE);
     (void)Rte_Write_TurnStatus_Hazard(TurnLight_Out.hazard ? TRUE : FALSE);
 
     uint8 alive = 0U;
-    const Std_ReturnType ack = Rte_Read_ClusterAck_Alive(&alive);              /* TL-REQ-007 */
+    const Std_ReturnType ack = Rte_Read_ClusterAck_Alive(&alive);              /* TL-REQ-007 */   // «6»
     const boolean lost = ((ack & RTE_E_MAX_AGE_EXCEEDED) != 0U) ? TRUE : FALSE;
     if (lost != TurnLight_ClusterLost)
     {
         TurnLight_ClusterLost = lost;
         (void)Rte_Write_TurnStatus_ClusterLost(lost);
-        (void)Rte_Call_EvClusterLost_SetEventStatus((lost == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);
+        (void)Rte_Call_EvClusterLost_SetEventStatus((lost == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);   // «7»
     }
-    (void)Rte_Call_Alive_CheckpointReached(0U);                               /* WdgM alive supervision */
+    (void)Rte_Call_Alive_CheckpointReached(0U);                               /* WdgM alive supervision */   // «8»
 }
 // [endregion]
 

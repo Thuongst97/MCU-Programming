@@ -48,7 +48,7 @@ static FUNC(Std_ReturnType, RTE_CODE) Rte_SendBool(Com_SignalIdType id, boolean 
 // [region:cs]
 FUNC(Std_ReturnType, RTE_CODE) Rte_Call_TurnLight_StalkLeft_Get(P2VAR(boolean, AUTOMATIC, RTE_APPL_DATA) value)
 {
-    return IoHwAb_Digital_Get(IoHwAbConf_Signal_StalkLeft, value);       /* a direct call: same ECU, same task */
+    return IoHwAb_Digital_Get(IoHwAbConf_Signal_StalkLeft, value);       /* a direct call: same ECU, same task */   // «7»
 }
 // [endregion]
 
@@ -77,15 +77,15 @@ FUNC(Std_ReturnType, RTE_CODE) Rte_Call_TurnLight_LampRight_Set(boolean on)
 FUNC(Std_ReturnType, RTE_CODE) Rte_Write_TurnLight_LampState_Left(boolean data)
 {
 #if (RTE_VFB_TRACE == STD_ON)
-    Rte_WriteHook_TurnLight_LampState_Left_Start(data);                  /* observe the VFB */
+    Rte_WriteHook_TurnLight_LampState_Left_Start(data);                  /* observe the VFB */   // «1»
 #endif
-    Rte_LampState[0] = data;                                              /* intra-ECU: a buffer */
-    return Rte_SendBool(ComConf_ComSignal_LampLeft, data);                /* inter-ECU: a Com signal */
+    Rte_LampState[0] = data;                                              /* intra-ECU: a buffer */   // «2»
+    return Rte_SendBool(ComConf_ComSignal_LampLeft, data);                /* inter-ECU: a Com signal */   // «3»
 }
 
 FUNC(Std_ReturnType, RTE_CODE) Rte_Read_LampMonitor_LampState_Left(P2VAR(boolean, AUTOMATIC, RTE_APPL_DATA) data)
 {
-    *data = Rte_LampState[0];                                             /* same task: no lock needed */
+    *data = Rte_LampState[0];                                             /* same task: no lock needed */   // «4»
     return RTE_E_OK;
 }
 // [endregion]
@@ -162,12 +162,12 @@ FUNC(Std_ReturnType, RTE_CODE) Rte_Write_TurnLight_TurnStatus_ResetCause(uint8 d
 FUNC(Std_ReturnType, RTE_CODE) Rte_Read_TurnLight_ClusterAck_Alive(P2VAR(uint8, AUTOMATIC, RTE_APPL_DATA) data)
 {
     const Std_ReturnType ret = (Com_ReceiveSignal(ComConf_ComSignal_AckAlive, data) == E_OK) ? RTE_E_OK : E_NOT_OK;
-    return (Rte_ClusterAckTimedOut == TRUE) ? (Std_ReturnType)(ret | RTE_E_MAX_AGE_EXCEEDED) : ret;   /* the value plus its age */
+    return (Rte_ClusterAckTimedOut == TRUE) ? (Std_ReturnType)(ret | RTE_E_MAX_AGE_EXCEEDED) : ret;   /* the value plus its age */   // «5»
 }
 
 FUNC(void, RTE_CODE) Rte_COMCbkTOut_ClusterAck(void)
 {
-    Rte_ClusterAckTimedOut = TRUE;
+    Rte_ClusterAckTimedOut = TRUE;   // «6»
 }
 
 FUNC(void, RTE_CODE) Rte_COMCbk_ClusterAck(void)
@@ -228,10 +228,10 @@ TASK(Task5ms)
 
 TASK(Task10ms)
 {
-    Can_MainFunction_Read();                                              /* bus -> Com, in task context */
+    Can_MainFunction_Read();                                              /* bus -> Com, in task context */   // «9»
     Com_MainFunctionRx();
     IoHwAb_MainFunction();                                                /* debounce, lamp current */
-    RE_TurnLight_10ms();                                                  /* the application */
+    RE_TurnLight_10ms();                                                  /* the application */   // «8»
     RE_LampMonitor_10ms();
     Com_MainFunctionTx();                                                 /* Com -> bus */
     Can_MainFunction_Write();
@@ -242,7 +242,7 @@ TASK(Task10ms)
 
 TASK(Task50ms)
 {
-    WdgM_MainFunction();                                                  /* triggers the watchdog only if all is well */
+    WdgM_MainFunction();                                                  /* triggers the watchdog only if all is well */   // «10»
     if (++Rte_HeartbeatDiv >= 10U)
     {
         Rte_HeartbeatDiv = 0U;

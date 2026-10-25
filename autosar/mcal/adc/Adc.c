@@ -131,12 +131,12 @@ FUNC(void, ADC_CODE) Adc_StartGroupConversion(Adc_GroupType Group)
     }
     if (Adc_State[Group].buffer == NULL_PTR)
     {
-        ADC_DET(ADC_STARTGROUPCONVERSION_SID, ADC_E_BUFFER_UNINIT);
+        ADC_DET(ADC_STARTGROUPCONVERSION_SID, ADC_E_BUFFER_UNINIT);   // «1»
         return;
     }
     if (Adc_Active >= 0)
     {
-        ADC_DET(ADC_STARTGROUPCONVERSION_SID, ADC_E_BUSY);
+        ADC_DET(ADC_STARTGROUPCONVERSION_SID, ADC_E_BUSY);   // «2»
         return;
     }
     Adc_State[Group].status = ADC_BUSY;
@@ -153,7 +153,7 @@ FUNC(Adc_StatusType, ADC_CODE) Adc_GetGroupStatus(Adc_GroupType Group)
         return ADC_IDLE;
     }
     P2VAR(Adc_GroupStateType, AUTOMATIC, ADC_VAR) st = &Adc_State[Group];
-    if ((st->status == ADC_BUSY) && ((ADC1->SR & ADC_SR_EOC) != 0U))      /* polling advances the group */
+    if ((st->status == ADC_BUSY) && ((ADC1->SR & ADC_SR_EOC) != 0U))      /* polling advances the group */   // «3»
     {
         st->buffer[st->next] = (Adc_ValueGroupType)(ADC1->DR & 0xFFFU);
         st->next++;
@@ -163,7 +163,7 @@ FUNC(Adc_StatusType, ADC_CODE) Adc_GetGroupStatus(Adc_GroupType Group)
         }
         else
         {
-            st->status = ADC_STREAM_COMPLETED;            /* one-shot group: completed and stream completed */
+            st->status = ADC_STREAM_COMPLETED;            /* one-shot group: completed and stream completed */   // «4»
             Adc_Active = -1;
         }
     }

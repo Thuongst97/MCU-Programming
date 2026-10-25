@@ -80,7 +80,7 @@ FUNC(void, WDG_CODE) Wdg_SetTriggerCondition(uint16 timeout)
     }
     if (timeout != 0U)
     {
-        IWDG->KR = WDG_KEY_RELOAD;                        /* timeout 0: stop triggering, reset follows */
+        IWDG->KR = WDG_KEY_RELOAD;                        /* timeout 0: stop triggering, reset follows */   // «1»
     }
 }
 // [endregion]

@@ -12,14 +12,14 @@
 
 // [region:api]
 /* The API the SWC calls is a set of names; the generator maps them to RTE functions or inlines */
-#define Rte_Call_StalkLeft_Get                    Rte_Call_TurnLight_StalkLeft_Get
+#define Rte_Call_StalkLeft_Get                    Rte_Call_TurnLight_StalkLeft_Get   // «1»
 #define Rte_Call_StalkRight_Get                   Rte_Call_TurnLight_StalkRight_Get
 #define Rte_Call_HazardSwitch_Get                 Rte_Call_TurnLight_HazardSwitch_Get
-#define Rte_Read_LampFailed_Left                  Rte_Read_TurnLight_LampFailed_Left
+#define Rte_Read_LampFailed_Left                  Rte_Read_TurnLight_LampFailed_Left   // «2»
 #define Rte_Read_LampFailed_Right                 Rte_Read_TurnLight_LampFailed_Right
 #define Rte_Call_LampLeft_Set                     Rte_Call_TurnLight_LampLeft_Set
 #define Rte_Call_LampRight_Set                    Rte_Call_TurnLight_LampRight_Set
-#define Rte_Write_LampState_Left                  Rte_Write_TurnLight_LampState_Left
+#define Rte_Write_LampState_Left                  Rte_Write_TurnLight_LampState_Left   // «3»
 #define Rte_Write_LampState_Right                 Rte_Write_TurnLight_LampState_Right
 #define Rte_Write_TurnStatus_IndLeft              Rte_Write_TurnLight_TurnStatus_IndLeft
 #define Rte_Write_TurnStatus_IndRight             Rte_Write_TurnLight_TurnStatus_IndRight

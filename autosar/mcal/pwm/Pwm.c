@@ -47,7 +47,7 @@ FUNC(void, PWM_CODE) Pwm_Init(P2CONST(Pwm_ConfigType, AUTOMATIC, PWM_APPL_CONST)
     }
     if (Pwm_ConfigPtr != NULL_PTR)
     {
-        PWM_DET(PWM_INIT_SID, PWM_E_ALREADY_INITIALIZED);
+        PWM_DET(PWM_INIT_SID, PWM_E_ALREADY_INITIALIZED);   // «1»
         return;
     }
     RCC->APB1ENR |= RCC_APB1ENR_TIM2EN | RCC_APB1ENR_TIM3EN | RCC_APB1ENR_TIM4EN;
@@ -55,7 +55,7 @@ FUNC(void, PWM_CODE) Pwm_Init(P2CONST(Pwm_ConfigType, AUTOMATIC, PWM_APPL_CONST)
     {
         P2CONST(Pwm_ChannelConfigType, AUTOMATIC, PWM_APPL_CONST) c = &ConfigPtr->channels[i];
         TIM_TypeDef *const tim = Pwm_Timer(c->timer);
-        tim->PSC = (uint16)((ConfigPtr->timerClockHz / ConfigPtr->countHz) - 1U);
+        tim->PSC = (uint16)((ConfigPtr->timerClockHz / ConfigPtr->countHz) - 1U);   // «2»
         tim->ARR = (uint32)ConfigPtr->period - 1U;
         const uint32 oc = (6UL << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE;   /* PWM mode 1, preload */
         if (c->tchannel <= 2U)
@@ -104,8 +104,8 @@ FUNC(void, PWM_CODE) Pwm_SetDutyCycle(Pwm_ChannelType ChannelNumber, uint16 Duty
         return;
     }
     P2CONST(Pwm_ChannelConfigType, AUTOMATIC, PWM_APPL_CONST) c = &Pwm_ConfigPtr->channels[ChannelNumber];
-    const uint32 duty = (DutyCycle > 0x8000U) ? 0x8000UL : (uint32)DutyCycle;      /* 0x8000 = 100 % */
-    *Pwm_Ccr(Pwm_Timer(c->timer), c->tchannel) = (duty * Pwm_ConfigPtr->period) >> 15;   /* next period */
+    const uint32 duty = (DutyCycle > 0x8000U) ? 0x8000UL : (uint32)DutyCycle;      /* 0x8000 = 100 % */   // «3»
+    *Pwm_Ccr(Pwm_Timer(c->timer), c->tchannel) = (duty * Pwm_ConfigPtr->period) >> 15;   /* next period */   // «4»
 }
 // [endregion]
 

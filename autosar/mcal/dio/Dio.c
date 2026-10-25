@@ -41,9 +41,9 @@ static FUNC(boolean, DIO_CODE) Dio_ValidChannel(Dio_ChannelType ChannelId, uint8
 // [region:channel]
 FUNC(Dio_LevelType, DIO_CODE) Dio_ReadChannel(Dio_ChannelType ChannelId)
 {
-    if (!Dio_ValidChannel(ChannelId, DIO_READCHANNEL_SID))
+    if (!Dio_ValidChannel(ChannelId, DIO_READCHANNEL_SID))   // «1»
     {
-        return STD_LOW;                                   /* the SWS asks for a defined value */
+        return STD_LOW;                                   /* the SWS asks for a defined value */   // «2»
     }
     const uint32 bit = 1UL << (ChannelId % 16U);
     return ((Dio_Gpio(ChannelId / 16U)->IDR & bit) != 0U) ? (Dio_LevelType)STD_HIGH : (Dio_LevelType)STD_LOW;
@@ -56,7 +56,7 @@ FUNC(void, DIO_CODE) Dio_WriteChannel(Dio_ChannelType ChannelId, Dio_LevelType L
         return;
     }
     const uint32 n = (uint32)ChannelId % 16U;
-    Dio_Gpio(ChannelId / 16U)->BSRR = (Level == STD_HIGH) ? (1UL << n) : (1UL << (n + 16U));   /* atomic */
+    Dio_Gpio(ChannelId / 16U)->BSRR = (Level == STD_HIGH) ? (1UL << n) : (1UL << (n + 16U));   /* atomic */   // «3»
 }
 // [endregion]
 

@@ -14,3 +14,10 @@ function(autosar_add target)
   bluepill_freertos(${target} CONFIG_DIR "${AR_CFG_DIR}")
   target_include_directories(${target}_freertos SYSTEM PUBLIC "${A}/include" "${A}/os_shim")
 endfunction()
+
+# The "before" halves of the AUTOSAR bad-vs-good gallery: compiled so they stay valid C, never linked.
+add_library(autosar_gallery STATIC "${CMAKE_CURRENT_SOURCE_DIR}/gallery/gallery.c")
+target_compile_options(autosar_gallery PRIVATE ${MCU_C_FLAGS} -Wno-conversion -Wno-sign-conversion -Wno-missing-prototypes)   # noted: bad code on purpose
+target_include_directories(autosar_gallery PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/det"
+  "${MCU_ROOT}/capstone/turnlight/stage3-autosar/cfg")
+target_link_libraries(autosar_gallery PRIVATE bluepill_cmsis)

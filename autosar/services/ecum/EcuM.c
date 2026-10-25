@@ -13,8 +13,8 @@
 // [region:init]
 FUNC(void, ECUM_CODE) EcuM_Init(void)
 {
-    EcuM_AL_DriverInitZero();                       /* Det: before anything can report an error */
-    Mcu_Init(&Mcu_Config);
+    EcuM_AL_DriverInitZero();                       /* Det: before anything can report an error */   // «1»
+    Mcu_Init(&Mcu_Config);                                                                               // «2»
     if (Mcu_InitClock(0U) == E_OK)                  /* clock setting 0: HSE 8 MHz x 9 = 72 MHz */
     {
         for (uint32 n = 0U; (n < 200000UL) && (Mcu_GetPllStatus() != MCU_PLL_LOCKED); ++n)
@@ -23,13 +23,13 @@ FUNC(void, ECUM_CODE) EcuM_Init(void)
         }
         (void)Mcu_DistributePllClock();             /* on failure the ECU keeps running on HSI */
     }
-    EcuM_AL_DriverInitOne();                        /* Port, Dio, ... : everything the OS needs */
-    StartOS(OSDEFAULTAPPMODE);                      /* does not return */
+    EcuM_AL_DriverInitOne();                        /* Port, Dio, ... : everything the OS needs */  // «3»
+    StartOS(OSDEFAULTAPPMODE);                      /* does not return */                           // «4»
 }
 
 FUNC(void, ECUM_CODE) EcuM_StartupTwo(void)
 {
-    EcuM_AL_DriverInitTwo();                        /* drivers needing the OS tick, the stack, the RTE */
+    EcuM_AL_DriverInitTwo();                        /* drivers needing the OS tick, the stack, the RTE */ // «5»
 }
 // [endregion]
 

@@ -21,11 +21,11 @@
 #define LOCAL_INLINE    static inline
 
 // [region:macros]
-#define FUNC(rettype, memclass)                         rettype
+#define FUNC(rettype, memclass)                         rettype   // «1»
 #define FUNC_P2CONST(rettype, ptrclass, memclass)       const rettype *
 #define FUNC_P2VAR(rettype, ptrclass, memclass)         rettype *
-#define P2VAR(ptrtype, memclass, ptrclass)              ptrtype *
-#define P2CONST(ptrtype, memclass, ptrclass)            const ptrtype *
+#define P2VAR(ptrtype, memclass, ptrclass)              ptrtype *   // «2»
+#define P2CONST(ptrtype, memclass, ptrclass)            const ptrtype *   // «3»
 #define CONSTP2VAR(ptrtype, memclass, ptrclass)         ptrtype * const
 #define CONSTP2CONST(ptrtype, memclass, ptrclass)       const ptrtype * const
 #define P2FUNC(rettype, ptrclass, fctname)              rettype (*fctname)

@@ -156,6 +156,8 @@ def main():
         for m in re.finditer(r"cppcheck-suppress\s+[\w.-]+(.*)", text):
             if not re.search(r"DEV-\d{3}", m.group(1)):
                 err("deviation", p, "cppcheck suppression without a DEV-nnn record")
+        if "gallery" in p.parts:
+            continue                                   # the "before" halves break the rules on purpose
         check_memmap(p, text)
         check_det(p, text)
         if p.is_relative_to(LIB) and p.suffix == ".h":

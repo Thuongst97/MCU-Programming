@@ -49,16 +49,16 @@ FUNC(void, PORT_CODE) Port_Init(P2CONST(Port_ConfigType, AUTOMATIC, PORT_APPL_CO
 {
     if (ConfigPtr == NULL_PTR)
     {
-        PORT_DET(PORT_INIT_SID, PORT_E_PARAM_POINTER);
+        PORT_DET(PORT_INIT_SID, PORT_E_PARAM_POINTER);   // «1»
         return;
     }
     if ((ConfigPtr->afioMapr & AFIO_MAPR_SWJ_CFG) == AFIO_MAPR_SWJ_CFG_DISABLE)
     {
-        PORT_DET(PORT_INIT_SID, PORT_E_PARAM_CONFIG);    /* would lock out the debugger: refuse */
+        PORT_DET(PORT_INIT_SID, PORT_E_PARAM_CONFIG);    /* would lock out the debugger: refuse */   // «2»
         return;
     }
     RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPCEN | RCC_APB2ENR_AFIOEN;
-    AFIO->MAPR = ConfigPtr->afioMapr;
+    AFIO->MAPR = ConfigPtr->afioMapr;   // «3»
     for (uint8 i = 0U; i < ConfigPtr->numPins; ++i)
     {
         if (ConfigPtr->pins[i].pin >= PORT_NUM_PINS)
@@ -66,9 +66,9 @@ FUNC(void, PORT_CODE) Port_Init(P2CONST(Port_ConfigType, AUTOMATIC, PORT_APPL_CO
             PORT_DET(PORT_INIT_SID, PORT_E_PARAM_PIN);
             continue;
         }
-        Port_ApplyPin(&ConfigPtr->pins[i]);
+        Port_ApplyPin(&ConfigPtr->pins[i]);   // «4»
     }
-    Port_ConfigPtr = ConfigPtr;
+    Port_ConfigPtr = ConfigPtr;   // «5»
 }
 // [endregion]
 

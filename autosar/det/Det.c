@@ -30,15 +30,15 @@ FUNC(void, DET_CODE) Det_Init(P2CONST(Det_ConfigType, AUTOMATIC, DET_APPL_CONST)
 FUNC(Std_ReturnType, DET_CODE) Det_ReportError(uint16 ModuleId, uint8 InstanceId, uint8 ApiId, uint8 ErrorId)
 {
     P2VAR(Det_ErrorType, AUTOMATIC, DET_VAR) e = &Det_Log[Det_Count % DET_LOG_SIZE];
-    e->moduleId = ModuleId;                               /* who, which instance, which API, what */
+    e->moduleId = ModuleId;                               /* who, which instance, which API, what */   // «1»
     e->instanceId = InstanceId;
     e->apiId = ApiId;
     e->errorId = ErrorId;
     Det_Count++;
 #ifdef DET_CALLOUT
-    DET_CALLOUT(ModuleId, InstanceId, ApiId, ErrorId);   /* e.g. print it, or halt for the debugger */
+    DET_CALLOUT(ModuleId, InstanceId, ApiId, ErrorId);   /* e.g. print it, or halt for the debugger */   // «2»
 #endif
-    return E_OK;                                          /* development errors never fail the caller */
+    return E_OK;                                          /* development errors never fail the caller */   // «3»
 }
 // [endregion]
 

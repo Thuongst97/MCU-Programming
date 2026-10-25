@@ -150,11 +150,11 @@ FUNC(Std_ReturnType, CAN_CODE) Can_Write(Can_HwHandleType Hth, P2CONST(Can_PduTy
             CAN1->sTxMailBox[m].TDHR = (uint32)d[4] | ((uint32)d[5] << 8) | ((uint32)d[6] << 16) | ((uint32)d[7] << 24);
             Can_TxPdu[m] = PduInfo->swPduHandle;
             Can_TxBusy[m] = TRUE;
-            CAN1->sTxMailBox[m].TIR = ((PduInfo->id & 0x7FFU) << CAN_TI0R_STID_Pos) | CAN_TI0R_TXRQ;   /* send */
+            CAN1->sTxMailBox[m].TIR = ((PduInfo->id & 0x7FFU) << CAN_TI0R_STID_Pos) | CAN_TI0R_TXRQ;   /* send */   // «2»
             return E_OK;
         }
     }
-    return CAN_BUSY;                                         /* CanIf may buffer and retry */
+    return CAN_BUSY;                                         /* CanIf may buffer and retry */   // «1»
 }
 // [endregion]
 
@@ -172,7 +172,7 @@ FUNC(void, CAN_CODE) Can_MainFunction_Write(void)
             Can_TxBusy[m] = FALSE;
             if ((tsr & txok[m]) != 0U)
             {
-                CanIf_TxConfirmation(Can_TxPdu[m]);          /* acknowledged on the bus */
+                CanIf_TxConfirmation(Can_TxPdu[m]);          /* acknowledged on the bus */   // «3»
             }
         }
     }
@@ -204,7 +204,7 @@ FUNC(void, CAN_CODE) Can_MainFunction_Read(void)
         const Can_HwType mailbox = {(rir >> CAN_RI0R_STID_Pos) & 0x7FFU, CanConf_CanHardwareObject_Rx, 0U};
         const uint8 dlc = (uint8)(rdtr & CAN_RDT0R_DLC);
         const PduInfoType pdu = {data, NULL_PTR, (PduLengthType)((dlc > 8U) ? 8U : dlc)};
-        CanIf_RxIndication(&mailbox, &pdu);                  /* up the stack, in task context */
+        CanIf_RxIndication(&mailbox, &pdu);                  /* up the stack, in task context */   // «4»
     }
 }
 // [endregion]
