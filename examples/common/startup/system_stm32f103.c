@@ -7,11 +7,14 @@
 
 uint32_t SystemCoreClock = 8000000U;   /* HSI after reset (RM0008 §7.2) */
 
+typedef void (*vector_t)(void);
+extern const vector_t g_vector_table[];   /* startup_stm32f103.c; its address depends on the image */
+
 void SystemInit(void)
 {
-    /* The vector table stays at the start of flash (0x08000000). Setting VTOR explicitly keeps
-     * the behaviour identical in Renode, which does not model the boot-pin memory alias. */
-    SCB->VTOR = FLASH_BASE;
+    /* Point VTOR at this image's own vector table: 0x08000000 for a normal program, the start of
+     * the application slot for an image started by a bootloader (example 12, module 16). */
+    SCB->VTOR = (uint32_t)(uintptr_t)g_vector_table;
     SystemCoreClock = 8000000U;
 }
 

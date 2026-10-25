@@ -283,6 +283,35 @@ window.MCU_DATA.examples = [
   "folder": "09-lowpower-stop"
  },
  {
+  "id": "10",
+  "title": "FreeRTOS basics: tasks, a queue, a mutex and an ISR semaphore",
+  "modules": [
+   "rtos"
+  ],
+  "peripherals": [
+   "SysTick",
+   "PendSV",
+   "SVCall",
+   "EXTI",
+   "USART1",
+   "GPIOC"
+  ],
+  "flavor": "FreeRTOS (static allocation)",
+  "pins": [
+   "PA0",
+   "PC13",
+   "PA9",
+   "PA10"
+  ],
+  "hw": [
+   "push button from PA0 to GND (optional)",
+   "USB-UART adapter"
+  ],
+  "sim": "full",
+  "tested_on": [],
+  "folder": "10-freertos-basics"
+ },
+ {
   "id": "11",
   "title": "Two Blue Pills on a CAN bus",
   "modules": [

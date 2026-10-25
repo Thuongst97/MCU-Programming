@@ -57,7 +57,7 @@ function(bluepill_add_executable name)
     set(BP_LINKER_SCRIPT "${MCU_COMMON}/ld/stm32f103c8_64k.ld")
   endif()
   add_executable(${name} ${BP_SOURCES})
-  set_target_properties(${name} PROPERTIES SUFFIX ".elf" LINK_DEPENDS "${BP_LINKER_SCRIPT}")
+  set_target_properties(${name} PROPERTIES SUFFIX ".elf" LINK_DEPENDS "${BP_LINKER_SCRIPT};${MCU_COMMON}/ld/stm32f103_sections.ld")
   target_compile_options(${name} PRIVATE ${MCU_C_FLAGS})
   target_include_directories(${name} PRIVATE ${BP_INCLUDES})
   target_compile_definitions(${name} PRIVATE ${BP_DEFINES})
@@ -72,7 +72,7 @@ function(bluepill_add_executable name)
     target_link_options(${name} PRIVATE -nostartfiles)
   endif()
   # [region:link]
-  target_link_options(${name} PRIVATE ${MCU_CPU_FLAGS}
+  target_link_options(${name} PRIVATE ${MCU_CPU_FLAGS} -L "${MCU_COMMON}/ld"
     -T "${BP_LINKER_SCRIPT}" --specs=nano.specs --specs=nosys.specs                # «7»
     -Wl,--gc-sections -Wl,-Map=$<TARGET_FILE_DIR:${name}>/${name}.map -Wl,--print-memory-usage)   # «8»
   add_custom_command(TARGET ${name} POST_BUILD
@@ -92,4 +92,21 @@ function(bluepill_add_executable name)
       COMMAND ${RENODE} -e "$$bin=@$<TARGET_FILE:${name}>; include @${BP_RENODE_SCRIPT}"
       DEPENDS ${name} USES_TERMINAL VERBATIM)
   endif()
+endfunction()
+
+# bluepill_freertos(<target> CONFIG_DIR <dir>)
+# Compiles the vendored FreeRTOS kernel (third_party/freertos_kernel, Cortex-M3 port, static
+# allocation only: no heap_x.c) with the FreeRTOSConfig.h found in <dir>, and links it into
+# <target>. Vendor code is built without our warning flags; its headers are SYSTEM includes.
+function(bluepill_freertos target)
+  cmake_parse_arguments(FR "" "CONFIG_DIR" "" ${ARGN})
+  set(K "${MCU_ROOT}/third_party/freertos_kernel")
+  add_library(${target}_freertos STATIC
+    "${K}/tasks.c" "${K}/queue.c" "${K}/list.c" "${K}/timers.c" "${K}/event_groups.c"
+    "${K}/portable/GCC/ARM_CM3/port.c")
+  target_include_directories(${target}_freertos SYSTEM PUBLIC
+    "${K}/include" "${K}/portable/GCC/ARM_CM3" "${FR_CONFIG_DIR}")
+  target_compile_options(${target}_freertos PRIVATE ${MCU_CPU_FLAGS} -std=c11 -ffunction-sections -fdata-sections -g3 -w)
+  target_link_libraries(${target}_freertos PUBLIC bluepill_cmsis)
+  target_link_libraries(${target} PRIVATE ${target}_freertos)
 endfunction()

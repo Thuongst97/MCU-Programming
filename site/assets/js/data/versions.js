@@ -109,6 +109,11 @@ window.MCU_DATA.versions = {
    "name": "Unity unit-test framework",
    "version": "v2.7.0",
    "url": "https://github.com/ThrowTheSwitch/Unity"
+  },
+  "freertos_kernel": {
+   "name": "FreeRTOS-Kernel (example 10, capstone stage 2, AUTOSAR OS shim)",
+   "version": "V11.3.2",
+   "url": "https://github.com/FreeRTOS/FreeRTOS-Kernel"
   }
  }
 };

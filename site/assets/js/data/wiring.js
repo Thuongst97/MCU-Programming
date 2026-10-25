@@ -41,6 +41,8 @@
     "11": { title: "Example 11 (each node): SN65HVD230 on PB8/PB9; node A also has a button on PA0", highlight: ["PB8", "PB9", "PA0"],
       wiring: [...SWD, ...UART, { pin: "left:3V3", to: "sn65.3V3", kind: "power" }, { pin: "left:GND", to: "sn65.GND", kind: "ground" },
         { pin: "B9", to: "sn65.D" }, { pin: "B8", to: "sn65.R" }, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
+    "10": { title: "Example 10: optional button on PA0 (EXTI0 → semaphore)", highlight: ["PA0", "PC13", "PA9", "PA10"],
+      wiring: [...SWD, ...UART, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
     "03": { title: "Example 03: LED on PA6 (TIM3 CH1), jumper PA6 → PA0 (TIM2 CH1)", highlight: ["PA6", "PA0", "PA9", "PA10"],
       wiring: [...SWD, ...UART, { pin: "A6", to: "led.A" }, { pin: "right:GND", to: "led.K", kind: "ground" }, { pin: "A6", to: "jumper.1" }, { pin: "A0", to: "jumper.2" }] },
   };
