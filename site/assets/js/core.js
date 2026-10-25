@@ -499,10 +499,10 @@
     stm32Base: { t: "STM32-base — Blue Pill board page and schematic notes", url: "https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html", kind: "community" },
   };
   const REFS = {
-    "autosar-review": [],
-    "autosar-diag-nvm": [],
-    "autosar-os-com": [],
-                                "autosar-mcal": ["arSrsBswGeneral", "arModuleList", "arStdTypes", "arPlatformTypes", "arCompilerAbs", "arMemMap", "arDet", "arPort", "arDio", "arPwm", "arAdc", "arCan", "arWdg", "rm0008Gpio"],
+                                            "autosar-review": ["arSrsBswGeneral", "arLayered", "misraC", "misraCompliance", "iso26262", "arMcu"],
+    "autosar-diag-nvm": ["iso14229", "iso15765", "arDem", "arDcm", "arCanTp", "arNvM", "arFee", "ds5319Flash"],
+    "autosar-os-com": ["arOs", "iso17356", "arRte", "arCom", "arPduR", "arCanIf", "arCan", "arEcuM", "iso11898"],
+    "autosar-mcal": ["arSrsBswGeneral", "arModuleList", "arStdTypes", "arPlatformTypes", "arCompilerAbs", "arMemMap", "arDet", "arPort", "arDio", "arPwm", "arAdc", "arCan", "arWdg", "rm0008Gpio"],
     "autosar-swc": ["arRte", "arSwcTemplate", "arLayered", "arCom", "arDem"],
     "autosar-arch": ["arLayered", "arMethodology", "arModuleList", "arSrsBswGeneral", "autosarRelease", "arEcuM"],
     "quality": ["misraC", "misraCompliance", "cppcheckManual", "unity", "cmock", "ctest", "gccAnalyzer", "gccArm"],

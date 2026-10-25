@@ -67,9 +67,9 @@ static void Os_TaskEntry(void *arg)
     {
         if (c->extended == FALSE)
         {
-            (void)ulTaskNotifyTake(pdTRUE, portMAX_DELAY);   /* suspended until ActivateTask() */
+            (void)ulTaskNotifyTake(pdTRUE, portMAX_DELAY);   /* suspended until ActivateTask() */   // «1»
         }
-        c->entry();                                          /* the TASK() body, ends with TerminateTask() */
+        c->entry();                                          /* the TASK() body, ends with TerminateTask() */   // «2»
         if (Os_Task[t].rechain == TRUE)
         {
             Os_Task[t].rechain = FALSE;
@@ -98,7 +98,7 @@ StatusType ActivateTask(TaskType TaskID)
     taskEXIT_CRITICAL();
     if (busy == TRUE)
     {
-        return Os_Error(E_OS_LIMIT);                         /* still running or already pending */
+        return Os_Error(E_OS_LIMIT);                         /* still running or already pending */   // «3»
     }
     (void)xTaskNotifyGive(Os_Task[TaskID].handle);
     return E_OK;
@@ -139,12 +139,12 @@ static void Os_AlarmExpired(TimerHandle_t timer)
     if ((Os_AlarmFirst[a] == TRUE) && (Os_AlarmCycle[a] != 0U))
     {
         Os_AlarmFirst[a] = FALSE;
-        (void)xTimerChangePeriod(timer, (TickType_t)Os_AlarmCycle[a], 0);   /* from now on: the cycle */
+        (void)xTimerChangePeriod(timer, (TickType_t)Os_AlarmCycle[a], 0);   /* from now on: the cycle */   // «4»
     }
     switch (c->action)
     {
     case OS_ALARM_ACTIVATETASK:
-        (void)ActivateTask(c->task);                         /* E_OS_LIMIT = the task overran its period */
+        (void)ActivateTask(c->task);                         /* E_OS_LIMIT = the task overran its period */   // «5»
         break;
     case OS_ALARM_SETEVENT:
         (void)SetEvent(c->task, c->event);

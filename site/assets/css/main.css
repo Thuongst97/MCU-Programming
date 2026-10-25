@@ -1048,3 +1048,15 @@ table.t.arb tr.arb-bus td { font-weight: 700; color: var(--copper); border-top: 
 
 /* code shows the characters you type: no ">=" -> "≥" ligatures */
 code, pre, kbd, .code-block, .code-block * { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+
+/* DTC status byte viewer (autosar-diag-nvm.html) */
+.dtcb-host { padding: 14px; margin: 14px 0; }
+.dtcb-row { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+.dtcb-bit { display: flex; flex-direction: column; align-items: center; padding: 6px 0; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font: 13px var(--mono); }
+.dtcb-bit small { color: var(--muted); font-size: 10px; }
+.dtcb-bit.on { border-color: var(--copper); background: color-mix(in srgb, var(--copper) 18%, var(--surface)); }
+.dtcb-hex { margin: 10px 0 4px; }
+.dtcb-list { list-style: none; padding: 0; margin: 0; font-size: 13.5px; color: var(--muted); }
+.dtcb-list li { padding: 3px 0; }
+.dtcb-list li.on { color: var(--text); }
+.ref-item { min-width: 0; overflow-wrap: anywhere; }

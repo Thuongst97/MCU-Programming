@@ -66,7 +66,7 @@ FUNC(uint8, COM_CODE) Com_SendSignal(Com_SignalIdType SignalId, P2CONST(void, AU
         return COM_SERVICE_NOT_AVAILABLE;
     }
     P2CONST(Com_SignalConfigType, AUTOMATIC, COM_APPL_CONST) s = &Com_ConfigPtr->signals[SignalId];
-    const uint32 mask = (1UL << s->bitSize) - 1U;
+    const uint32 mask = (1UL << s->bitSize) - 1U;   // «1»
     // cppcheck-suppress misra-c2012-11.5 ; DEV-002
     const uint32 value = (uint32)(*(const uint8 *)SignalDataPtr) & mask;     /* 1..8 bit unsigned */
     P2VAR(uint8, AUTOMATIC, COM_VAR) d = Com_IPdu[s->ipdu].data;
@@ -80,7 +80,7 @@ FUNC(uint8, COM_CODE) Com_SendSignal(Com_SignalIdType SignalId, P2CONST(void, AU
     d[3] = (uint8)(word >> 24U);
     if ((s->triggeredOnChange == TRUE) && (old != value))
     {
-        Com_IPdu[s->ipdu].pending = TRUE;                                     /* mixed mode: send now */
+        Com_IPdu[s->ipdu].pending = TRUE;                                     /* mixed mode: send now */   // «2»
     }
     SchM_Exit_Com_COM_EXCLUSIVE_AREA_0();
     return E_OK;
@@ -124,7 +124,7 @@ FUNC(void, COM_CODE) Com_MainFunctionTx(void)
             continue;
         }
         Com_IPdu[i].timerMs += Com_ConfigPtr->mainFunctionPeriodMs;
-        if ((Com_IPdu[i].pending == TRUE) || (Com_IPdu[i].timerMs >= c->periodMs))       /* on change or cycle */
+        if ((Com_IPdu[i].pending == TRUE) || (Com_IPdu[i].timerMs >= c->periodMs))       /* on change or cycle */   // «3»
         {
             uint8 copy[8];
             SchM_Enter_Com_COM_EXCLUSIVE_AREA_0();
@@ -135,7 +135,7 @@ FUNC(void, COM_CODE) Com_MainFunctionTx(void)
             Com_IPdu[i].pending = FALSE;
             SchM_Exit_Com_COM_EXCLUSIVE_AREA_0();
             PduInfoType pdu = {copy, NULL_PTR, c->length};
-            if ((c->txCallout == NULL_PTR) || (c->txCallout((PduIdType)i, &pdu) == TRUE))   /* e.g. alive counter */
+            if ((c->txCallout == NULL_PTR) || (c->txCallout((PduIdType)i, &pdu) == TRUE))   /* e.g. alive counter */   // «4»
             {
                 (void)PduR_ComTransmit(c->lowerPduId, &pdu);                    /* refused: next cycle repeats */
             }
@@ -161,7 +161,7 @@ FUNC(void, COM_CODE) Com_MainFunctionRx(void)
         Com_IPdu[i].timerMs += Com_ConfigPtr->mainFunctionPeriodMs;
         const boolean expired = (Com_IPdu[i].timerMs >= c->timeoutMs) ? TRUE : FALSE;
         SchM_Exit_Com_COM_EXCLUSIVE_AREA_0();
-        if (expired == TRUE)                                                   /* deadline monitoring */
+        if (expired == TRUE)                                                   /* deadline monitoring */   // «5»
         {
             Com_IPdu[i].timedOut = TRUE;
             if (c->timeoutNotification != NULL_PTR)

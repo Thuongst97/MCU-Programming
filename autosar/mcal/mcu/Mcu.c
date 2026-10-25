@@ -32,6 +32,7 @@ static VAR(uint32, MCU_VAR) Mcu_ResetRaw;
 #define MCU_START_SEC_CODE
 #include "Mcu_MemMap.h"
 
+// [region:wait]
 static FUNC(boolean, MCU_CODE) Mcu_WaitSet(volatile uint32 *reg, uint32 mask, uint32 value)
 {
     for (uint32 n = 0U; n < MCU_WAIT_LOOPS; ++n)
@@ -43,6 +44,7 @@ static FUNC(boolean, MCU_CODE) Mcu_WaitSet(volatile uint32 *reg, uint32 mask, ui
     }
     return FALSE;                                         /* every hardware wait has a timeout */
 }
+// [endregion]
 
 FUNC(void, MCU_CODE) Mcu_Init(P2CONST(Mcu_ConfigType, AUTOMATIC, MCU_APPL_CONST) ConfigPtr)
 {

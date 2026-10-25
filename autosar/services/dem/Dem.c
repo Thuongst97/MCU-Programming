@@ -54,7 +54,7 @@ FUNC(Std_ReturnType, DEM_CODE) Dem_SetEventStatus(Dem_EventIdType EventId, Dem_E
     P2CONST(Dem_EventParameterType, AUTOMATIC, DEM_APPL_CONST) p = &Dem_ConfigPtr->events[i];
     SchM_Enter_Dem_DEM_EXCLUSIVE_AREA_0();
     sint16 c = Dem_Counter[i];
-    switch (EventStatus)                                               /* counter-based debouncing */
+    switch (EventStatus)                                               /* counter-based debouncing */   // «1»
     {
     case DEM_EVENT_STATUS_PREFAILED:
         c = ((c + p->stepUp) > p->failThreshold) ? p->failThreshold : (sint16)(c + p->stepUp);
@@ -63,7 +63,7 @@ FUNC(Std_ReturnType, DEM_CODE) Dem_SetEventStatus(Dem_EventIdType EventId, Dem_E
         c = ((c - p->stepDown) < p->passThreshold) ? p->passThreshold : (sint16)(c - p->stepDown);
         break;
     case DEM_EVENT_STATUS_FAILED:
-        c = p->failThreshold;                                          /* qualified at once */
+        c = p->failThreshold;                                          /* qualified at once */   // «2»
         break;
     default:
         c = p->passThreshold;
@@ -72,7 +72,7 @@ FUNC(Std_ReturnType, DEM_CODE) Dem_SetEventStatus(Dem_EventIdType EventId, Dem_E
     Dem_Counter[i] = c;
     const Dem_UdsStatusByteType old = Dem_Status[i];
     Dem_UdsStatusByteType st = old;
-    if (c >= p->failThreshold)
+    if (c >= p->failThreshold)   // «3»
     {
         st |= DEM_UDS_STATUS_TF | DEM_UDS_STATUS_TFTOC | DEM_UDS_STATUS_PDTC | DEM_UDS_STATUS_CDTC |
               DEM_UDS_STATUS_TFSLC;                                    /* confirmed at the first failure */
@@ -80,7 +80,7 @@ FUNC(Std_ReturnType, DEM_CODE) Dem_SetEventStatus(Dem_EventIdType EventId, Dem_E
     }
     else if (c <= p->passThreshold)
     {
-        st &= (Dem_UdsStatusByteType)~DEM_UDS_STATUS_TF;               /* the rest stays as history */
+        st &= (Dem_UdsStatusByteType)~DEM_UDS_STATUS_TF;               /* the rest stays as history */   // «4»
         st &= (Dem_UdsStatusByteType)~(DEM_UDS_STATUS_TNCSLC | DEM_UDS_STATUS_TNCTOC);
     }
     else
@@ -91,7 +91,7 @@ FUNC(Std_ReturnType, DEM_CODE) Dem_SetEventStatus(Dem_EventIdType EventId, Dem_E
     SchM_Exit_Dem_DEM_EXCLUSIVE_AREA_0();
     if ((st != old) && (Dem_ConfigPtr->statusChanged != NULL_PTR))
     {
-        Dem_ConfigPtr->statusChanged(EventId, old, st);
+        Dem_ConfigPtr->statusChanged(EventId, old, st);   // «5»
     }
     return E_OK;
 }

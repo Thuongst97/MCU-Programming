@@ -30,17 +30,17 @@ FUNC(void, LAMPMONITOR_CODE) RE_LampMonitor_10ms(void)
     boolean onL = FALSE;
     boolean onR = FALSE;
     uint16 raw = 0U;
-    (void)Rte_Read_LampState_Left(&onL);
+    (void)Rte_Read_LampState_Left(&onL);   // «1»
     (void)Rte_Read_LampState_Right(&onR);
-    (void)Rte_Call_LampCurrent_Get(&raw);
+    (void)Rte_Call_LampCurrent_Get(&raw);   // «2»
     const bool on[TL_SIDES] = {onL == TRUE, onR == TRUE};
     lampmon_event_t ev[TL_SIDES];
-    lampmon_step(&LampMonitor_State, on, raw, 10U, ev);
+    lampmon_step(&LampMonitor_State, on, raw, 10U, ev);   // «3»
     if (ev[TL_LEFT] != LAMPMON_NO_CHANGE)
     {
         const boolean f = LampMonitor_State.failed[TL_LEFT] ? TRUE : FALSE;
-        (void)Rte_Write_LampFailed_Left(f);                                    /* to TurnLight and Com */
-        (void)Rte_Call_EvLampOutLeft_SetEventStatus((f == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);
+        (void)Rte_Write_LampFailed_Left(f);                                    /* to TurnLight and Com */   // «4»
+        (void)Rte_Call_EvLampOutLeft_SetEventStatus((f == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);   // «5»
     }
     if (ev[TL_RIGHT] != LAMPMON_NO_CHANGE)
     {

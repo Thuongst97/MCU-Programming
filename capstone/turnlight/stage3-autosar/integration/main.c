@@ -70,14 +70,14 @@ void EcuM_AL_DriverInitTwo(void)
     IoHwAb_Init(&IoHwAb_Config);
     Wdg_Init(&Wdg_Config);
     WdgM_Init(&WdgM_Config);
-    (void)CanIf_SetControllerMode(CanConf_CanController_0, CAN_CS_STARTED);   /* production: CanSM via BswM */
+    (void)CanIf_SetControllerMode(CanConf_CanController_0, CAN_CS_STARTED);   /* production: CanSM via BswM */   // «2»
     (void)Rte_Start();
 }
 
 TASK(Init)
 {
     EcuM_StartupTwo();
-    (void)SetRelAlarm(OsAlarm_5ms_ID, 5U, 5U);           /* production: autostart alarms in the OS config */
+    (void)SetRelAlarm(OsAlarm_5ms_ID, 5U, 5U);           /* production: autostart alarms in the OS config */   // «1»
     (void)SetRelAlarm(OsAlarm_10ms_ID, 10U, 10U);
     (void)SetRelAlarm(OsAlarm_50ms_ID, 50U, 50U);
     (void)TerminateTask();
@@ -97,7 +97,7 @@ boolean Integration_TurnLightStatusTxCallout(PduIdType id, PduInfoType *pdu)
 
 void Integration_DemStatusChanged(uint16 EventId, uint8 oldStatus, uint8 newStatus)
 {
-    if (((oldStatus ^ newStatus) & DEM_UDS_STATUS_TF) != 0U)    /* testFailed changed */
+    if (((oldStatus ^ newStatus) & DEM_UDS_STATUS_TF) != 0U)    /* testFailed changed */   // «3»
     {
         uart_puts("dem: ");
         uart_puts(Dem_Config.events[EventId - 1U].name);
