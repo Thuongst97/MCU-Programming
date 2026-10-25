@@ -361,7 +361,7 @@
         ["usb", "USB not enumerating", "r10 1.5k pull-up d+"],
         ["can-silent", "CAN sends nothing", "no ack termination transceiver silent loopback"],
       ] },
-    { id: "automotive-mcus", status: "planned", phase: 8, file: "automotive-mcus.html", num: "C", group: "Reference",
+    { id: "automotive-mcus", status: "ready", phase: 8, file: "automotive-mcus.html", num: "C", group: "Reference",
       title: "From Blue Pill to Automotive-Grade MCUs", short: "Automotive MCUs", icon: "🏭", accent: "#94a3b8",
       desc: "How each lesson maps to NXP S32K1xx, Infineon AURIX TC3xx and Renesas RH850: qualification, safety, vendor MCAL and tooling.",
       sections: [
@@ -369,7 +369,7 @@
         ["mapping", "Lesson mapping table", "s32k aurix rh850 mapping"],
         ["vendor-mcal", "Vendor MCAL and tools", "rtd mcal tresos davinci"],
       ] },
-    { id: "ll-drivers", status: "planned", phase: 8, file: "ll-drivers.html", num: "D", group: "Reference",
+    { id: "ll-drivers", status: "ready", phase: 8, file: "ll-drivers.html", num: "D", group: "Reference",
       title: "Appendix: ST's LL Drivers", short: "LL Drivers", icon: "📚", accent: "#94a3b8",
       desc: "What ST's Low-Layer drivers are, how they map onto the registers you already know, and when a team picks registers, LL or HAL.",
       sections: [
@@ -497,10 +497,18 @@
     iso15765: { t: "ISO 15765-2 — Diagnostic communication over CAN, transport protocol (summary)", url: "https://www.iso.org/standard/84211.html", doc: "ISO 15765-2:2024", kind: "iso" },
     iso26262: { t: "ISO 26262 — Road vehicles, functional safety (overview)", url: "https://www.iso.org/standard/68383.html", doc: "ISO 26262-1:2018", kind: "iso" },
     iso17356: { t: "ISO 17356-3 — OSEK/VDX operating system (summary)", url: "https://www.iso.org/standard/40079.html", doc: "ISO 17356-3:2005", kind: "iso" },
+    stm32CubeF1: { t: "STM32CubeF1 — HAL and LL drivers (ST)", url: "https://github.com/STMicroelectronics/STM32CubeF1", kind: "st" },
+    um1850: { t: "UM1850 — Description of STM32F1 HAL and low-layer drivers", url: ST + "user_manual/um1850-description-of-stm32f1-hal-and-lowlayer-drivers-stmicroelectronics.pdf", doc: "UM1850", kind: "st" },
+    nxpS32k: { t: "NXP S32K automotive microcontrollers (product family)", url: "https://www.nxp.com/products/processors-and-microcontrollers/s32-automotive-platform/s32k-auto-general-purpose-mcus:S32K-MCUS", kind: "datasheet" },
+    infineonAurix: { t: "Infineon AURIX TC3xx microcontrollers (product family)", url: "https://www.infineon.com/cms/en/product/microcontroller/32-bit-tricore-microcontroller/32-bit-tricore-aurix-tc3xx/", kind: "datasheet" },
+    renesasRh850: { t: "Renesas RH850 automotive microcontrollers (product family)", url: "https://www.renesas.com/en/products/microcontrollers-microprocessors/rh850-automotive-mcus", kind: "datasheet" },
+    aecQ100: { t: "AEC-Q100 — failure mechanism based stress test qualification for integrated circuits", url: "http://www.aecouncil.com/AECDocuments.html", doc: "AEC-Q100", kind: "spec" },
     stm32Base: { t: "STM32-base — Blue Pill board page and schematic notes", url: "https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html", kind: "community" },
   };
   const REFS = {
-                                                        "capstone-autosar": ["arLayered", "arRte", "arCom", "arWdgM", "arDem", "arEcuM", "arOs", "arModuleList"],
+                                                                "automotive-mcus": ["aecQ100", "iso26262", "nxpS32k", "infineonAurix", "renesasRh850", "ds5319", "arLayered"],
+    "ll-drivers": ["um1850", "stm32CubeF1", "rm0008Rcc", "rm0008Gpio", "cmsisDeviceF1"],
+    "capstone-autosar": ["arLayered", "arRte", "arCom", "arWdgM", "arDem", "arEcuM", "arOs", "arModuleList"],
     "capstone-rtos": ["freertosCm3", "freertosConfig", "freertosStack", "freertosKernel", "rm0008Iwdg", "pm0056Exc"],
     "capstone-baremetal": ["uneceR48", "rm0008Tim", "rm0008Can", "rm0008Adc", "rm0008Iwdg", "iso11898", "renodeDocs"],
     "autosar-review": ["arSrsBswGeneral", "arLayered", "misraC", "misraCompliance", "iso26262", "arMcu"],

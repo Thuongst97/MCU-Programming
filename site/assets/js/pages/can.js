@@ -146,6 +146,15 @@
     ],
   });
 
+  const N13 = {
+    1: ["Parity P0", "Even parity over ID bits 0, 1, 2 and 4."],
+    2: ["Parity P1", "Odd parity over ID bits 1, 3, 4 and 5. A slave drops a header whose parity does not match."],
+    3: ["Enhanced checksum", "LIN 2.x includes the protected ID; the classic LIN 1.x checksum covers the data only (and is still used for the diagnostic frames 0x3C/0x3D)."],
+    4: ["Sum with carry", "An 8-bit sum where every carry is added back in."],
+    5: ["Inverted", "The receiver adds everything including the checksum and expects 0xFF."],
+  };
+  renderCodeExplorer($("#ex-13-pid"), { ...embedded("src-13-pid"), notes: N13 });
+  renderCodeExplorer($("#ex-13-cs"), { ...embedded("src-13-cs"), notes: N13 });
   Checklist($("#ck-can"), [
     "You can explain dominant and recessive, and why the lowest ID wins arbitration.",
     "You can compute <code>CAN_BTR</code> for 500 kbit/s and 250 kbit/s at 36 MHz.",

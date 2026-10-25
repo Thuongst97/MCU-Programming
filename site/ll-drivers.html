@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Appendix: ST&#x27;s LL Drivers — MCU Academy</title>
+  <meta name="description" content="What ST&#x27;s Low-Layer drivers are, how they map onto the registers you already know, and when a team picks registers, LL or HAL.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="ll-drivers">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Reference D</span><span>/</span><span>LL Drivers</span></nav>
+          <div class="eyebrow">Reference D · Reference</div>
+          <h1>Appendix: ST&#x27;s LL Drivers</h1>
+          <p class="lead">The course writes registers through the CMSIS header. ST offers two layers on top: HAL, which you met on the setup page, and the Low-Layer (LL) drivers. This appendix shows what LL is, puts it next to the register code you already know, and helps you decide which one a project should use.</p>
+          <div class="page-meta"><span>⏱ 20 min read</span><span>🎯 Beginner</span><span>📂 examples/00-bluepill-blink-uart/ll</span></div>
+        </header>
+
+        <section class="doc-section" id="what-ll" data-title="What LL is (and isn&#x27;t)">
+          <div class="sec-head"><h2><span class="sec-num">D.1</span>What LL is (and isn&#x27;t)</h2></div>
+          <p>The <b>LL drivers</b> (<code>stm32f1xx_ll_*.h</code>, part of ST's STM32CubeF1 package) are mostly <code>static inline</code> functions, each wrapping one or a few register accesses. <code>LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_13)</code> is a single write to <code>GPIOC-&gt;BSRR</code>. They add readable names and a little argument packing, not behaviour:</p>
+          <ul>
+            <li>no state, no handles, no callbacks, no timeouts: you still write every wait loop yourself;</li>
+            <li>no interrupt handlers: you still write <code>USART1_IRQHandler</code>;</li>
+            <li>a few helper functions (<code>LL_USART_SetBaudRate</code>, <code>LL_RCC_GetSystemClocksFreq</code>) do arithmetic you would otherwise write by hand.</li>
+          </ul>
+          <p>The course's LL build of example 00 uses the same startup code and linker script as the register build and only the header-only parts of LL, taken from the CubeMX-generated HAL folder (<code>examples/00-…/hal/Drivers</code>, the one place vendor HAL code lives in this repository).</p>
+          <script type="text/plain" id="src-ll-io" data-src="examples/00-bluepill-blink-uart/ll/src/main.c" data-region="io" data-lang="c" data-file="examples/00-bluepill-blink-uart/ll/src/main.c" data-start="48" data-end="61" data-sha="fddb1a5bffe4">
+static void io_init(void)
+{
+    LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOA | LL_APB2_GRP1_PERIPH_GPIOC | LL_APB2_GRP1_PERIPH_USART1); // «5»
+    LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_13, LL_GPIO_MODE_OUTPUT);                                   // «6»
+    LL_GPIO_SetPinSpeed(GPIOC, LL_GPIO_PIN_13, LL_GPIO_SPEED_FREQ_LOW);
+    LL_GPIO_SetPinOutputType(GPIOC, LL_GPIO_PIN_13, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_9, LL_GPIO_MODE_ALTERNATE);
+    LL_GPIO_SetPinSpeed(GPIOA, LL_GPIO_PIN_9, LL_GPIO_SPEED_FREQ_HIGH);
+    LL_GPIO_SetPinOutputType(GPIOA, LL_GPIO_PIN_9, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_10, LL_GPIO_MODE_FLOATING);
+    LL_USART_SetBaudRate(USART1, SystemCoreClock, 115200U);      /* computes BRR for you */          // «7»
+    LL_USART_SetTransferDirection(USART1, LL_USART_DIRECTION_TX_RX);
+    LL_USART_Enable(USART1);
+}
+</script>
+          <div id="ex-ll-io"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>LL is a set of labelled light switches on top of the fuse box: flipping "kitchen" is the same as flipping fuse 7, but you no longer have to remember the number. HAL is a smart-home app: it does more for you, and decides some things you might have wanted to decide yourself.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="side-by-side" data-title="Registers vs LL side by side">
+          <div class="sec-head"><h2><span class="sec-num">D.2</span>Registers vs LL side by side</h2></div>
+          <p>The clock setup, written with registers (left) and with LL (right). Read them line by line: almost every LL call has exactly one register statement on the other side.</p>
+          <div class="cmp-host" id="cmp-clock"></div>
+          <script type="text/plain" id="src-bare-clock" data-src="examples/00-bluepill-blink-uart/bare/src/main.c" data-region="clock" data-lang="c" data-file="examples/00-bluepill-blink-uart/bare/src/main.c" data-start="58" data-end="81" data-sha="c4395b86a08f">
+static int clock_72mhz(void)
+{
+    RCC->CR |= RCC_CR_HSEON;                                         /* start the 8 MHz crystal */  // «6»
+    if (!wait_set(&RCC->CR, RCC_CR_HSERDY, RCC_CR_HSERDY))
+    {
+        return 1;                                                    /* no crystal: stay on HSI */
+    }
+    FLASH->ACR = FLASH_ACR_PRFTBE | (2U << FLASH_ACR_LATENCY_Pos);   /* 2 wait states BEFORE speeding up */ // «7»
+    RCC->CFGR |= RCC_CFGR_PPRE1_DIV2                                 /* APB1 <= 36 MHz */            // «8»
+               | RCC_CFGR_PLLSRC                                     /* PLL input: HSE */
+               | RCC_CFGR_PLLMULL9;                                  /* 8 MHz x 9 = 72 MHz */        // «9»
+    RCC->CR |= RCC_CR_PLLON;
+    if (!wait_set(&RCC->CR, RCC_CR_PLLRDY, RCC_CR_PLLRDY))
+    {
+        return 2;
+    }
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;        /* switch SYSCLK to the PLL */  // «10»
+    if (!wait_set(&RCC->CFGR, RCC_CFGR_SWS, RCC_CFGR_SWS_PLL))       /* hardware confirms in SWS */  // «11»
+    {
+        return 3;
+    }
+    SystemCoreClock = 72000000U;
+    return 0;
+}
+</script>
+          <script type="text/plain" id="src-ll-clock" data-src="examples/00-bluepill-blink-uart/ll/src/main.c" data-region="clock" data-lang="c" data-file="examples/00-bluepill-blink-uart/ll/src/main.c" data-start="24" data-end="44" data-sha="fddb1a5bffe4">
+static int clock_72mhz(void)
+{
+    uint32_t n;
+    LL_RCC_HSE_Enable();                                          /* RCC->CR |= RCC_CR_HSEON */         // «1»
+    for (n = 0U; (LL_RCC_HSE_IsReady() == 0U) && (n < WAIT_LOOPS); ++n) { }
+    if (n == WAIT_LOOPS) { return 1; }
+    LL_FLASH_SetLatency(LL_FLASH_LATENCY_2);                      /* FLASH->ACR LATENCY field = 2 */  // «2»
+    LL_FLASH_EnablePrefetch();
+    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE_DIV_1, LL_RCC_PLL_MUL_9);                       // «3»
+    LL_RCC_PLL_Enable();
+    for (n = 0U; (LL_RCC_PLL_IsReady() == 0U) && (n < WAIT_LOOPS); ++n) { }
+    if (n == WAIT_LOOPS) { return 2; }
+    LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
+    LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_2);                   /* APB1 <= 36 MHz */
+    LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_1);
+    LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);                                                 // «4»
+    for (n = 0U; (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL) && (n < WAIT_LOOPS); ++n) { }
+    if (n == WAIT_LOOPS) { return 3; }
+    SystemCoreClock = 72000000U;
+    return 0;
+}
+</script>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The name does not make it right</span><p><code>LL_FLASH_LATENCY_2</code> is <code>0x2</code>: two wait states. The CMSIS macro <code>FLASH_ACR_LATENCY_2</code> is the mask <code>0x4</code>, bit 2 of the field, which is not a valid latency on the F1 at all (module 04). Similar-looking names in the two layers can mean different things: when in doubt, check the value in the header against the reference manual.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="choosing" data-title="Registers, LL or HAL?">
+          <div class="sec-head"><h2><span class="sec-num">D.3</span>Registers, LL or HAL?</h2></div>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th></th><th>Registers (CMSIS)</th><th>LL</th><th>HAL</th></tr></thead>
+            <tbody>
+              <tr><td>Example 00, debug build (flash)</td><td>~1.7 KB</td><td>~2.7 KB</td><td>~6.3 KB</td></tr>
+              <tr><td>What you learn about the chip</td><td>everything</td><td>almost everything</td><td>the API, less of the chip</td></tr>
+              <tr><td>Portability across STM32 families</td><td>low: register names differ (F1 <code>CRL</code> vs F4 <code>MODER</code>)</td><td>medium: similar API, family details leak</td><td>high: same API on most families</td></tr>
+              <tr><td>Timeouts, state, error handling</td><td>yours</td><td>yours</td><td>built in (with its own ideas)</td></tr>
+              <tr><td>Fit for AUTOSAR MCAL code</td><td>yes: MCALs are written at this level</td><td>possible inside an MCAL</td><td>no: overlaps with MCAL responsibilities</td></tr>
+            </tbody>
+          </table></div>
+          <p>A common choice in industry: HAL or LL for prototypes and tools, registers (or the vendor's AUTOSAR MCAL) for production firmware where every line must be reviewed and its timing understood. This course teaches registers so that whichever layer you meet later, you know what it does underneath.</p>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">One appendix, not a track</span><p>LL appears only on this page and HAL only on the setup page. Every other module uses registers through the CMSIS header.</p></div></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/compare.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/ll-drivers.js?v=__BUILD__"></script>
+</body>
+</html>
