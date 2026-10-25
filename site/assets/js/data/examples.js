@@ -133,7 +133,8 @@ window.MCU_DATA.examples = [
   "pins": [
    "PA9",
    "PA10",
-   "PC13"
+   "PC13",
+   "PA8"
   ],
   "hw": [
    "USB-UART adapter"
