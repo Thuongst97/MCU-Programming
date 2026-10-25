@@ -16,7 +16,7 @@ if(CMAKE_CROSSCOMPILING)
       add_subdirectory("${dir}")
     endif()
   endforeach()
-  foreach(dir IN ITEMS capstone/turnlight autosar)
+  foreach(dir IN ITEMS autosar capstone/turnlight)   # the library before its users
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${dir}/CMakeLists.txt")
       add_subdirectory("${dir}")
     endif()
