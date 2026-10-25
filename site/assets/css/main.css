@@ -837,6 +837,7 @@ pre.code .abadge { margin-left: 14px; font-size: 0.68rem; font-weight: 700; min-
 .calc-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px 12px; margin-bottom: 10px; }
 .calc-inputs label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
 .calc-inputs input { font: 13px var(--mono); background: var(--surface-solid); color: var(--text); border: 1px solid var(--border-hi); border-radius: 6px; padding: 5px 7px; }
+.calc-out { overflow-x: auto; }
 .calc-out table.t { margin: 0; }
 .calc-ok { color: var(--green); } .calc-bad { color: var(--red); }
 .calc-best td { background: var(--green-dim); }
@@ -874,6 +875,37 @@ pre.code .abadge { margin-left: 14px; font-size: 0.68rem; font-weight: 700; min-
 .cmp-col.good .code-block { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
 .cmp-why { margin-top: 8px; color: var(--text-2); }
 @media (max-width: 900px) { .cmp-grid { grid-template-columns: 1fr; } }
+
+/* page-specific widgets (ring buffer, address space) */
+.rb-wrap { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+.rb-wrap svg { width: 240px; min-width: 0 !important; height: auto; flex: none; }
+.rb-side { flex: 1 1 220px; }
+.rb-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.rb-slot { fill: var(--dg-card); stroke: var(--dg-card-border); }
+.rb-slot.used { fill: color-mix(in srgb, var(--blue) 26%, var(--dg-card)); stroke: var(--blue); }
+.rb-val { fill: var(--dg-title); font: 700 13px var(--mono); }
+.rb-idx { fill: var(--dg-faint); font: 10px var(--mono); }
+.rb-ptr line { stroke-width: 3; }
+.rb-ptr text { font: 700 11px var(--mono); }
+.rb-ptr.head line { stroke: var(--copper); } .rb-ptr.head text { fill: var(--copper); }
+.rb-ptr.tail line { stroke: var(--green); } .rb-ptr.tail text { fill: var(--green); }
+
+.sar-in { stroke: var(--copper); stroke-width: 2; stroke-dasharray: 6 4; }
+.sar-lbl { fill: var(--copper); font: 11px var(--mono); }
+.sar-step rect { stroke-width: 1.2; }
+.sar-step.keep rect { fill: color-mix(in srgb, var(--green) 30%, transparent); stroke: var(--green); }
+.sar-step.drop rect { fill: color-mix(in srgb, var(--red) 18%, transparent); stroke: var(--red); stroke-dasharray: 4 3; }
+.sar-step text { fill: var(--dg-muted); font: 10.5px var(--mono); }
+#sar-svg svg { min-width: 560px; }
+
+table.t.arb td, table.t.arb th { text-align: center; font-family: var(--mono); padding: 6px 7px; }
+table.t.arb td:first-child { text-align: left; }
+table.t.arb td.arb-lost { background: var(--red-dim); color: var(--red); font-weight: 700; }
+table.t.arb td.arb-off { color: var(--faint); }
+table.t.arb tr.arb-bus td { font-weight: 700; color: var(--copper); border-top: 2px solid var(--border-hi); }
+.flt-list { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 4px; }
+.flt-list li { font-family: var(--mono); font-size: 13px; padding: 4px 8px; border-radius: 6px; }
+.flt-list li.ok { background: var(--green-dim); } .flt-list li.no { background: var(--red-dim); color: var(--muted); }
 
 /* ============================================================ 9. Hero art (tools/hero-art.py) */
 .hero-art {

@@ -168,7 +168,7 @@
   function render(spec) {
     const { len, hscale } = layout(spec);
     const NAME_W = 64, ROW = 44, AMP = 22, TOP = spec.bands ? 30 : 10;
-    const W = NAME_W + len * hscale + 16;
+    const W = NAME_W + len * hscale + (spec.signals.some((x) => x.refText) ? 52 : 16);
     const H = TOP + spec.signals.length * ROW + 10;
     const X = (t) => NAME_W + t * hscale;
     let s = "";
@@ -177,7 +177,10 @@
       if (b.text) {
         const w = (b.to - b.from) * hscale;
         const fits = b.text.length * 6.2 < w + 4;
-        s += `<text x="${X(b.from) + w / 2}" y="${TOP - 10 - (fits ? 0 : (i % 2) * 11)}" text-anchor="middle">${esc(fits || b.text.length < 9 ? b.text : b.text.slice(0, 6) + "…")}</text>`;
+        // a label that does not fit is staggered upwards if the band is reasonably wide, otherwise
+        // left out of the drawing (it stays available as a tooltip on the band)
+        if (fits || w >= 26) s += `<text x="${X(b.from) + w / 2}" y="${TOP - 10 - (fits ? 0 : (i % 2) * 11)}" text-anchor="middle">${esc(fits || b.text.length < 9 ? b.text : b.text.slice(0, 6) + "…")}</text>`;
+        s += `<title>${esc(b.text)}</title>`;
       }
       s += `</g>`;
     });

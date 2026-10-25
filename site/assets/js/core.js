@@ -119,7 +119,7 @@
       ] },
   
     /* ───────────── Group: Peripherals ───────────── */
-    { id: "uart", status: "planned", phase: 4, file: "uart.html", num: "08", group: "Peripherals",
+    { id: "uart", status: "ready", phase: 4, file: "uart.html", num: "08", group: "Peripherals",
       title: "USART: Frames, Interrupts and a Command Shell", short: "UART", icon: "💬", accent: "#60a5fa",
       desc: "UART framing, BRR math, interrupt-driven RX/TX with a lock-free ring buffer, and the USART LIN mode.",
       sections: [
@@ -130,7 +130,7 @@
         ["shell", "A tiny command shell", "command line parser shell"],
         ["lin-mode", "LIN mode on the F1 USART", "lin break lbd lbdl linen"],
       ] },
-    { id: "adc-dma", status: "planned", phase: 4, file: "adc-dma.html", num: "09", group: "Peripherals",
+    { id: "adc-dma", status: "ready", phase: 4, file: "adc-dma.html", num: "09", group: "Peripherals",
       title: "ADC and DMA", short: "ADC & DMA", icon: "🎚️", accent: "#e8a36b",
       desc: "12-bit SAR ADC, calibration, sampling time, scan mode, then DMA circular transfers that free the CPU.",
       sections: [
@@ -141,7 +141,7 @@
         ["adc-dma", "Scan + DMA circular", "scan mode dma circular half transfer"],
         ["noise", "Noise, averaging and Vrefint", "oversampling average vrefint temperature sensor"],
       ] },
-    { id: "i2c", status: "planned", phase: 4, file: "i2c.html", num: "10", group: "Peripherals",
+    { id: "i2c", status: "ready", phase: 4, file: "i2c.html", num: "10", group: "Peripherals",
       title: "I2C and an SSD1306 OLED", short: "I2C", icon: "🖥️", accent: "#3fb68b",
       desc: "I2C protocol on the wire, the F1 I2C peripheral and its errata, then drawing on an SSD1306 OLED.",
       sections: [
@@ -151,7 +151,7 @@
         ["errata", "Errata you must know", "busy flag analog filter errata workaround"],
         ["ssd1306", "Driving the SSD1306", "ssd1306 oled framebuffer page addressing"],
       ] },
-    { id: "spi", status: "planned", phase: 4, file: "spi.html", num: "11", group: "Peripherals",
+    { id: "spi", status: "ready", phase: 4, file: "spi.html", num: "11", group: "Peripherals",
       title: "SPI and a W25Qxx Flash", short: "SPI", icon: "🔁", accent: "#a78bfa",
       desc: "SPI modes (CPOL/CPHA), chip select discipline, and reading/writing a W25Qxx NOR flash.",
       sections: [
@@ -161,7 +161,7 @@
         ["w25q", "Talking to a W25Qxx", "jedec id 0x9f read 0x03 page program erase status busy"],
         ["dma-spi", "SPI with DMA", "spi dma"],
       ] },
-    { id: "can", status: "planned", phase: 4, file: "can.html", num: "12", group: "Peripherals",
+    { id: "can", status: "ready", phase: 4, file: "can.html", num: "12", group: "Peripherals",
       title: "CAN with bxCAN (and CAN FD, LIN in Theory)", short: "CAN & LIN", icon: "🚗", accent: "#fbbf24",
       desc: "CAN physical layer, frame format, arbitration, bit timing and filters, two Blue Pills over SN65HVD230, plus CAN FD and LIN concepts.",
       sections: [
@@ -176,7 +176,7 @@
         ["can-fd", "CAN FD in theory", "can fd brs edl 64 byte not supported bxcan"],
         ["lin", "LIN in theory", "lin master slave schedule table break sync pid checksum"],
       ] },
-    { id: "power-wdg", status: "planned", phase: 4, file: "power-wdg.html", num: "13", group: "Peripherals",
+    { id: "power-wdg", status: "ready", phase: 4, file: "power-wdg.html", num: "13", group: "Peripherals",
       title: "Watchdogs, Reset Sources and Low Power", short: "Watchdog & Power", icon: "🔋", accent: "#3fb68b",
       desc: "IWDG vs WWDG, reading reset causes, Sleep/Stop/Standby modes and waking up correctly.",
       sections: [
@@ -426,9 +426,30 @@
     ddi0403Exc: { t: "ARMv7-M ARM — exception model", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", sec: "B1.5", kind: "arm" },
     ddi0337Lat: { t: "Cortex-M3 TRM — exception latency and tail-chaining", url: "https://developer.arm.com/documentation/ddi0337/latest/", doc: "ARM DDI 0337", sec: "5", kind: "arm" },
     cmsisCore: { t: "CMSIS-Core (Cortex-M) documentation", url: "https://arm-software.github.io/CMSIS_6/latest/Core/index.html", kind: "tool" },
+    rm0008Pwr: { t: "RM0008 — power control (low-power modes)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "5", kind: "st" },
+    rm0008Adc: { t: "RM0008 — analog-to-digital converter (ADC)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "11", kind: "st" },
+    rm0008Dma: { t: "RM0008 — direct memory access controller (DMA)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "13", kind: "st" },
+    rm0008Iwdg: { t: "RM0008 — independent watchdog (IWDG)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "19", kind: "st" },
+    rm0008Wwdg: { t: "RM0008 — window watchdog (WWDG)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "20", kind: "st" },
+    rm0008Can: { t: "RM0008 — controller area network (bxCAN)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "24", kind: "st" },
+    rm0008Spi: { t: "RM0008 — serial peripheral interface (SPI)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "25", kind: "st" },
+    rm0008I2c: { t: "RM0008 — inter-integrated circuit interface (I2C)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "26", kind: "st" },
+    um10204: { t: "UM10204 — I2C-bus specification and user manual (NXP)", url: "https://www.nxp.com/docs/en/user-guide/UM10204.pdf", doc: "UM10204", kind: "spec" },
+    iso11898: { t: "ISO 11898-1 — CAN data link layer and physical signalling (summary)", url: "https://www.iso.org/standard/63648.html", doc: "ISO 11898-1:2015", kind: "iso" },
+    iso11898p2: { t: "ISO 11898-2 — CAN high-speed physical medium attachment (summary)", url: "https://www.iso.org/standard/67244.html", doc: "ISO 11898-2:2016", kind: "iso" },
+    iso17987: { t: "ISO 17987 — Local Interconnect Network (LIN) (summary)", url: "https://www.iso.org/standard/61222.html", doc: "ISO 17987-1:2016", kind: "iso" },
+    tiSn65: { t: "SN65HVD230 3.3 V CAN transceiver datasheet (TI)", url: "https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf", doc: "SLOS346", kind: "datasheet" },
+    winbondW25q: { t: "Winbond W25Q serial NOR flash (product family and datasheets)", url: "https://www.winbond.com/hq/product/code-storage-flash-memory/serial-nor-flash/", kind: "datasheet" },
+    ssd1306: { t: "SSD1306 OLED controller datasheet (Solomon Systech, copy hosted by Adafruit)", url: "https://cdn-shop.adafruit.com/datasheets/SSD1306.pdf", kind: "community" },
     stm32Base: { t: "STM32-base — Blue Pill board page and schematic notes", url: "https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html", kind: "community" },
   };
   const REFS = {
+    "power-wdg": ["rm0008Pwr", "rm0008Iwdg", "rm0008Wwdg", "rm0008Rcc", "rm0008Debug", "ds5319Elec", "pm0056"],
+    "can": ["rm0008Can", "iso11898", "iso11898p2", "iso17987", "rm0008Gpio", "tiSn65"],
+    "spi": ["rm0008Spi", "rm0008Dma", "ds5319Elec", "winbondW25q"],
+    "i2c": ["rm0008I2c", "es096", "um10204", "ds5319Pins", "ssd1306"],
+    "adc-dma": ["rm0008Adc", "rm0008Dma", "ds5319Elec", "ds5319Pins", "rm0008Rcc"],
+    "uart": ["rm0008Usart", "rm0008Rcc", "pm0056Nvic", "iso17987", "ds5319Pins"],
     "timers": ["rm0008Tim", "rm0008Rcc", "rm0008Gpio", "ds5319Pins", "pm0056"],
     "interrupts": ["pm0056Nvic", "ddi0403Exc", "ddi0337Lat", "rm0008Exti", "rm0008Usart", "cmsisCore"],
     "gpio": ["rm0008Gpio", "ds5319Pins", "ds5319Elec", "rm0008Exti", "es096", "stm32Base"],

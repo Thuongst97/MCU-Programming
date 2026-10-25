@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CAN with bxCAN (and CAN FD, LIN in Theory) — MCU Academy</title>
+  <meta name="description" content="CAN physical layer, frame format, arbitration, bit timing and filters, two Blue Pills over SN65HVD230, plus CAN FD and LIN concepts.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="can">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 12</span><span>/</span><span>CAN &amp; LIN</span></nav>
+          <div class="eyebrow">Module 12 · Peripherals</div>
+          <h1>CAN with bxCAN (and CAN FD, LIN in Theory)</h1>
+          <p class="lead">CAN is the backbone of in-vehicle networks: dozens of ECUs share one twisted pair, any node can talk, the most important message always wins, and a broken node takes itself off the bus. This module goes from the voltages on the wire to the bxCAN registers, then connects two Blue Pills. CAN FD and LIN are covered in theory.</p>
+          <div class="page-meta"><span>⏱ 60 min read</span><span>🎯 Intermediate → advanced</span><span>📂 examples/11-can-two-nodes</span></div>
+        </header>
+
+        <section class="doc-section" id="physical" data-title="Physical layer and transceivers">
+          <div class="sec-head"><h2><span class="sec-num">12.1</span>Physical layer and transceivers</h2></div>
+          <p>CAN uses two wires, <b>CAN_H</b> and <b>CAN_L</b>, and reads the <b>difference</b> between them, so noise that hits both wires equally cancels out (ISO 11898-2). There are two bus states:</p>
+          <ul>
+            <li><b>Recessive</b> (logic 1): nobody drives; both wires float at about 2.5 V, difference ≈ 0 V.</li>
+            <li><b>Dominant</b> (logic 0): a transceiver pulls CAN_H up to about 3.5 V and CAN_L down to about 1.5 V, difference ≈ 2 V.</li>
+          </ul>
+          <p>Dominant always beats recessive: if one node sends 0 and another 1, the bus reads 0. This "wired-AND" is what makes arbitration work. The MCU never touches the bus directly: a <b>transceiver</b> (the 3.3 V SN65HVD230 on the Blue Pill) converts between the CAN_TX/CAN_RX logic pins and the differential pair. A 120 Ω resistor at each end of the bus absorbs reflections.</p>
+          <div id="wv-phys"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>A room full of people with one rule: anyone may shout "no!" (dominant), and silence means "yes" (recessive). If even one person shouts, everyone hears "no". Nobody can be talked over by silence.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="frame" data-title="The CAN frame">
+          <div class="sec-head"><h2><span class="sec-num">12.2</span>The CAN frame</h2></div>
+          <p>A classic CAN data frame with an 11-bit identifier (ISO 11898-1). Change the ID and the data: the CRC is computed and <b>stuff bits</b> are inserted live. After five equal bits in a row, the sender inserts one opposite bit (red markers) so that receivers always see edges to stay synchronised.</p>
+          <div id="wv-can"></div>
+          <div class="wv-controls">
+            <label for="can-id">ID (hex, 11 bit) <input id="can-id" type="text" value="3A0"></label>
+            <label for="can-data">Data (hex bytes) <input id="can-data" type="text" value="05 00"></label>
+            <span id="can-out" class="mono small"></span>
+          </div>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Field</th><th>Bits</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td>SOF</td><td>1</td><td>Start of frame, dominant; every node synchronises on its edge.</td></tr>
+              <tr><td>Identifier</td><td>11</td><td>What the message is, and its priority (lower = more important).</td></tr>
+              <tr><td>RTR, IDE, r0</td><td>3</td><td>Data or remote frame; standard or extended ID; reserved.</td></tr>
+              <tr><td>DLC</td><td>4</td><td>Number of data bytes, 0–8.</td></tr>
+              <tr><td>Data</td><td>0–64</td><td>The payload.</td></tr>
+              <tr><td>CRC</td><td>15 + 1</td><td>Checksum over SOF…data, then a recessive delimiter.</td></tr>
+              <tr><td>ACK</td><td>1 + 1</td><td>The sender sends recessive; <b>any</b> receiver that got the frame right overwrites it with dominant.</td></tr>
+              <tr><td>EOF</td><td>7</td><td>Seven recessive bits.</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="doc-section" id="arbitration" data-title="Arbitration and errors">
+          <div class="sec-head"><h2><span class="sec-num">12.3</span>Arbitration and errors</h2></div>
+          <p>When several nodes start at the same moment, they all send their identifier bit by bit and listen at the same time. A node that sends recessive (1) but reads dominant (0) has lost and stops sending at once, without destroying the winner's frame. The lowest identifier wins. Enter up to three IDs:</p>
+          <div id="arb" class="hd-wrap"></div>
+          <p>Errors are handled the same collective way: every node checks every frame, and a node that detects an error destroys the frame with an <b>error frame</b> (six dominant bits that break the stuffing rule), so everyone discards it and the sender retries. To stop a faulty node from jamming the bus, each node keeps a <b>transmit error counter</b> (TEC) and a <b>receive error counter</b> (REC), which decide its error state:</p>
+          <div id="sm-err"></div>
+          <div id="reg-esr"></div>
+        </section>
+
+        <section class="doc-section" id="bit-timing" data-title="Bit timing calculator">
+          <div class="sec-head"><h2><span class="sec-num">12.4</span>Bit timing calculator</h2></div>
+          <p>There is no clock wire, so every node divides each bit into <b>time quanta</b> (tq) and resynchronises on edges. In bxCAN a bit is: 1 tq sync segment, <code>TS1+1</code> tq before the <b>sample point</b>, <code>TS2+1</code> tq after it. The quantum is <code>(BRP+1) ÷ PCLK1</code> (RM0008 §24.7.7). All nodes on one bus must use the same bit rate and similar sample points; 87.5 % is a common target in automotive networks.</p>
+          <div id="calc-can"></div>
+          <div id="reg-btr"></div>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">500 kbit/s at 36 MHz</span><p>BRP = 4 (field 3), 1 + 15 + 2 = 18 tq, sample point 16 ÷ 18 = 88.9 %: <code>CAN_BTR = 0x001E0003</code>. Example 11 uses exactly this; the calculator ranks it first because it keeps at least 2 tq after the sample point.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="bxcan" data-title="The bxCAN peripheral">
+          <div class="sec-head"><h2><span class="sec-num">12.5</span>The bxCAN peripheral</h2></div>
+          <p>bxCAN ("basic extended CAN") has three transmit mailboxes, two receive FIFOs of three frames each, and 14 filter banks (RM0008 §24). It has three modes: <b>Sleep</b> (after reset), <b>Initialization</b> (configure BTR and filters) and <b>Normal</b>. Leaving initialization requires 11 consecutive recessive bits on CAN_RX, which is why a missing transceiver keeps it stuck.</p>
+          <div id="reg-mcr"></div>
+          <script type="text/plain" id="src-11-init" data-src="examples/11-can-two-nodes/src/can.c" data-region="init" data-lang="c" data-file="examples/11-can-two-nodes/src/can.c" data-start="25" data-end="60" data-sha="6263e3511934">
+bool can_init(uint32_t btr, can_mode_t mode)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_IOPBEN | RCC_APB2ENR_AFIOEN;
+    RCC->APB1ENR |= RCC_APB1ENR_CAN1EN;
+    /* CAN on PB8/PB9. SWJ_CFG reads back undefined, so write it explicitly (000 = reset default). */
+    AFIO->MAPR = (AFIO->MAPR & ~(AFIO_MAPR_CAN_REMAP | AFIO_MAPR_SWJ_CFG)) | AFIO_MAPR_CAN_REMAP_REMAP2;  // «1»
+    GPIOB->CRH = (GPIOB->CRH & ~(GPIO_CRH_MODE8 | GPIO_CRH_CNF8 | GPIO_CRH_MODE9 | GPIO_CRH_CNF9))
+                 | GPIO_CRH_CNF8_1                        /* PB8 CAN_RX: input with pull-up */
+                 | GPIO_CRH_MODE9 | GPIO_CRH_CNF9_1;      /* PB9 CAN_TX: AF push-pull */
+    GPIOB->BSRR = GPIO_BSRR_BS8;
+
+    CAN1->MCR = CAN_MCR_INRQ | CAN_MCR_ABOM;              /* leave Sleep, request Initialization */  // «2»
+    if (!wait_msr(CAN_MSR_INAK | CAN_MSR_SLAK, CAN_MSR_INAK))
+    {
+        return false;
+    }
+    CAN1->BTR = btr | ((mode == CAN_MODE_SILENT_LOOPBACK) ? (CAN_BTR_LBKM | CAN_BTR_SILM) : 0U);  // «3»
+
+    /* One filter bank, 32-bit mask mode, mask 0: accept every frame into FIFO 0. */
+    CAN1->FMR |= CAN_FMR_FINIT;                                                                       // «4»
+    CAN1->FA1R &= ~1U;
+    CAN1->FS1R |= 1U;                                     /* bank 0: one 32-bit filter */
+    CAN1->FM1R &= ~1U;                                    /* identifier/mask mode */
+    CAN1->FFA1R &= ~1U;                                   /* to FIFO 0 */
+    CAN1->sFilterRegister[0].FR1 = 0U;                    /* identifier (don't care) */
+    CAN1->sFilterRegister[0].FR2 = 0U;                    /* mask: no bit must match */
+    CAN1->FA1R |= 1U;
+    CAN1->FMR &= ~CAN_FMR_FINIT;
+
+    CAN1->IER = CAN_IER_FMPIE0;                           /* interrupt when FIFO 0 is not empty */
+    NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 5U);           /* vector shared with USB (IRQ 20) */     // «5»
+    NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
+
+    CAN1->MCR &= ~CAN_MCR_INRQ;                           /* to Normal mode ... */
+    return wait_msr(CAN_MSR_INAK, 0U);                    /* ... once 11 recessive bits are seen */  // «6»
+}
+</script>
+          <div id="ex-init"></div>
+          <script type="text/plain" id="src-11-tx" data-src="examples/11-can-two-nodes/src/can.c" data-region="tx" data-lang="c" data-file="examples/11-can-two-nodes/src/can.c" data-start="64" data-end="78" data-sha="6263e3511934">
+bool can_send(const can_frame_t *f)
+{
+    const uint32_t tsr = CAN1->TSR;
+    uint32_t mb;
+    if ((tsr & CAN_TSR_TME0) != 0U) { mb = 0U; }
+    else if ((tsr & CAN_TSR_TME1) != 0U) { mb = 1U; }
+    else if ((tsr & CAN_TSR_TME2) != 0U) { mb = 2U; }
+    else { return false; }                                /* all three mailboxes pending */          // «7»
+    CAN_TxMailBox_TypeDef *m = &CAN1->sTxMailBox[mb];
+    m->TDTR = f->dlc & 0xFU;
+    m->TDLR = (uint32_t)f->data[0] | ((uint32_t)f->data[1] << 8) | ((uint32_t)f->data[2] << 16) | ((uint32_t)f->data[3] << 24);
+    m->TDHR = (uint32_t)f->data[4] | ((uint32_t)f->data[5] << 8) | ((uint32_t)f->data[6] << 16) | ((uint32_t)f->data[7] << 24);
+    m->TIR = ((uint32_t)f->id << CAN_TI0R_STID_Pos) | CAN_TI0R_TXRQ;   /* standard ID, data frame: go */ // «8»
+    return true;
+}
+</script>
+          <div id="ex-tx"></div>
+          <script type="text/plain" id="src-11-rx" data-src="examples/11-can-two-nodes/src/can.c" data-region="rx" data-lang="c" data-file="examples/11-can-two-nodes/src/can.c" data-start="82" data-end="115" data-sha="6263e3511934">
+void USB_LP_CAN1_RX0_IRQHandler(void);
+void USB_LP_CAN1_RX0_IRQHandler(void)
+{
+    while ((CAN1->RF0R & CAN_RF0R_FMP0) != 0U)            /* up to 3 frames may be waiting */
+    {
+        const uint32_t head = s_rx_head;
+        can_frame_t *f = &s_rxq[head % RXQ_LEN];
+        f->id = (uint16_t)(CAN1->sFIFOMailBox[0].RIR >> CAN_RI0R_STID_Pos);                          // «9»
+        f->dlc = (uint8_t)(CAN1->sFIFOMailBox[0].RDTR & CAN_RDT0R_DLC);
+        const uint32_t lo = CAN1->sFIFOMailBox[0].RDLR, hi = CAN1->sFIFOMailBox[0].RDHR;
+        for (uint32_t i = 0U; i < 4U; ++i)
+        {
+            f->data[i] = (uint8_t)(lo >> (8U * i));
+            f->data[i + 4U] = (uint8_t)(hi >> (8U * i));
+        }
+        CAN1->RF0R |= CAN_RF0R_RFOM0;                     /* release the FIFO slot */             // «10»
+        if ((head - s_rx_tail) < RXQ_LEN)
+        {
+            s_rx_head = head + 1U;                        /* drop the frame if main() is behind */
+        }
+    }
+}
+
+bool can_receive(can_frame_t *f)
+{
+    const uint32_t tail = s_rx_tail;
+    if (s_rx_head == tail)
+    {
+        return false;
+    }
+    *f = s_rxq[tail % RXQ_LEN];
+    s_rx_tail = tail + 1U;
+    return true;
+}
+</script>
+          <div id="ex-rx"></div>
+        </section>
+
+        <section class="doc-section" id="filters" data-title="Acceptance filters">
+          <div class="sec-head"><h2><span class="sec-num">12.6</span>Acceptance filters</h2></div>
+          <p>A busy bus carries hundreds of message IDs, and an ECU needs a few of them. Acceptance filters drop the rest in hardware. In <b>mask mode</b> a frame passes if its identifier matches the filter ID in every bit where the mask is 1; in <b>list mode</b> the filter holds exact IDs. Each of the 14 banks is one 32-bit filter or two 16-bit filters (RM0008 §24.7.4). Try a mask:</p>
+          <div id="flt" class="hd-wrap"></div>
+          <p>Example 11 configures bank 0 as a 32-bit mask filter with mask 0, which accepts everything: fine for a demo, wrong for a real ECU that should only wake its CPU for messages it uses.</p>
+        </section>
+
+        <section class="doc-section" id="usb-conflict" data-title="Why CAN and USB can&#x27;t run together">
+          <div class="sec-head"><h2><span class="sec-num">12.7</span>Why CAN and USB can&#x27;t run together</h2></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">CAN and USB cannot be used at the same time on the F103</span><p>The USB device peripheral and bxCAN share a 512-byte SRAM buffer and the interrupt vectors 19 and 20 (<code>USB_HP_CAN1_TX</code>, <code>USB_LP_CAN1_RX0</code>) (RM0008 §24.1 and §23). A product with both would need a different MCU. The course remaps CAN to PB8/PB9 anyway, to keep PA11/PA12 free.</p></div></div>
+          <p>The shared vector shows up in code: example 11's receive handler is named <code>USB_LP_CAN1_RX0_IRQHandler</code>.</p>
+        </section>
+
+        <section class="doc-section" id="two-nodes" data-title="Two nodes on a real bus">
+          <div class="sec-head"><h2><span class="sec-num">12.8</span>Two nodes on a real bus</h2></div>
+          <p>Each node needs a transceiver; CAN_H to CAN_H, CAN_L to CAN_L over a twisted pair, a common ground, and 120 Ω at both ends (many SN65HVD230 modules carry one; check yours).</p>
+          <div id="po-can"></div>
+          <p>Before touching the bus, each node tests itself in <b>silent loopback</b> mode: the transmitter is connected internally to the receiver and nothing reaches the pins, so this works without a transceiver or a second node.</p>
+          <script type="text/plain" id="src-11-self" data-src="examples/11-can-two-nodes/src/main.c" data-region="selftest" data-lang="c" data-file="examples/11-can-two-nodes/src/main.c" data-start="40" data-end="58" data-sha="5f94636594f7">
+static bool self_test(void)
+{
+    if (!can_init(CAN_BTR_500K_36MHZ, CAN_MODE_SILENT_LOOPBACK))     /* TX goes straight to RX */ // «11»
+    {
+        return false;
+    }
+    const can_frame_t probe = {0x7FFU, 2U, {0xCAU, 0xFEU}};
+    (void)can_send(&probe);
+    can_frame_t got;
+    const uint32_t start = millis();
+    while ((millis() - start) < 50U)
+    {
+        if (can_receive(&got))
+        {
+            return (got.id == probe.id) && (got.dlc == 2U) && (got.data[1] == 0xFEU);
+        }
+    }
+    return false;
+}
+</script>
+          <div id="ex-self"></div>
+          <script type="text/plain" id="src-11-main" data-src="examples/11-can-two-nodes/src/main.c" data-region="main" data-lang="c" data-file="examples/11-can-two-nodes/src/main.c" data-start="85" data-end="134" data-sha="5f94636594f7">
+    uint32_t next_report = 1000U, sent = 0U, received = 0U;
+#if defined(NODE_A)
+    uint32_t next_tx = 0U;
+    bool last_button = false;
+#endif
+    for (;;)
+    {
+        const uint32_t now = millis();
+        can_frame_t f;
+        while (can_receive(&f))
+        {
+            ++received;
+#if defined(NODE_B)
+            if (f.id == ID_BUTTON)                                                                     // «12»
+            {
+                if (f.data[0] != 0U) { led_on(); } else { led_off(); }
+                const can_frame_t reply = {ID_LED, 1U, {f.data[0]}};
+                sent += can_send(&reply) ? 1U : 0U;
+                put_frame("rx", &f);
+            }
+#else
+            put_frame("rx", &f);
+#endif
+        }
+#if defined(NODE_A)
+        const bool b = button_pressed();
+        if ((b != last_button) || ((int32_t)(now - next_tx) >= 0))       /* on change + every 100 ms */ // «13»
+        {
+            last_button = b;
+            next_tx = now + 100U;
+            const can_frame_t tx = {ID_BUTTON, 2U, {b ? 1U : 0U, (uint8_t)sent}};
+            sent += can_send(&tx) ? 1U : 0U;
+        }
+#endif
+        if ((int32_t)(now - next_report) >= 0)
+        {
+            next_report += 1000U;
+            uart_puts("tx ");
+            uart_put_dec(sent);
+            uart_puts(" rx ");
+            uart_put_dec(received);
+            uart_puts(" TEC ");
+            uart_put_dec(can_tec());                                                                   // «14»
+            uart_puts(" REC ");
+            uart_put_dec(can_rec());
+            uart_puts(" ");
+            uart_puts(can_state());
+            uart_puts("\n");
+        }
+    }
+</script>
+          <div id="ex-main"></div>
+          <div id="seq-can"></div>
+          <script type="text/plain" data-code data-src="examples/11-can-two-nodes/expected-output.txt" data-lang="console" data-file="expected-output.txt (node B)" data-start="1" data-end="5" data-sha="4b849564e6d9">
+Example 11 node B: bxCAN 500 kbit/s on PB8/PB9
+self-test (silent loopback): OK
+rx id 0x00000100 dlc 2 data0 0
+tx 10 rx 10 TEC 0 REC 0 error active
+rx id 0x00000100 dlc 2 data0 1
+</script>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 11)</span><p>✅ Two Renode machines on a CAN hub: self-test, filters, the RX interrupt and the frame exchange (button on A → LED on B) are tested. ⚠️ Frame level only: <b>no bit timing, no transceivers, no ACK slot, no error frames</b>, so the error counters stay at 0 even for a node alone on the bus (on hardware its TEC climbs to error passive). ❌ Not tested on Blue Pills yet. All IDs are hypothetical.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="can-fd" data-title="CAN FD in theory">
+          <div class="sec-head"><h2><span class="sec-num">12.9</span>CAN FD in theory</h2></div>
+          <p><b>CAN FD</b> (flexible data-rate, ISO 11898-1:2015) keeps arbitration at the classic bit rate, then switches to a faster rate for the data phase and allows up to 64 data bytes. The F103's bxCAN does <b>not</b> support CAN FD; worse, a classic controller treats an FD frame as an error. Mixed networks need FD-tolerant or FD-capable controllers everywhere.</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th></th><th>Classic CAN</th><th>CAN FD</th></tr></thead>
+            <tbody>
+              <tr><td>Data per frame</td><td>0–8 bytes</td><td>0–64 bytes</td></tr>
+              <tr><td>Data-phase bit rate</td><td>same as arbitration (≤ 1 Mbit/s)</td><td>faster (2–5 Mbit/s typical)</td></tr>
+              <tr><td>New control bits</td><td>—</td><td>FDF (FD format), BRS (bit-rate switch), ESI (error state)</td></tr>
+              <tr><td>CRC</td><td>15 bit</td><td>17 or 21 bit, with stuff-bit counter</td></tr>
+              <tr><td>On the F103</td><td>bxCAN</td><td>not available</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="doc-section" id="lin" data-title="LIN in theory">
+          <div class="sec-head"><h2><span class="sec-num">12.10</span>LIN in theory</h2></div>
+          <p><b>LIN</b> is CAN's cheap little sibling for simple functions (switch panels, mirror motors, rain sensors). It is a single wire at up to 20 kbit/s with one <b>master</b> that runs a fixed <b>schedule table</b> and polls slaves; slaves never speak unasked, so there is no arbitration. A LIN node is often just a UART plus a transceiver, which is why the F1's USART has a LIN mode (<a href="uart.html#lin-mode">module 08</a>).</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th></th><th>CAN</th><th>LIN</th></tr></thead>
+            <tbody>
+              <tr><td>Wires</td><td>2 (differential)</td><td>1 (+ ground, 12 V)</td></tr>
+              <tr><td>Speed</td><td>up to 1 Mbit/s (classic)</td><td>up to 20 kbit/s</td></tr>
+              <tr><td>Access</td><td>multi-master, arbitration by ID</td><td>single master, schedule table</td></tr>
+              <tr><td>Error handling</td><td>error frames, counters, bus-off</td><td>checksum; the master notices missing answers</td></tr>
+              <tr><td>Typical use</td><td>powertrain, chassis, body backbone</td><td>switches, actuators, sensors on a sub-bus</td></tr>
+            </tbody>
+          </table></div>
+          <div id="ck-can"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/calc.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/can.js?v=__BUILD__"></script>
+</body>
+</html>

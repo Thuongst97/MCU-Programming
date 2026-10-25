@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>USART: Frames, Interrupts and a Command Shell — MCU Academy</title>
+  <meta name="description" content="UART framing, BRR math, interrupt-driven RX/TX with a lock-free ring buffer, and the USART LIN mode.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="uart">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 08</span><span>/</span><span>UART</span></nav>
+          <div class="eyebrow">Module 08 · Peripherals</div>
+          <h1>USART: Frames, Interrupts and a Command Shell</h1>
+          <p class="lead">A UART turns bytes into a timed sequence of high and low levels on one wire, and back. No clock line is shared, so both sides must agree on the timing in advance. This module covers the frame, the baud-rate divider, interrupt-driven I/O with a lock-free ring buffer, a small command shell, and the LIN mode .</p>
+          <div class="page-meta"><span>⏱ 45 min read</span><span>🎯 Intermediate</span><span>📂 examples/04-uart-shell-ringbuffer</span></div>
+        </header>
+
+        <section class="doc-section" id="frame" data-title="Anatomy of a UART frame">
+          <div class="sec-head"><h2><span class="sec-num">8.1</span>Anatomy of a UART frame</h2></div>
+          <p>The line idles high. A frame starts with one low <b>start bit</b>, then 5–9 data bits <b>least significant bit first</b>, an optional <b>parity bit</b>, and one or two high <b>stop bits</b>. "8N1" means 8 data bits, no parity, 1 stop bit: 10 bit times per byte. Type a character and watch its frame:</p>
+          <div id="wv-uart"></div>
+          <div class="wv-controls">
+            <label for="uart-char">Character <input id="uart-char" type="text" maxlength="1" value="H"></label>
+            <label for="uart-parity">Parity <select id="uart-parity"><option value="none">none</option><option value="even">even</option><option value="odd">odd</option></select></label>
+            <label for="uart-stop">Stop bits <select id="uart-stop"><option>1</option><option>2</option></select></label>
+            <span id="uart-out" class="mono small"></span>
+          </div>
+          <p>The receiver detects the falling edge of the start bit, then samples each bit in its middle. The F1 USART oversamples by 16 and takes three samples around the middle of each bit to reject noise (RM0008 §27.3.3); disagreeing samples set the noise flag <code>NE</code>.</p>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>Two people agree to tap out a message at exactly one tap per second, without looking at each other's watch. The first tap says "starting now"; after that each listener counts seconds on their own watch. If one watch runs 5 % fast, by the tenth tap they are half a tap apart and start hearing the wrong taps. That is why both sides need accurate clocks.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="baud" data-title="Baud rate and BRR">
+          <div class="sec-head"><h2><span class="sec-num">8.2</span>Baud rate and BRR</h2></div>
+          <p>The USART divides its peripheral clock by 16 × USARTDIV to get the baud rate (RM0008 §27.3.4). USARTDIV is stored in <code>USART_BRR</code> as a 12-bit integer part and a 4-bit fraction in sixteenths:</p>
+          <div class="formula">USARTDIV = f<sub>PCLK</sub> ÷ (16 × baud) &nbsp;→&nbsp; BRR = mantissa &lt;&lt; 4 | round(fraction × 16)</div>
+          <div id="calc-brr"></div>
+          <div id="reg-brr"></div>
+          <p>USART1 is on APB2 (72 MHz at the course setup); USART2 and USART3 are on APB1 (36 MHz). Plugging in the wrong bus clock is the classic cause of garbage output. The receiver tolerates a total clock mismatch of a few percent between the two sides; the calculator shows the error that the divider's rounding adds.</p>
+        </section>
+
+        <section class="doc-section" id="polling-irq" data-title="Polling vs interrupts">
+          <div class="sec-head"><h2><span class="sec-num">8.3</span>Polling vs interrupts</h2></div>
+          <p><b>Polling</b> waits on the status flags: simple, but the CPU can do nothing else, and at 115 200 baud a byte takes about 87 µs. <b>Interrupts</b> let the USART call you when it needs attention:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Flag (USART_SR)</th><th>Interrupt enable (USART_CR1)</th><th>Means</th></tr></thead>
+            <tbody>
+              <tr><td><code>RXNE</code></td><td><code>RXNEIE</code></td><td>A received byte waits in <code>DR</code>. Reading <code>DR</code> clears it.</td></tr>
+              <tr><td><code>ORE</code></td><td><code>RXNEIE</code></td><td>Overrun: a new byte arrived before the old one was read. The new byte is lost.</td></tr>
+              <tr><td><code>TXE</code></td><td><code>TXEIE</code></td><td><code>DR</code> is free for the next byte. Stays set while empty, so disable <code>TXEIE</code> when you have nothing to send.</td></tr>
+              <tr><td><code>TC</code></td><td><code>TCIE</code></td><td>The last bit has left the pin. Needed before turning the USART off or switching an RS-485 driver.</td></tr>
+            </tbody>
+          </table></div>
+          <div id="reg-sr"></div>
+          <p>Example 04 enables only the receive interrupt at start-up and turns the transmit interrupt on whenever there is something to send:</p>
+          <script type="text/plain" id="src-04-init" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="init" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="17" data-end="26" data-sha="6330a97aedd6">
+static void uart_irq_init(uint32_t baud)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_USART1EN;
+    GPIOA->CRH = (GPIOA->CRH & ~(GPIO_CRH_CNF9 | GPIO_CRH_MODE9 | GPIO_CRH_CNF10 | GPIO_CRH_MODE10))
+                 | GPIO_CRH_CNF9_1 | GPIO_CRH_MODE9 | GPIO_CRH_CNF10_0;
+    USART1->BRR = (clock_pclk2() + (baud / 2U)) / baud;
+    USART1->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE;   /* RX interrupt on */ // «1»
+    NVIC_SetPriority(USART1_IRQn, 6U);                                                                // «2»
+    NVIC_EnableIRQ(USART1_IRQn);
+}
+</script>
+          <div id="ex-init"></div>
+          <script type="text/plain" id="src-04-isr" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="isr" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="30" data-end="54" data-sha="6330a97aedd6">
+void USART1_IRQHandler(void);
+void USART1_IRQHandler(void)
+{
+    const uint32_t sr = USART1->SR;
+    if ((sr & (USART_SR_RXNE | USART_SR_ORE)) != 0U)          /* byte received (or overrun) */      // «3»
+    {
+        const uint8_t b = (uint8_t)USART1->DR;                /* reading DR clears RXNE and ORE */
+        if (!ringbuf_put(&s_rx, b))
+        {
+            s_rx_dropped++;                                   /* main() was too slow: count, don't block */
+        }
+    }
+    if (((USART1->CR1 & USART_CR1_TXEIE) != 0U) && ((sr & USART_SR_TXE) != 0U))                    // «4»
+    {
+        uint8_t b;
+        if (ringbuf_get(&s_tx, &b))
+        {
+            USART1->DR = b;
+        }
+        else
+        {
+            USART1->CR1 &= ~USART_CR1_TXEIE;                  /* nothing left: stop TXE interrupts */ // «5»
+        }
+    }
+}
+</script>
+          <div id="ex-isr"></div>
+          <div id="seq-rx"></div>
+        </section>
+
+        <section class="doc-section" id="ring-buffer" data-title="A lock-free ring buffer">
+          <div class="sec-head"><h2><span class="sec-num">8.4</span>A lock-free ring buffer</h2></div>
+          <p>The interrupt handler and <code>main()</code> run at different times and speeds. A <b>ring buffer</b> between them absorbs the difference. With exactly one producer and one consumer, it needs no locking: each index is written by one side only. Try it: <i>Put</i> is what the RX interrupt does, <i>Get</i> is what <code>main()</code> does.</p>
+          <div id="rb-viz" class="hd-wrap"></div>
+          <script type="text/plain" id="src-04-rbtype" data-src="examples/04-uart-shell-ringbuffer/src/ringbuf.h" data-region="type" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/ringbuf.h" data-start="15" data-end="20" data-sha="804413d002fa">
+typedef struct
+{
+    uint8_t buf[RINGBUF_SIZE];
+    volatile uint32_t head;   /* next slot to write; written only by the producer */  // «1»
+    volatile uint32_t tail;   /* next slot to read;  written only by the consumer */
+} ringbuf_t;
+</script>
+          <div id="ex-rbtype"></div>
+          <script type="text/plain" id="src-04-rb" data-src="examples/04-uart-shell-ringbuffer/src/ringbuf.c" data-region="putget" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/ringbuf.c" data-start="11" data-end="40" data-sha="073cbe6d1ec0">
+/* head and tail run freely and wrap at 2^32; head - tail is always the number of bytes
+ * stored, even across the wrap, because unsigned subtraction is modulo 2^32. */
+uint32_t ringbuf_count(const ringbuf_t *rb)
+{
+    return rb->head - rb->tail;                                     // «2»
+}
+
+bool ringbuf_put(ringbuf_t *rb, uint8_t byte)
+{
+    const uint32_t head = rb->head;
+    if ((head - rb->tail) >= RINGBUF_SIZE)
+    {
+        return false;                                               /* full: drop, never block */
+    }
+    rb->buf[head & (RINGBUF_SIZE - 1U)] = byte;                     // «3»
+    rb->head = head + 1U;   /* publish AFTER the data is stored */  // «4»
+    return true;
+}
+
+bool ringbuf_get(ringbuf_t *rb, uint8_t *byte)
+{
+    const uint32_t tail = rb->tail;
+    if (rb->head == tail)
+    {
+        return false;
+    }
+    *byte = rb->buf[tail & (RINGBUF_SIZE - 1U)];
+    rb->tail = tail + 1U;   /* free the slot AFTER reading it */    // «5»
+    return true;
+}
+</script>
+          <div id="ex-rb"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Two producers break it</span><p>The lock-free property holds only for one writer of <code>head</code> and one writer of <code>tail</code>. If two interrupts at different priorities both call <code>ringbuf_put()</code> on the same buffer, one can preempt the other between the read and the write of <code>head</code>, and a byte is lost. Then you need a critical section.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="shell" data-title="A tiny command shell">
+          <div class="sec-head"><h2><span class="sec-num">8.5</span>A tiny command shell</h2></div>
+          <p>With bytes arriving reliably, a shell is just a line editor and a lookup table. The code below has no hardware access at all, so the tests in <code>examples/04-…/test/test_shell.c</code> run it on your PC.</p>
+          <script type="text/plain" id="src-04-feed" data-src="examples/04-uart-shell-ringbuffer/src/shell.c" data-region="feed" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/shell.c" data-start="71" data-end="105" data-sha="93ad1e02a599">
+void shell_feed(shell_t *sh, char c)
+{
+    const char prev = sh->prev;
+    sh->prev = c;
+    if ((c == '\n') && (prev == '\r'))
+    {
+        return;                                                /* CR LF: the CR already ran the line */
+    }
+    if ((c == '\r') || (c == '\n'))                            /* Enter: run the line */  // «8»
+    {
+        sh->write("\n");
+        sh->line[sh->len] = '\0';
+        execute(sh);
+        sh->len = 0U;
+        sh->write("> ");
+    }
+    else if ((c == '\b') || (c == 0x7F))                       /* Backspace or DEL */    // «9»
+    {
+        if (sh->len > 0U)
+        {
+            sh->len--;
+            sh->write("\b \b");                                /* erase on the terminal */
+        }
+    }
+    else if ((c >= ' ') && (sh->len < (SHELL_LINE_MAX - 1U)))  /* printable, room left */ // «10»
+    {
+        sh->line[sh->len++] = c;
+        const char echo[2] = {c, '\0'};
+        sh->write(echo);                                       /* echo what was typed */
+    }
+    else
+    {
+        /* control character or line full: ignore */
+    }
+}
+</script>
+          <div id="ex-feed"></div>
+          <script type="text/plain" id="src-04-exec" data-src="examples/04-uart-shell-ringbuffer/src/shell.c" data-region="execute" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/shell.c" data-start="30" data-end="67" data-sha="93ad1e02a599">
+/* Split the line in place at spaces: "led on" -> argv = {"led", "on"}. */
+static void execute(shell_t *sh)
+{
+    const char *argv[SHELL_ARGS_MAX];
+    uint32_t argc = 0U;
+    char *p = sh->line;
+    while ((*p != '\0') && (argc < SHELL_ARGS_MAX))
+    {
+        while (*p == ' ')
+        {
+            *p++ = '\0';                                       // «6»
+        }
+        if (*p == '\0')
+        {
+            break;
+        }
+        argv[argc++] = p;
+        while ((*p != ' ') && (*p != '\0'))
+        {
+            ++p;
+        }
+    }
+    if (argc == 0U)
+    {
+        return;                                                /* empty line */
+    }
+    for (size_t i = 0U; i < sh->ncmds; ++i)
+    {
+        if (strcmp(argv[0], sh->cmds[i].name) == 0)            // «7»
+        {
+            sh->cmds[i].fn(argc, argv);
+            return;
+        }
+    }
+    sh->write("unknown command: ");
+    sh->write(argv[0]);
+    sh->write(" (try help)\n");
+}
+</script>
+          <div id="ex-exec"></div>
+          <p>What a session looks like (from <code>expected-output.txt</code>):</p>
+          <script type="text/plain" data-code data-src="examples/04-uart-shell-ringbuffer/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="12" data-sha="97a4f705b42c">
+Example 04: UART shell (type help)
+> help
+Commands:
+  help - list commands
+  led - led on|off|toggle (PC13)
+  clock - show the bus clocks
+  mco - mco hse|pll|off: clock out on PA8
+  uptime - milliseconds since start
+  regs - dump RCC and FLASH registers
+> clock
+SYSCLK/HCLK 72000000 Hz, PCLK1 36000000 Hz, PCLK2 72000000 Hz
+> 
+</script>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 04)</span><p>✅ The Robot test types commands into the simulated UART and checks the answers and the LED. ⚠️ Characters arrive without real bit timing, so overruns never happen in simulation. ❌ Not tested on a Blue Pill yet.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="lin-mode" data-title="LIN mode on the F1 USART">
+          <div class="sec-head"><h2><span class="sec-num">8.6</span>LIN mode on the F1 USART</h2></div>
+          <p><b>LIN</b> (Local Interconnect Network, ISO 17987) is a cheap single-wire bus for simple car body functions: switches, mirrors, seat motors. It is a UART frame format plus a schedule: one master asks, a slave answers. The F1's USART has a LIN mode (<code>USART_CR2.LINEN</code>) that adds what a plain UART lacks (RM0008 §27.3.8):</p>
+          <ul>
+            <li><b>Break:</b> the master starts every frame with at least 13 low bit times, longer than any valid byte. <code>USART_CR1.SBK</code> sends one.</li>
+            <li><b>Break detection:</b> a receiver with <code>LINEN</code> sets <code>LBD</code> when it sees a break of 10 or 11 bits (<code>LBDL</code>), and can interrupt (<code>LBDIE</code>).</li>
+          </ul>
+          <p>A frame header is: break, sync byte <code>0x55</code> (a 10101010 pattern slaves use to measure the master's baud rate), and a <b>protected identifier</b>: 6 ID bits plus 2 parity bits.</p>
+          <div id="wv-lin"></div>
+          <div class="wv-controls"><label for="lin-id">Frame ID (0–63) <input id="lin-id" type="number" min="0" max="63" value="18"></label><span id="lin-out" class="mono small"></span></div>
+          <p>Physically, LIN needs a transceiver that moves the signal to the car's 12 V level; the course keeps LIN to theory here and to a 3.3 V two-board demo in example 13. <a href="can.html#lin">Module 12</a> compares LIN with CAN.</p>
+          <div id="ck-uart"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/calc.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/uart.js?v=__BUILD__"></script>
+</body>
+</html>

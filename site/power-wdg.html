@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Watchdogs, Reset Sources and Low Power — MCU Academy</title>
+  <meta name="description" content="IWDG vs WWDG, reading reset causes, Sleep/Stop/Standby modes and waking up correctly.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="power-wdg">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 13</span><span>/</span><span>Watchdog &amp; Power</span></nav>
+          <div class="eyebrow">Module 13 · Peripherals</div>
+          <h1>Watchdogs, Reset Sources and Low Power</h1>
+          <p class="lead">Two things a product needs and a demo never shows: recovering by itself when the software hangs, and spending most of its life asleep. This module covers the watchdogs, how to find out why the chip reset, the Sleep, Stop and Standby modes, and the surprises waiting after a wake-up.</p>
+          <div class="page-meta"><span>⏱ 45 min read</span><span>🎯 Intermediate</span><span>📂 examples/08-iwdg-hardfault, examples/09-lowpower-stop</span></div>
+        </header>
+
+        <section class="doc-section" id="reset-causes" data-title="Who reset me?">
+          <div class="sec-head"><h2><span class="sec-num">13.1</span>Who reset me?</h2></div>
+          <p>Every reset sets a flag in <code>RCC_CSR</code> (RM0008 §7.3.10), and the flags stay set until software clears them with <code>RMVF</code>. Reading them at boot is the cheapest diagnostic a device can have: a field unit that keeps rebooting because of the watchdog tells you exactly that.</p>
+          <div id="reg-csr"></div>
+          <script type="text/plain" id="src-08-boot" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="boot" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="122" data-end="135" data-sha="5aee32d3acad">
+uart_puts("\nExample 08 boot, reset cause: ");
+uart_puts(reset_cause(RCC->CSR));                                                              // «14»
+uart_puts("\n");
+RCC->CSR |= RCC_CSR_RMVF;                       /* clear the flags for next time */
+if (s_last_fault.magic == FAULT_MAGIC)
+{
+    char why[96];
+    uart_puts("last fault: pc ");
+    uart_put_hex(s_last_fault.pc);
+    uart_puts(" ");
+    uart_puts(fault_describe(s_last_fault.cfsr, s_last_fault.hfsr, why, sizeof why));
+    uart_puts("\n");
+    s_last_fault.magic = 0U;                    /* report each fault once */
+}
+</script>
+          <div id="ex-boot"></div>
+          <script type="text/plain" id="src-08-cause" data-src="examples/08-iwdg-hardfault/src/faultdecode.c" data-region="reset-cause" data-lang="c" data-file="examples/08-iwdg-hardfault/src/faultdecode.c" data-start="69" data-end="78" data-sha="224370312755">
+const char *reset_cause(uint32_t csr)
+{
+    if ((csr & (1UL << 29)) != 0U) { return "independent watchdog"; }                          // «3»
+    if ((csr & (1UL << 30)) != 0U) { return "window watchdog"; }
+    if ((csr & (1UL << 31)) != 0U) { return "low-power management"; }
+    if ((csr & (1UL << 28)) != 0U) { return "software (SYSRESETREQ)"; }
+    if ((csr & (1UL << 27)) != 0U) { return "power-on"; }                                      // «4»
+    if ((csr & (1UL << 26)) != 0U) { return "reset pin"; }
+    return "unknown";
+}
+</script>
+          <div id="ex-cause"></div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">PINRSTF is almost always set</span><p>Every internal reset source also pulls the NRST pin low for a moment, so the pin flag accompanies all the others. Check the specific flags first and treat "pin" as the fallback, as the decoder above does.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="iwdg" data-title="Independent watchdog">
+          <div class="sec-head"><h2><span class="sec-num">13.2</span>Independent watchdog</h2></div>
+          <p>The <b>independent watchdog</b> (IWDG) is a 12-bit down-counter clocked by the ~40 kHz LSI, independent of the main clock. If software does not reload it in time, it resets the chip. Once started it cannot be stopped, not even by the program that started it (RM0008 §19).</p>
+          <script type="text/plain" id="src-08-iwdg" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="iwdg" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="27" data-end="44" data-sha="5aee32d3acad">
+static void iwdg_start_1s(void)
+{
+    DBGMCU->CR |= DBGMCU_CR_DBG_IWDG_STOP;          /* don't reset while halted at a breakpoint */ // «2»
+    IWDG->KR = 0x5555U;                             /* unlock PR and RLR */                        // «3»
+    IWDG->PR = 3U;                                  /* LSI / 32: about 1.25 kHz */
+    IWDG->RLR = 1250U - 1U;                         /* about 1 s; LSI varies 30-60 kHz (DS5319) */
+    for (uint32_t n = 0U; ((IWDG->SR & (IWDG_SR_PVU | IWDG_SR_RVU)) != 0U) && (n < 100000U); ++n)
+    {
+        /* the new values cross into the LSI clock domain */
+    }
+    IWDG->KR = 0xAAAAU;                             /* reload the counter */
+    IWDG->KR = 0xCCCCU;                             /* start: from now on it cannot be stopped */   // «4»
+}
+
+static void iwdg_feed(void)
+{
+    IWDG->KR = 0xAAAAU;                                                                            // «5»
+}
+</script>
+          <div id="ex-iwdg"></div>
+          <p>Pick a prescaler and reload value. Because the LSI may run anywhere from 30 to 60 kHz (DS5319), the real timeout varies by a factor of two: design for the short end.</p>
+          <div id="iwdg-calc" class="calc-host glass"></div>
+          <div id="reg-iwdgpr"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Feed the watchdog from the right place</span><p>Kicking the watchdog from a timer interrupt keeps the chip alive even when the main loop is stuck, which defeats the purpose. Feed it only when every important activity has proved it is running (the capstone's watchdog manager does exactly that).</p></div></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>A dead man's switch on a train: the driver must press a pedal every few seconds. If the driver falls asleep, the train stops by itself. Pressing the pedal with a brick (a timer interrupt) defeats it.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="wwdg" data-title="Window watchdog">
+          <div class="sec-head"><h2><span class="sec-num">13.3</span>Window watchdog</h2></div>
+          <p>The <b>window watchdog</b> (WWDG) runs from PCLK1 and catches a second class of bug: refreshing too <i>early</i>. Its 7-bit counter counts down; a reset happens if it drops below <code>0x40</code>, or if software refreshes it while it is still above the window value <code>W</code> (RM0008 §20). Refreshes are only accepted inside the window, so a loop that runs too fast, for example because it skipped work, also resets the chip.</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th></th><th>IWDG</th><th>WWDG</th></tr></thead>
+            <tbody>
+              <tr><td>Clock</td><td>LSI (~40 kHz), keeps running if the main clock fails</td><td>PCLK1 ÷ 4096 ÷ 2<sup>WDGTB</sup></td></tr>
+              <tr><td>Catches</td><td>Software stuck (no refresh)</td><td>Software stuck <i>or</i> running too fast</td></tr>
+              <tr><td>Timeout range</td><td>~0.1 ms to ~26 s</td><td>~0.1 ms to ~58 ms at 36 MHz</td></tr>
+              <tr><td>Early warning</td><td>—</td><td>Early-wakeup interrupt at counter 0x40</td></tr>
+              <tr><td>Can be stopped</td><td>No</td><td>No (until reset)</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="doc-section" id="modes" data-title="Sleep, Stop, Standby">
+          <div class="sec-head"><h2><span class="sec-num">13.4</span>Sleep, Stop, Standby</h2></div>
+          <p>The Cortex-M3 enters a low-power mode with <code>WFI</code> (wait for interrupt) or <code>WFE</code> (wait for event). What stops depends on <code>SCB-&gt;SCR.SLEEPDEEP</code> and <code>PWR_CR</code> (RM0008 §5.3):</p>
+          <div id="sm-power"></div>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Mode</th><th>Stops</th><th>Wake-up</th><th>Keeps</th></tr></thead>
+            <tbody>
+              <tr><td>Sleep</td><td>CPU clock only</td><td>any interrupt; fast</td><td>everything</td></tr>
+              <tr><td>Stop</td><td>all clocks of the 1.8 V domain, PLL, HSI, HSE</td><td>any EXTI line (pins, RTC alarm, PVD, USB wake-up); microseconds, on HSI</td><td>SRAM and registers</td></tr>
+              <tr><td>Standby</td><td>1.8 V domain powered off</td><td>WKUP pin (PA0) rising, RTC alarm, NRST, IWDG; like a reset</td><td>backup registers and RTC only</td></tr>
+            </tbody>
+          </table></div>
+          <p>Typical currents range from milliamps in Sleep to tens of microamps in Stop and a few microamps in Standby (DS5319 supply-current tables). On a Blue Pill the power LED and the regulator draw more than the MCU in Stop, so measure the board, then remove the LED's resistor if you need the real numbers.</p>
+          <div id="reg-pwrcr"></div>
+        </section>
+
+        <section class="doc-section" id="wakeup" data-title="Wake-up sources">
+          <div class="sec-head"><h2><span class="sec-num">13.5</span>Wake-up sources</h2></div>
+          <p>Example 09 shows both: Sleep, woken by every SysTick interrupt, and Stop, woken only by the button on EXTI line 0.</p>
+          <script type="text/plain" id="src-09-sleep" data-src="examples/09-lowpower-stop/src/main.c" data-region="sleep" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="37" data-end="48" data-sha="454166a55535">
+static uint32_t sleep_for_one_second(void)
+{
+    uint32_t wakes = 0U;
+    const uint32_t start = millis();
+    SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;                               /* WFI = Sleep: only the CPU clock stops */ // «1»
+    while ((millis() - start) < 1000U)
+    {
+        __WFI();                                                      /* any interrupt wakes it: here SysTick */  // «2»
+        ++wakes;
+    }
+    return wakes;
+}
+</script>
+          <div id="ex-sleep"></div>
+          <script type="text/plain" id="src-09-main" data-src="examples/09-lowpower-stop/src/main.c" data-region="main" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="85" data-end="98" data-sha="454166a55535">
+for (uint32_t n = 1U;; ++n)
+{
+    uart_puts("stop mode: press the button on PA0 to wake up\n");
+    delay_ms(5U);                                                 /* let the last byte leave the UART */  // «8»
+    led_off();
+    enter_stop();
+    led_on();
+    uart_puts("wake ");
+    uart_put_dec(n);
+    uart_puts(": back at ");
+    uart_put_dec(SystemCoreClock / 1000000U);
+    uart_puts(" MHz\n");
+    delay_ms(300U);
+}
+</script>
+          <div id="ex-main"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The lost wake-up race</span><p>If the button is pressed after you decide to sleep but before <code>WFI</code> executes, its interrupt runs while you are still awake, and <code>WFI</code> then sleeps until the <i>next</i> press. Example 09 accepts that (it is a demo), but products check a "pending work" flag with interrupts masked right before sleeping, or use <code>WFE</code> with the event register, which remembers an event that happened before the instruction.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="after-stop" data-title="Restoring clocks after Stop">
+          <div class="sec-head"><h2><span class="sec-num">13.6</span>Restoring clocks after Stop</h2></div>
+          <p>Stop mode switches off the PLL and the HSE. When an interrupt wakes the chip, it continues on the 8 MHz HSI (RM0008 §5.3.5): the UART baud rate, SysTick period and every timer are now wrong by a factor of nine until the clock tree is rebuilt.</p>
+          <script type="text/plain" id="src-09-stop" data-src="examples/09-lowpower-stop/src/main.c" data-region="stop" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="52" data-end="66" data-sha="454166a55535">
+static void enter_stop(void)
+{
+    RCC->APB1ENR |= RCC_APB1ENR_PWREN;                                /* PWR registers need their clock */      // «3»
+    PWR->CR |= PWR_CR_LPDS;                                           /* regulator in low-power mode */
+    PWR->CR &= ~PWR_CR_PDDS;                                          /* deepsleep = Stop, not Standby */       // «4»
+    PWR->CR |= PWR_CR_CWUF;                                           /* clear the wake-up flag */
+    SysTick->CTRL &= ~SysTick_CTRL_ENABLE_Msk;                        /* its interrupt would end Stop at once */ // «5»
+    SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
+    __DSB();
+    __WFI();                                                          /* clocks stop here until EXTI0 */       // «6»
+    SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
+    /* Woken up: the system clock is now HSI 8 MHz and the PLL and HSE are off (RM0008 §5.3.5). */
+    (void)clock_init_72mhz();                                                                                  // «7»
+    systick_init_1ms();
+}
+</script>
+          <div id="ex-stop"></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (examples 08 and 09)</span><p>✅ Watchdog reset, fault decoding, Sleep and Stop control flow with button wake-up are tested in Renode. ⚠️ The course's RCC model always reports "power-on" as the reset cause, and Renode's clocks do not really stop in Stop. ❌ No current or power model at all. Not tested on a Blue Pill yet.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="debug-lowpower" data-title="Debugging low-power code">
+          <div class="sec-head"><h2><span class="sec-num">13.7</span>Debugging low-power code</h2></div>
+          <p>In Stop and Standby the debug logic loses its clock and the debugger disconnects. <code>DBGMCU_CR</code> keeps the clocks the debugger needs running in low-power modes, and can freeze the watchdogs and timers while the core is halted at a breakpoint (RM0008 §31.16.3):</p>
+          <div id="reg-dbgmcu"></div>
+          <p>Example 08 sets <code>DBG_IWDG_STOP</code> so a breakpoint never triggers a watchdog reset; example 09 sets <code>DBG_SLEEP</code> and <code>DBG_STOP</code> in debug builds only, because they raise the current consumption.</p>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Can't connect after flashing a low-power program?</span><p>If the chip enters Stop or Standby right after reset, the debugger may never catch it awake. Connect under reset, or boot with BOOT0 = 1 (<a href="troubleshooting.html#cannot-halt">Troubleshooting</a>).</p></div></div>
+          <div id="ck-power"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/power-wdg.js?v=__BUILD__"></script>
+</body>
+</html>
