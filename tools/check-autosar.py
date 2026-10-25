@@ -31,7 +31,7 @@ PROJ = ROOT / "capstone/turnlight/stage3-autosar"
 CALLOUTS = {"EcuM_AL_DriverInitZero", "EcuM_AL_DriverInitOne", "EcuM_AL_DriverInitTwo", "ShutdownHook", "ErrorHook"}
 OS_API = {"StartOS", "ShutdownOS", "ActivateTask", "TerminateTask", "ChainTask", "GetTaskID", "SetRelAlarm",
           "CancelAlarm", "SetEvent", "ClearEvent", "GetEvent", "WaitEvent", "GetResource", "ReleaseResource",
-          "SuspendAllInterrupts", "ResumeAllInterrupts"}
+          "SuspendAllInterrupts", "ResumeAllInterrupts", "Os_AssertFailed"}
 APP_LIBS = {"turnlight_sm.h", "lampmon.h"}       # application libraries an SWC may use (PLAN.md §5.2)
 BSW_HEADER_NAMES = re.compile(r'#include\s+"(Std_Types|Platform_Types|Compiler|Det|Mcu|Port|Dio|Pwm|Adc|Wdg|WdgIf|Can|CanIf|PduR|Com|Dem|WdgM|EcuM|IoHwAb|Os|stm32f103xb|SchM_\w+|\w+_MemMap|\w+_Cfg)\.h"')
 errors = []
