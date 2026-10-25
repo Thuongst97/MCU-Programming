@@ -25,4 +25,8 @@
     ],
     edges: [{ from: "swc", to: "dio", kind: "rte", label: "Rte_Write" }],
   });
+  window.MCU.Pinout($("#po-demo"), { board: "bluepill", mode: "wiring", ...window.MCU_DATA.wiring["01"] });
+  window.MCU.Register($("#reg-demo"), { reg: "RCC_CFGR", value: 0x001d0402 });
+  window.MCU.MemoryMap($("#mm-demo"), { map: "00-bluepill-blink-uart" });
+  window.MCU.Checklist($("#ck-demo"), ["one", "two"], { key: "fixture" });
 })();

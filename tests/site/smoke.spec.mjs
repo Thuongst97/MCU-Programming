@@ -150,6 +150,23 @@ test("engines render and respond (fixture page)", async ({ browser }) => {
   await expect(page.locator("#lg-demo .lg-cross")).toHaveCount(1);
   await page.hover('#lg-demo .lg-node[data-id="swc"]');
   await expect(page.locator("#lg-demo .lg-edge.lit")).toHaveCount(1);
+  // pinout: wiring view drew parts; clicking a pin fills the side panel; search highlights
+  await expect(page.locator("#po-demo .po-ext")).toHaveCount(3);
+  await page.click('#po-demo [data-pin="PA9"] .po-dot');
+  await expect(page.locator("#po-demo .po-panel h4")).toContainText("PA9");
+  await page.fill("#po-demo .po-search", "CAN_TX");
+  await expect(page.locator("#po-demo .po-pin.match")).toHaveCount(2);
+  // register: the C expression follows the value; toggling a bit changes it
+  await expect(page.locator("#reg-demo .reg-cexpr")).toHaveText("RCC->CFGR = RCC_CFGR_PLLMULL9 | RCC_CFGR_PLLSRC | RCC_CFGR_PPRE1_DIV2 | RCC_CFGR_SW_PLL;");
+  await page.click('#reg-demo .reg-bit[data-bit="0"]');
+  await expect(page.locator("#reg-demo .reg-hex")).toHaveText("0x001D0403");
+  // memory map: stepping highlights .data in flash and RAM
+  await page.click('#mm-demo [data-act="next"]');
+  await page.click('#mm-demo [data-act="next"]');
+  await expect(page.locator("#mm-demo .mm-sec.on")).toHaveCount(2);
+  // checklist: ticking persists the count
+  await page.check("#ck-demo input[data-i='1']");
+  await expect(page.locator("#ck-demo .ck-count")).toHaveText("1 / 2");
   expect(problems).toEqual([]);
   await context.close();
 });

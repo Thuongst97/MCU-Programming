@@ -36,8 +36,10 @@ jobs:
         run: python3 tools/update-third-party.py --check
       - name: Tool unit tests
         run: python3 -m unittest discover -s tests/tools -v
-      - name: Runtime unit tests (lib/code.js)
+      - name: Runtime and engine unit tests
         run: node --test tests/site/*.test.mjs
+      - name: Example wiring diagrams match the pin data
+        run: node tools/export-wiring.mjs --check
 
   browser-smoke:
     name: Browser smoke test (Playwright)
