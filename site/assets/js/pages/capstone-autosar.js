@@ -32,14 +32,36 @@
       { id: "pwm", band: "mcal", title: "Pwm.c, Adc.c", sub: "TIM3, ADC1" },
       { id: "can", band: "mcal", title: "Can.c", sub: "polling" },
       { id: "wdg", band: "mcal", title: "Wdg.c, Mcu.c", sub: "IWDG, PLL" },
+      { id: "canfd", band: "mcal", title: "Can (CAN FD)", sub: "production MCU only", soft: true,
+        tip: "Not on the Blue Pill: bxCAN is classic CAN only. See 26.5 for what changes per layer." },
     ],
     edges: [
       { from: "tl", to: "rte", kind: "rte" }, { from: "lm", to: "rte", kind: "rte" },
       { from: "rte", to: "io", kind: "call" }, { from: "rte", to: "com", kind: "call" }, { from: "rte", to: "dem", kind: "call" }, { from: "rte", to: "wdgm", kind: "call" },
       { from: "com", to: "canif", kind: "pdu" }, { from: "canif", to: "can", kind: "pdu" }, { from: "io", to: "port", kind: "call" }, { from: "io", to: "pwm", kind: "call" },
       { from: "wdgm", to: "wdgif", kind: "call" }, { from: "wdgif", to: "wdg", kind: "call" },
+      { from: "canif", to: "canfd", kind: "opt" },
     ],
   });
+
+  /* 26.5: DLC ↔ payload length, classic CAN vs CAN FD (ISO 11898-1:2015) */
+  const FD_LEN = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
+  const fd = $("#fd-dlc");
+  fd.innerHTML = `<div class="wv-controls"><label for="fd-bytes">Payload <input id="fd-bytes" type="range" min="0" max="64" value="20"></label><span id="fd-bytes-out" class="mono small"></span></div>
+    <div class="table-wrap"><table class="t"><thead><tr><th><span class="sr-only">Aspect</span></th><th>Classic CAN</th><th>CAN FD</th></tr></thead><tbody id="fd-rows"></tbody></table></div>`;
+  const showFd = () => {
+    const n = +$("#fd-bytes").value;
+    const dlc = FD_LEN.findIndex((len) => len >= n);
+    const pad = FD_LEN[dlc] - n;
+    const frames = Math.max(1, Math.ceil(n / 8));
+    $("#fd-bytes-out").textContent = `${n} byte${n === 1 ? "" : "s"} of application data`;
+    $("#fd-rows").innerHTML = `
+      <tr><td>Frames on the bus</td><td>${n <= 8 ? "1" : `${frames} (needs segmentation: CanTp or an application protocol)`}</td><td>1</td></tr>
+      <tr><td>DLC sent</td><td>${n <= 8 ? n : "up to 8 per frame"}</td><td>${dlc}</td></tr>
+      <tr><td>Bytes in the data field</td><td>${n <= 8 ? n : "up to 8 per frame"}</td><td>${FD_LEN[dlc]}${pad ? ` (${pad} padding byte${pad === 1 ? "" : "s"})` : ""}</td></tr>`;
+  };
+  $("#fd-bytes").addEventListener("input", showFd);
+  showFd();
 
   const tag = (id, a, b) => { $(`${id} .cmp-col.bad .cmp-tag`).textContent = a; $(`${id} .cmp-col.good .cmp-tag`).textContent = b; };
   Compare($("#cmp-in"), { bad: "src-c-in-before", good: "src-c-in-after", rule: ["Inputs through ports"],

@@ -596,6 +596,7 @@ const SITE = [
       ["swc", "The TurnLight SWC", "swc runnables ports"],
       ["rte", "The RTE layer", "rte hand-written mirrors generated"],
       ["bsw", "BSW-lite and MCAL", "com canif can dio pwm adc wdg"],
+      ["can-fd", "Upgrade path: CAN FD", "can fd fdcan 64 bytes dlc padding brs data phase bit rate transceiver"],
       ["review", "Self-review against the checklist", "review checklist"],
       ["next", "Where to go next", "real tools davinci tresos s32k aurix"],
     ] },
@@ -1385,7 +1386,7 @@ Det, Mcu, Port, Dio, Pwm, Adc, Wdg, Can, CanIf, PduR, Com, Dem, WdgM, WdgIf, IoH
 `check-autosar.py`; `gen-autosar-cfg.py` (MemMap + `Compiler_Cfg.h` from `cfg/modules.txt`).
 - **Exit criterion not met:** no requirement ID is cited, because autosar.org was unreachable from the
   build environment and rule 13b forbids IDs from memory. `tools/autosar-ids.txt` is empty;
-  `docs/autosar-self-review.md` lists the 26 open items and every AUTOSAR page carries a
+  `docs/autosar-self-review.md` lists the open items (27 since the CAN FD section) and every AUTOSAR page carries a
   "Verification status" note.
 - Deviations: **Gpt and Fls are not implemented** (the capstone uses the OS counter as its only time
   base and has no NV data); the page lists them as "not implemented" instead of stubbing them. **Dcm,

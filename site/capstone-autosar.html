@@ -34,6 +34,7 @@
           <div class="callout warn"><div class="ci">🔎</div><div><span class="ct">Verification status</span><p>Every API, type and rule on this page names its AUTOSAR R25-11 document. The requirement IDs and exact values are still being checked against the R25-11 PDFs; until then they come from the R4.x-era specifications, and no requirement ID is quoted, because the course never makes one up. Progress is tracked in <a href="https://github.com/Thuongst97/MCU-Programming/blob/main/docs/autosar-self-review.md">the self-review log</a>.</p></div></div>
           <p>Every box is a file you can open in <code>stage3-autosar/</code> or <code>autosar/</code>:</p>
           <div id="lg-tl3" class="lg-host"></div>
+          <p>The dashed box is the one item that is not a file in this repository: a CAN FD controller, which the Blue Pill does not have. <a href="#can-fd">26.5</a> shows what moving TurnLight to CAN FD would change, layer by layer.</p>
           <div class="table-wrap"><table class="t">
             <thead><tr><th>Folder</th><th>Role</th><th>In production</th></tr></thead>
             <tbody>
@@ -333,8 +334,33 @@ FUNC(void, WDGM_CODE) WdgM_MainFunction(void)
           <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The OS underneath is not AUTOSAR</span><p>Stage 3 runs on <code>autosar/os_shim</code>, an OSEK-like API over FreeRTOS. Task mapping, alarms and the code structure match an AUTOSAR ECU; timing protection, memory protection and the OS's certification do not exist here (module 21 lists the differences).</p></div></div>
         </section>
 
+        <section class="doc-section" id="can-fd" data-title="Upgrade path: CAN FD">
+          <div class="sec-head"><h2><span class="sec-num">26.5</span>Upgrade path: CAN FD</h2></div>
+          <p>CAN FD (<a href="can.html#can-fd">12.9</a>) arbitrates at the classic bit rate, then switches to a faster data phase and carries up to 64 bytes per frame. The F103's bxCAN speaks classic CAN only, so everything in this section is <b>on paper</b>: it is what you would change to move TurnLight to an automotive MCU with a CAN FD controller, such as the families in <a href="automotive-mcus.html">Appendix C</a>. Nothing here runs on the Blue Pill or in Renode.</p>
+          <p>TurnLight itself doesn't need it: <code>TurnLightStatus</code> is 4 bytes. CAN FD pays off when frames grow: authenticated messages that carry a MAC and a freshness value, bulk sensor data, and software download over UDS, where 64-byte frames and a faster data phase cut flashing time.</p>
+          <div class="callout analogy"><div class="ci">🚚</div><div><span class="ct">Same gate, bigger truck</span><p>Every vehicle queues at the same toll gate at the same speed: that is arbitration, and it works exactly as in classic CAN. Once through the gate, a CAN FD frame switches to the fast lane and carries a container instead of an envelope. Anyone who only knows envelopes, a classic node, sees something illegal and blocks the road.</p></div></div>
+          <h3>Payload, DLC and padding</h3>
+          <p>Above 8 bytes, CAN FD does not allow every length: DLC codes 9 to 15 mean 12, 16, 20, 24, 32, 48 and 64 bytes (ISO 11898-1:2015), so the driver pads up to the next valid size. Move the slider to compare with classic CAN:</p>
+          <div id="fd-dlc"></div>
+          <h3>What changes, layer by layer</h3>
+          <p>This is the payoff of the layering in <a href="#target-arch">26.1</a>: the change stays below the RTE.</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Layer</th><th>Our file(s)</th><th>With CAN FD</th></tr></thead>
+            <tbody>
+              <tr><td>SWCs</td><td><code>TurnLight.c</code>, <code>LampMonitor.c</code></td><td>No change. They read and write signals, never frames.</td></tr>
+              <tr><td>RTE</td><td><code>Rte.c</code></td><td>No change. It maps ports to Com signals, whatever frame carries them.</td></tr>
+              <tr><td>Com</td><td><code>Com_PBcfg.c</code>, <code>Com.c</code></td><td>The I-PDU length may grow up to 64 bytes in the configuration. Our Com-lite would need more: it keeps 8 bytes per I-PDU (<code>data[8]</code>) and packs signals into bytes 0–3 only.</td></tr>
+              <tr><td>PduR</td><td><code>PduR_PBcfg.c</code></td><td>No change. It routes by PDU ID, not by length or frame format.</td></tr>
+              <tr><td>CanIf</td><td><code>CanIf_PBcfg.c</code></td><td>Each TX PDU is configured as a classic or an FD frame, and its length may exceed 8 bytes. The CAN IDs (<code>0x3A0</code>, <code>0x3A1</code>, hypothetical) stay.</td></tr>
+              <tr><td>Can driver</td><td><code>Can.c</code>, <code>Can_PBcfg.c</code></td><td>A new driver for the FD controller. Its configuration holds two bit timings, arbitration phase and data phase, instead of one <code>CAN_BTR</code> value. Our <code>Can_Write</code> rejects any length above 8 today.</td></tr>
+              <tr><td>Hardware</td><td>board</td><td>An FD-capable controller, and a transceiver rated for the data-phase rate. The SN65HVD230 is specified for signalling rates up to 1 Mbit/s (SLOS346): fine for classic CAN, not for a 2 or 5 Mbit/s data phase.</td></tr>
+            </tbody>
+          </table></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">One classic node breaks an FD bus</span><p>A classic CAN controller treats an FD frame as an error and destroys it with an error frame. Every node on the bus must be FD-capable (or FD-tolerant): here that includes the cluster node, which is a second Blue Pill. Migrate the whole network, not one ECU.</p></div></div>
+        </section>
+
         <section class="doc-section" id="review" data-title="Self-review against the checklist">
-          <div class="sec-head"><h2><span class="sec-num">26.5</span>Self-review against the checklist</h2></div>
+          <div class="sec-head"><h2><span class="sec-num">26.6</span>Self-review against the checklist</h2></div>
           <p>The self-review checklist from <code>CLAUDE.md</code>, applied to stage 3. Machine-checked items run in CI on every push:</p>
           <div class="table-wrap"><table class="t">
             <thead><tr><th>Item</th><th>Status</th></tr></thead>
@@ -354,7 +380,7 @@ FUNC(void, WDGM_CODE) WdgM_MainFunction(void)
         </section>
 
         <section class="doc-section" id="next" data-title="Where to go next">
-          <div class="sec-head"><h2><span class="sec-num">26.6</span>Where to go next</h2></div>
+          <div class="sec-head"><h2><span class="sec-num">26.7</span>Where to go next</h2></div>
           <p>Where to go from the Blue Pill:</p>
           <ul>
             <li><b>Real tools.</b> Vector DaVinci Configurator and Developer, Elektrobit tresos, ETAS ISOLAR, and the silicon vendors' MCAL configurators generate exactly the files <code>cfg/</code> and <code>rte/</code> imitate. Student and evaluation licences exist for some of them.</li>

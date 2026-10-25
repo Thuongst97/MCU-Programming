@@ -333,6 +333,7 @@
         ["swc", "The TurnLight SWC", "swc runnables ports"],
         ["rte", "The RTE layer", "rte hand-written mirrors generated"],
         ["bsw", "BSW-lite and MCAL", "com canif can dio pwm adc wdg"],
+        ["can-fd", "Upgrade path: CAN FD", "can fd fdcan 64 bytes dlc padding brs data phase bit rate transceiver"],
         ["review", "Self-review against the checklist", "review checklist"],
         ["next", "Where to go next", "real tools davinci tresos s32k aurix"],
       ] },
@@ -508,7 +509,7 @@
   const REFS = {
                                                                 "automotive-mcus": ["aecQ100", "iso26262", "nxpS32k", "infineonAurix", "renesasRh850", "ds5319", "arLayered"],
     "ll-drivers": ["um1850", "stm32CubeF1", "rm0008Rcc", "rm0008Gpio", "cmsisDeviceF1"],
-    "capstone-autosar": ["arLayered", "arRte", "arCom", "arWdgM", "arDem", "arEcuM", "arOs", "arModuleList"],
+    "capstone-autosar": ["arLayered", "arRte", "arCom", "arWdgM", "arDem", "arEcuM", "arOs", "arModuleList", "arCanIf", "arCan", "iso11898", "tiSn65"],
     "capstone-rtos": ["freertosCm3", "freertosConfig", "freertosStack", "freertosKernel", "rm0008Iwdg", "pm0056Exc"],
     "capstone-baremetal": ["uneceR48", "rm0008Tim", "rm0008Can", "rm0008Adc", "rm0008Iwdg", "iso11898", "renodeDocs"],
     "autosar-review": ["arSrsBswGeneral", "arLayered", "misraC", "misraCompliance", "iso26262", "arMcu"],
