@@ -17,6 +17,15 @@ typedef enum
  * ADC 12 MHz (/6, the maximum is 14 MHz), 2 flash wait states. On failure the clock stays on HSI. */
 clock_status_t clock_init_72mhz(void);
 
+/* Microcontroller clock output on PA8, to measure a clock with a scope or frequency counter. */
+typedef enum
+{
+    CLOCK_MCO_OFF = 0,
+    CLOCK_MCO_HSE,        /* 8 MHz crystal */
+    CLOCK_MCO_PLL_DIV2    /* 36 MHz at the course setup; SYSCLK itself (72 MHz) is above the 50 MHz pin limit */
+} clock_mco_t;
+void clock_mco(clock_mco_t src);
+
 /* Bus clocks derived from the current RCC settings (Hz). */
 uint32_t clock_hclk(void);
 uint32_t clock_pclk1(void);

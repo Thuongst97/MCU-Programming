@@ -20,9 +20,10 @@ void led_off(void)
     GPIOC->BSRR = GPIO_BSRR_BS13;   /* set = drive high = LED off */
 }
 
+// [region:toggle]
 void led_toggle(void)
 {
-    if ((GPIOC->ODR & GPIO_ODR_ODR13) != 0U)
+    if ((GPIOC->ODR & GPIO_ODR_ODR13) != 0U)   /* read back what we last drove */  // «1»
     {
         led_on();
     }
@@ -31,3 +32,4 @@ void led_toggle(void)
         led_off();
     }
 }
+// [endregion]

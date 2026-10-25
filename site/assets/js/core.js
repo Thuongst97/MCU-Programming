@@ -23,7 +23,7 @@
      shown greyed out with their roadmap phase (PLAN.md §11) and never linked. */
   const SITE = [
     /* ───────────── Group: Start here ───────────── */
-    { id: "fundamentals", status: "planned", phase: 3, file: "fundamentals.html", num: "01", group: "Start here",
+    { id: "fundamentals", status: "ready", phase: 3, file: "fundamentals.html", num: "01", group: "Start here",
       title: "What Is a Microcontroller?", short: "MCU Fundamentals", icon: "🧠", accent: "#e8a36b",
       desc: "MCU vs MPU, the Cortex-M3 core, buses, memory map, registers and how C becomes bits on a pin.",
       sections: [
@@ -57,7 +57,7 @@
       ] },
   
     /* ───────────── Group: From reset to main ───────────── */
-    { id: "boot", status: "planned", phase: 3, file: "boot.html", num: "03", group: "From reset to main",
+    { id: "boot", status: "ready", phase: 3, file: "boot.html", num: "03", group: "From reset to main",
       title: "Startup Code, Vector Table & Linker Scripts", short: "Startup & Linker", icon: "🚀", accent: "#e8a36b",
       desc: "What happens between reset and main(): boot modes, vector table, .data/.bss init, linker script sections and map files.",
       sections: [
@@ -70,7 +70,7 @@
         ["c-vs-asm", "Startup in C vs ST's assembly", "startup_stm32f103xb.s c startup comparison"],
         ["pitfalls", "Pitfalls", "64k vs 128k estack alignment 8-byte aapcs"],
       ] },
-    { id: "clocks", status: "planned", phase: 3, file: "clocks.html", num: "04", group: "From reset to main",
+    { id: "clocks", status: "ready", phase: 3, file: "clocks.html", num: "04", group: "From reset to main",
       title: "Clocks: RCC, HSE, PLL and Flash Wait States", short: "Clock Tree", icon: "⏱️", accent: "#fbbf24",
       desc: "The STM32F1 clock tree end to end, why 72 MHz needs two flash wait states, and how every peripheral clock is derived.",
       sections: [
@@ -82,7 +82,7 @@
         ["peripheral-clocks", "Peripheral clock enables", "rcc_apb2enr rcc_apb1enr rcc_ahbenr"],
         ["mco", "Measuring the clock (MCO on PA8)", "mco pa8 oscilloscope"],
       ] },
-    { id: "gpio", status: "planned", phase: 3, file: "gpio.html", num: "05", group: "From reset to main",
+    { id: "gpio", status: "ready", phase: 3, file: "gpio.html", num: "05", group: "From reset to main",
       title: "GPIO and Alternate Functions", short: "GPIO & AFIO", icon: "📍", accent: "#3fb68b",
       desc: "CRL/CRH modes, ODR vs BSRR, pull-ups, 5 V tolerance, AFIO remapping and how not to lock yourself out of SWD.",
       sections: [
@@ -94,7 +94,7 @@
         ["swj", "SWJ_CFG: keeping SWD alive", "swj_cfg jtag disable pa13 pa14 pa15 pb3 pb4 lockout"],
         ["debounce", "Buttons and debouncing", "button bounce debounce pull-up"],
       ] },
-    { id: "interrupts", status: "planned", phase: 3, file: "interrupts.html", num: "06", group: "From reset to main",
+    { id: "interrupts", status: "ready", phase: 3, file: "interrupts.html", num: "06", group: "From reset to main",
       title: "Interrupts, NVIC, EXTI and SysTick", short: "Interrupts & NVIC", icon: "⚡", accent: "#60a5fa",
       desc: "Exception model, NVIC priorities with 4 priority bits, EXTI line mapping, SysTick time base and safe sharing with main().",
       sections: [
@@ -106,7 +106,7 @@
         ["shared-data", "Sharing data with an ISR", "volatile atomic critical section primask race"],
         ["scheduler", "A non-blocking cooperative scheduler", "super loop cooperative scheduler tasks millis"],
       ] },
-    { id: "timers", status: "planned", phase: 3, file: "timers.html", num: "07", group: "From reset to main",
+    { id: "timers", status: "ready", phase: 3, file: "timers.html", num: "07", group: "From reset to main",
       title: "Timers, PWM and Input Capture", short: "Timers & PWM", icon: "〰️", accent: "#a78bfa",
       desc: "General-purpose timers, prescaler/ARR math, PWM output compare, input capture and the APB1 ×2 timer-clock rule.",
       sections: [
@@ -420,9 +420,21 @@
     ldManual: { t: "GNU ld manual — linker scripts", url: "https://sourceware.org/binutils/docs/ld/Scripts.html", kind: "tool" },
     cortexDebug: { t: "Cortex-Debug for VS Code — wiki", url: "https://github.com/Marus/cortex-debug/wiki", kind: "tool" },
     armGnu: { t: "Arm GNU Toolchain downloads", url: "https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads", kind: "tool" },
+    rm0008Exti: { t: "RM0008 — interrupts and events (NVIC vector table, EXTI)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "10", kind: "st" },
+    rm0008Tim: { t: "RM0008 — general-purpose timers TIM2 to TIM5", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "15", kind: "st" },
+    pm0056Nvic: { t: "PM0056 — NVIC, SCB and SysTick", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", sec: "4.3–4.5", kind: "st" },
+    ddi0403Exc: { t: "ARMv7-M ARM — exception model", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", sec: "B1.5", kind: "arm" },
+    ddi0337Lat: { t: "Cortex-M3 TRM — exception latency and tail-chaining", url: "https://developer.arm.com/documentation/ddi0337/latest/", doc: "ARM DDI 0337", sec: "5", kind: "arm" },
+    cmsisCore: { t: "CMSIS-Core (Cortex-M) documentation", url: "https://arm-software.github.io/CMSIS_6/latest/Core/index.html", kind: "tool" },
     stm32Base: { t: "STM32-base — Blue Pill board page and schematic notes", url: "https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html", kind: "community" },
   };
   const REFS = {
+    "timers": ["rm0008Tim", "rm0008Rcc", "rm0008Gpio", "ds5319Pins", "pm0056"],
+    "interrupts": ["pm0056Nvic", "ddi0403Exc", "ddi0337Lat", "rm0008Exti", "rm0008Usart", "cmsisCore"],
+    "gpio": ["rm0008Gpio", "ds5319Pins", "ds5319Elec", "rm0008Exti", "es096", "stm32Base"],
+    "clocks": ["rm0008Rcc", "ds5319Elec", "pm0075", "ds5319", "rm0008Gpio"],
+    "boot": ["rm0008Boot", "pm0056", "ddi0403Reset", "ldManual", "gccArm", "an2606", "cmsisDeviceF1"],
+    "fundamentals": ["ds5319", "rm0008Boot", "rm0008Rcc", "pm0056", "ddi0403", "ddi0337", "cmsisDeviceF1", "gccArm", "ldManual"],
     "troubleshooting": ["openocdManual", "rm0008Debug", "rm0008Gpio", "rm0008Sig", "ds5319Pins", "es096", "an2606", "um1075", "stm32Base"],
     "board": ["ds5319Pins", "ds5319Elec", "rm0008Gpio", "rm0008Boot", "rm0008Sig", "es096", "stm32Base"],
     "setup": ["ds5319", "ds5319Pins", "rm0008Boot", "rm0008Rcc", "rm0008Gpio", "rm0008Usart", "pm0075", "pm0056", "ddi0403Reset", "an3155", "um1075", "um2237", "openocdManual", "cmakeToolchains", "cmakePresets", "gccArm", "ldManual", "cortexDebug", "armGnu", "renodeDocs"],

@@ -3,6 +3,7 @@
  * Never 128 KB: the second 64 KB on many C8 dies is untested and undocumented.
  * Shared by every example from 01 on; example 00 carries an annotated copy of this file.
  */
+/* [region:memory] */
 ENTRY(Reset_Handler)                       /* «1» */
 
 MEMORY                                     /* «2» */
@@ -17,6 +18,7 @@ _estack = ORIGIN(RAM) + LENGTH(RAM);       /* «3» */
 /* The link fails if the static data plus these reserves do not fit into RAM. */
 _Min_Heap_Size  = 0x000;                   /* no malloc in this course */
 _Min_Stack_Size = 0x400;                   /* 1 KB main stack: checked, not enforced at run time */
+/* [endregion] */
 
 SECTIONS
 {
@@ -46,6 +48,7 @@ SECTIONS
     *(.ARM.exidx* .gnu.linkonce.armexidx.*)
   } >FLASH
 
+  /* [region:data] */
   /* Initialised variables live in RAM (VMA) but their start values are stored in flash (LMA). */
   _sidata = LOADADDR(.data);               /* «5» */
   .data :
@@ -71,6 +74,7 @@ SECTIONS
     _ebss = .;
     __bss_end__ = _ebss;
   } >RAM
+  /* [endregion] */
 
   /* Reserve heap + stack so the link fails early when RAM runs out. */
   ._user_heap_stack (NOLOAD) :             /* «7» */

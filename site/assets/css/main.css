@@ -594,7 +594,7 @@ pre.code .abadge { margin-left: 14px; font-size: 0.68rem; font-weight: 700; min-
 .seq-legend span::before { content: ""; display: inline-block; width: 18px; height: 2px; background: currentColor; vertical-align: middle; margin-right: 6px; }
 
 /* layered renderer */
-.lg-host { padding: 16px; }
+.lg-host { padding: 16px; overflow-x: auto; }
 .lg-svg { display: block; width: 100%; min-width: 760px; height: auto; }
 .lg-svg text { font-family: var(--font); }
 .lg-t0 { stop-color: var(--tn, var(--tone-rte)); stop-opacity: 0; } .lg-t1 { stop-color: var(--tn, var(--tone-rte)); stop-opacity: 0.9; } .lg-t2 { stop-color: var(--tn, var(--tone-rte)); }
@@ -816,7 +816,7 @@ pre.code .abadge { margin-left: 14px; font-size: 0.68rem; font-weight: 700; min-
 .clk-controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px 12px; }
 .clk-controls label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
 .clk-controls select { font: 12px var(--mono); background: var(--surface-solid); color: var(--text); border: 1px solid var(--border-hi); border-radius: 6px; padding: 4px; }
-.clk-presets { display: flex; gap: 6px; align-items: end; }
+.clk-presets { display: flex; gap: 6px; align-items: end; grid-column: 1 / -1; flex-wrap: wrap; }
 .clk-canvas { overflow-x: auto; margin: 12px 0 6px; background: var(--dg-canvas); border-radius: 10px; border: 1px solid var(--dg-canvas-border); padding: 8px; }
 .clk-canvas svg { display: block; width: 100%; min-width: 760px; height: auto; }
 .clk-node rect { fill: var(--dg-card); stroke: var(--dg-card-border); }

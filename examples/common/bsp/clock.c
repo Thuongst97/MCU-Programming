@@ -61,6 +61,29 @@ clock_status_t clock_init_72mhz(void)
     return CLOCK_OK;
 }
 
+// [region:mco]
+void clock_mco(clock_mco_t src)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+    /* PA8: alternate-function push-pull, 50 MHz edges: the fastest the pin allows */
+    GPIOA->CRH = (GPIOA->CRH & ~(GPIO_CRH_MODE8 | GPIO_CRH_CNF8)) | GPIO_CRH_MODE8 | GPIO_CRH_CNF8_1;  // «11»
+    uint32_t mco = RCC_CFGR_MCO_NOCLOCK;
+    if (src == CLOCK_MCO_HSE)
+    {
+        mco = RCC_CFGR_MCO_HSE;                                                                     // «12»
+    }
+    else if (src == CLOCK_MCO_PLL_DIV2)
+    {
+        mco = RCC_CFGR_MCO_PLLCLK_DIV2;
+    }
+    else
+    {
+        /* CLOCK_MCO_OFF */
+    }
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_MCO) | mco;
+}
+// [endregion]
+
 static uint32_t apb_shift(uint32_t ppre_bits)
 {
     /* PPREx: 0xx = /1, 100 = /2, 101 = /4, 110 = /8, 111 = /16 */

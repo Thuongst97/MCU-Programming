@@ -148,6 +148,25 @@ static void cmd_clock(uint32_t argc, const char *const argv[])
     uart_write(" Hz\n");
 }
 
+static void cmd_mco(uint32_t argc, const char *const argv[])
+{
+    if ((argc >= 2U) && (argv[1][0] == 'h'))
+    {
+        clock_mco(CLOCK_MCO_HSE);
+        uart_write("MCO on PA8: HSE (8 MHz)\n");
+    }
+    else if ((argc >= 2U) && (argv[1][0] == 'p'))
+    {
+        clock_mco(CLOCK_MCO_PLL_DIV2);
+        uart_write("MCO on PA8: PLL / 2 (36 MHz)\n");
+    }
+    else
+    {
+        clock_mco(CLOCK_MCO_OFF);
+        uart_write("MCO off\n");
+    }
+}
+
 static void cmd_uptime(uint32_t argc, const char *const argv[])
 {
     (void)argc;
@@ -177,6 +196,7 @@ static const shell_cmd_t s_cmds[] = {
     {"help", "list commands", cmd_help},
     {"led", "led on|off|toggle (PC13)", cmd_led},
     {"clock", "show the bus clocks", cmd_clock},
+    {"mco", "mco hse|pll|off: clock out on PA8", cmd_mco},
     {"uptime", "milliseconds since start", cmd_uptime},
     {"regs", "dump RCC and FLASH registers", cmd_regs},
 };

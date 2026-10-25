@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>What Is a Microcontroller? — MCU Academy</title>
+  <meta name="description" content="MCU vs MPU, the Cortex-M3 core, buses, memory map, registers and how C becomes bits on a pin.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="fundamentals">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 01</span><span>/</span><span>MCU Fundamentals</span></nav>
+          <div class="eyebrow">Module 01 · Start here</div>
+          <h1>What Is a Microcontroller?</h1>
+          <p class="lead">A microcontroller is a whole computer on one chip: CPU, memory and peripherals, with no operating system unless you bring one. This module builds the mental model the rest of the course relies on: where things live in memory, what a register really is, and how C turns into bits on a pin.</p>
+          <div class="page-meta"><span>⏱ 35 min read</span><span>🎯 Beginner</span><span>📂 examples/00-bluepill-blink-uart</span></div>
+        </header>
+
+        <section class="doc-section" id="mcu-vs-mpu" data-title="MCU vs MPU vs SoC">
+          <div class="sec-head"><h2><span class="sec-num">1.1</span>MCU vs MPU vs SoC</h2></div>
+          <p>If you come from Android or Linux, you have been programming <b>microprocessors</b> (MPUs): fast application cores (Cortex-A) with a memory management unit, gigabytes of external DRAM, and an operating system that hides the hardware behind drivers and system calls. A <b>microcontroller</b> (MCU) sits at the other end:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th></th><th>MCU (STM32F103)</th><th>MPU (a Cortex-A head unit)</th></tr></thead>
+            <tbody>
+              <tr><td>Memory</td><td>64 KB flash + 20 KB SRAM on the chip</td><td>GBs of external DRAM, eMMC/UFS storage</td></tr>
+              <tr><td>Address translation</td><td>None: an address is a physical location</td><td>MMU with virtual memory per process</td></tr>
+              <tr><td>Software</td><td>Your program, from reset (bare metal) or on a small RTOS</td><td>Linux or Android, apps in processes</td></tr>
+              <tr><td>Start-up time</td><td>Microseconds to <code>main()</code></td><td>Seconds to a usable system</td></tr>
+              <tr><td>Hardware access</td><td>Write a register directly</td><td>Through a kernel driver</td></tr>
+              <tr><td>Timing</td><td>Predictable to the clock cycle</td><td>Best effort, caches and scheduling jitter</td></tr>
+              <tr><td>Power</td><td>Milliamps running, microamps asleep</td><td>Watts</td></tr>
+            </tbody>
+          </table></div>
+          <p>A modern car contains both. The infotainment head unit is an MPU-class <b>SoC</b> (system on chip) running Android Automotive. Door modules, lighting, seat and climate controllers, the brakes and the engine are <b>ECUs</b> (electronic control units) built around microcontrollers, often dozens per car, talking over CAN and LIN. AUTOSAR Classic, the end goal of this course, is written for those MCU-based ECUs.</p>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>An MPU running Android is a large office building with a reception desk: you ask the receptionist (the kernel) and someone else flips the switch. A microcontroller is a workshop where you are alone with the machines. Nobody stops you, nobody helps you, and every switch on the wall is one you can reach.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="inside-f103" data-title="Inside the STM32F103C8T6">
+          <div class="sec-head"><h2><span class="sec-num">1.2</span>Inside the STM32F103C8T6</h2></div>
+          <p>The STM32F103C8T6 packs an Arm Cortex-M3 core running at up to 72 MHz, 64 KB of flash for the program, 20 KB of SRAM for data, and a set of peripherals: GPIO, timers, USARTs, SPI, I2C, a 12-bit ADC, USB, CAN, DMA and watchdogs (DS5319). Hover over a block to see how it connects:</p>
+          <div id="lg-f103"></div>
+          <p>Three things in this picture matter for everything that follows:</p>
+          <ul>
+            <li><b>Buses have speeds.</b> The AHB runs the core, memories and DMA at up to 72 MHz. Peripherals hang off two bridges: <b>APB2</b> (up to 72 MHz) and <b>APB1</b> (up to 36 MHz). Which bus a peripheral sits on decides which clock it gets and which enable register turns it on.</li>
+            <li><b>DMA is a second bus master.</b> It moves data between peripherals and memory while the CPU does something else (<a href="adc-dma.html#dma">module 09</a>).</li>
+            <li><b>Everything is clock-gated.</b> After reset almost every peripheral has its clock off to save power. Turning it on is always step one (<a href="clocks.html#peripheral-clocks">module 04</a>).</li>
+          </ul>
+        </section>
+
+        <section class="doc-section" id="memory-map" data-title="The memory map">
+          <div class="sec-head"><h2><span class="sec-num">1.3</span>The memory map</h2></div>
+          <p>The Cortex-M3 sees one flat 32-bit address space: 4 GB of addresses, from <code>0x00000000</code> to <code>0xFFFFFFFF</code>. Most of it is empty. Flash, SRAM and every peripheral register are given fixed addresses in it by the chip's designers. Click a region:</p>
+          <div id="mm-space"></div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">Why the program starts at 0x08000000 and also at 0</span><p>After reset the core fetches its first two words from address 0. With BOOT0 = 0, the chip maps (aliases) the main flash at address 0, so the same bytes appear at <code>0x00000000</code> and at <code>0x08000000</code>. With BOOT0 = 1 it maps the system memory with ST's bootloader there instead (RM0008 §3.4).</p></div></div>
+        </section>
+
+        <section class="doc-section" id="registers" data-title="Registers and volatile">
+          <div class="sec-head"><h2><span class="sec-num">1.4</span>Registers and volatile</h2></div>
+          <p>A peripheral is controlled through <b>registers</b>: 32-bit words at fixed addresses in the peripheral region. Writing to such an address does not store data in memory. It changes the hardware: turns on a clock, drives a pin, starts a conversion. Reading returns the hardware's current state. This is called <b>memory-mapped I/O</b>.</p>
+          <p>Here is the first thing every GPIO program does, from example 00. Click the numbers:</p>
+          <script type="text/plain" id="src-00-led-f" data-src="examples/00-bluepill-blink-uart/bare/src/main.c" data-region="led" data-lang="c" data-file="bare/src/main.c" data-start="13" data-end="28" data-sha="c4395b86a08f">
+static void led_init(void)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;                                     // «1»
+    GPIOC->CRH = (GPIOC->CRH & ~(GPIO_CRH_MODE13 | GPIO_CRH_CNF13))       // «2»
+                 | GPIO_CRH_MODE13_1;   /* output, 2 MHz max, push-pull */  // «3»
+}
+
+static void led_on(void)
+{
+    GPIOC->BSRR = GPIO_BSRR_BR13;   /* drive LOW: the LED is wired to 3.3 V, so it lights */ // «4»
+}
+
+static void led_off(void)
+{
+    GPIOC->BSRR = GPIO_BSRR_BS13;   /* drive HIGH: no current, LED off */
+}
+</script>
+          <div id="ex-led"></div>
+          <p>The names come from ST's CMSIS device header <code>stm32f103xb.h</code>. This is what they expand to. The snippet below is <b>for illustration only</b>: never type raw addresses in real code.</p>
+          <script type="text/plain" data-code data-lang="c" data-label="what the macro expands to">/* RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;  expands to roughly: */
+          (*(volatile uint32_t *)(0x40021000UL + 0x18UL)) |= (1UL << 4);   /* RCC_BASE + offsetof(APB2ENR), bit IOPCEN */</script>
+          <p>Three ideas hide in that line:</p>
+          <ol>
+            <li><b><code>volatile</code></b> tells the compiler that this location can change, or has side effects, outside the program's control. Without it, the optimiser may merge, reorder or delete accesses it thinks are redundant, such as writing the same register twice or reading a status flag in a loop.</li>
+            <li><b>Read-modify-write.</b> <code>|=</code> reads the whole register, sets one bit and writes it back, so the other 31 bits keep their value. If an interrupt changes the same register between the read and the write, its change is lost. <a href="interrupts.html#shared-data">Module 06</a> shows how to avoid that.</li>
+            <li><b>Masks and shifts.</b> Fields are groups of bits. You clear a field with <code>&amp;= ~MASK</code> and set a value with <code>| (value &lt;&lt; POS)</code>. The header provides <code>_Msk</code> and <code>_Pos</code> for every field.</li>
+          </ol>
+          <p>Try it on the register from the snippet. Click a bit to toggle it; the C expression follows:</p>
+          <div id="reg-apb2enr"></div>
+        </section>
+
+        <section class="doc-section" id="cortex-m3" data-title="The Cortex-M3 core">
+          <div class="sec-head"><h2><span class="sec-num">1.5</span>The Cortex-M3 core</h2></div>
+          <p>The Cortex-M3 is Arm's ARMv7-M core for microcontrollers (ARM DDI 0403, ARM DDI 0337). What you need to know as a programmer:</p>
+          <ul>
+            <li><b>Thumb-2 only.</b> It executes a mix of 16- and 32-bit instructions. There is no "ARM state"; trying to enter it causes a fault (<a href="faults-debug.html#decode">module 15</a>).</li>
+            <li><b>Registers</b> <code>r0</code>–<code>r12</code>, the stack pointer <code>sp</code> (two of them: MSP and PSP), the link register <code>lr</code> (return address), the program counter <code>pc</code>, and the status register <code>xPSR</code>.</li>
+            <li><b>NVIC</b>, the interrupt controller, is part of the core. The STM32F103 uses 4 priority bits, so 16 priority levels (PM0056).</li>
+            <li><b>SysTick</b>, a 24-bit timer inside the core, gives every Cortex-M a standard time base.</li>
+            <li><b>Hardware divide</b> and single-cycle multiply, but <b>no floating-point unit</b>: <code>float</code> arithmetic is done in software and is slow.</li>
+            <li><b>Exceptions are C functions.</b> The core saves the registers a C function may clobber before it calls an interrupt handler, so handlers need no assembly (<a href="interrupts.html#entry-exit">module 06</a>).</li>
+          </ul>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">No FPU, small RAM</span><p>A single <code>printf("%f")</code> can pull in many kilobytes of library code, and a 4 KB array on the stack can overflow the whole RAM budget of a task. The course avoids <code>printf</code> and dynamic allocation for these reasons.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="toolchain" data-title="From C to flash">
+          <div class="sec-head"><h2><span class="sec-num">1.6</span>From C to flash</h2></div>
+          <p>On an MCU nothing compiles your program on the target. A <b>cross toolchain</b> on your PC turns C into a file the chip can execute. Step through what happens to example 00:</p>
+          <div id="seq-toolchain"></div>
+          <p>The output is an <b>ELF</b> file: the machine code plus addresses, symbol names and debug information. The debugger reads the ELF; the chip only ever receives the raw bytes. Run these on the build output to see for yourself:</p>
+          <script type="text/plain" data-code data-lang="console" data-file="terminal">$ arm-none-eabi-size  build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf
+          $ arm-none-eabi-nm -n build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf | head
+          $ arm-none-eabi-objdump -d --start-address=0x08000000 --stop-address=0x08000010 build/…/00-bluepill-blink-uart.elf</script>
+        </section>
+
+        <section class="doc-section" id="takeaways" data-title="Key takeaways">
+          <div class="sec-head"><h2><span class="sec-num">1.7</span>Key takeaways</h2></div>
+          <ul>
+            <li>An MCU is CPU + flash + SRAM + peripherals on one chip, running your code from reset with no operating system.</li>
+            <li>Everything has an address. Peripheral registers live at <code>0x40000000</code> and up; writing them changes hardware.</li>
+            <li>Use the CMSIS names (<code>RCC-&gt;APB2ENR</code>, <code>RCC_APB2ENR_IOPCEN</code>), never raw addresses, and remember that they are <code>volatile</code>.</li>
+            <li>Peripherals sit on buses with different speeds and start with their clock off.</li>
+            <li>The Cortex-M3 has no FPU and 20 KB of RAM on this chip: size matters.</li>
+          </ul>
+          <p>Next: <a href="setup.html">set up your tools and run a program</a>, then follow the CPU <a href="boot.html">from reset to <code>main()</code></a>.</p>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/fundamentals.js?v=__BUILD__"></script>
+</body>
+</html>

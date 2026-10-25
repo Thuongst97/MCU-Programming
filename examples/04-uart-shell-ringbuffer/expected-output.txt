@@ -4,6 +4,7 @@ Commands:
   help - list commands
   led - led on|off|toggle (PC13)
   clock - show the bus clocks
+  mco - mco hse|pll|off: clock out on PA8
   uptime - milliseconds since start
   regs - dump RCC and FLASH registers
 > clock
