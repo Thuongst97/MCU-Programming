@@ -2,6 +2,7 @@
 """Unit tests for the authoring and check tools. Run: python3 -m unittest discover -s tests/tools -v"""
 import importlib.util
 import shutil
+import re
 import subprocess
 import sys
 import tempfile
@@ -112,9 +113,20 @@ class SiteToolsTest(unittest.TestCase):
         r = self.run_tool(ROOT, "check-site.py")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
+    @staticmethod
+    def make_planned(repo, page_id):
+        """Turn a ready page back into a planned one in a scratch copy (all pages may be ready)."""
+        core = repo / "site/assets/js/core.js"
+        text = core.read_text(encoding="utf-8").replace(f'{{ id: "{page_id}", status: "ready"', f'{{ id: "{page_id}", status: "planned"')
+        text = re.sub(rf'^\s*"?{re.escape(page_id)}"?: \[[^\]]*\],\n', "", text, count=1, flags=re.M)   # its REFS entry
+        core.write_text(text, encoding="utf-8")
+        for f in (repo / f"site/{page_id}.html", repo / f"site/assets/js/pages/{page_id}.js"):
+            f.unlink(missing_ok=True)
+
     def test_check_site_catches_problems(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = copy_repo(tmp)
+            self.make_planned(repo, "setup")
             idx = repo / "site/index.html"
             idx.write_text(idx.read_text(encoding="utf-8").replace('href="#path"', 'href="#nowhere"').replace("</main>", '<a href="setup.html">x</a></main>'), encoding="utf-8")
             r = self.run_tool(repo, "check-site.py")
@@ -125,6 +137,7 @@ class SiteToolsTest(unittest.TestCase):
     def test_new_module_scaffold_is_blocked_until_written(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = copy_repo(tmp)
+            self.make_planned(repo, "board")
             r = self.run_tool(repo, "new-module.py", "board")
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             html = (repo / "site/board.html").read_text(encoding="utf-8")

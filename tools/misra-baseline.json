@@ -1,0 +1,48 @@
+{
+ "examples/02-systick-scheduler/src/scheduler.c": {
+  "misra-c2012-10.8": 1
+ },
+ "examples/03-tim-pwm-dimming/src/breath.c": {
+  "misra-c2012-17.8": 1
+ },
+ "examples/04-uart-shell-ringbuffer/src/shell.c": {
+  "misra-c2012-10.4": 1,
+  "misra-c2012-13.3": 3
+ },
+ "examples/05-adc-pot-dma/src/adcmath.c": {
+  "misra-c2012-12.1": 2,
+  "misra-c2012-12.3": 1
+ },
+ "examples/06-i2c-oled-ssd1306/src/font5x7.h": {
+  "misra-c2012-8.11": 1
+ },
+ "examples/06-i2c-oled-ssd1306/src/gfx.c": {
+  "misra-c2012-10.2": 1,
+  "misra-c2012-12.1": 7,
+  "misra-c2012-15.7": 1,
+  "misra-c2012-17.7": 1,
+  "misra-c2012-17.8": 3,
+  "misra-c2012-18.4": 1
+ },
+ "examples/06-i2c-oled-ssd1306/src/ssd1306.c": {
+  "misra-c2012-8.9": 1
+ },
+ "examples/07-spi-flash-w25q/src/main.c": {
+  "misra-c2012-12.1": 1,
+  "misra-c2012-8.9": 1
+ },
+ "examples/07-spi-flash-w25q/src/w25q.h": {
+  "misra-c2012-2.5": 1
+ },
+ "examples/08-iwdg-hardfault/src/faultdecode.c": {
+  "misra-c2012-12.1": 2,
+  "misra-c2012-17.7": 2,
+  "misra-c2012-8.9": 2
+ },
+ "examples/12-uart-bootloader/src/proto.c": {
+  "misra-c2012-10.6": 1
+ },
+ "examples/12-uart-bootloader/src/proto.h": {
+  "misra-c2012-2.5": 2
+ }
+}

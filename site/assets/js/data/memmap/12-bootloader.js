@@ -29,34 +29,34 @@ window.MCU_DATA = window.MCU_DATA || {};
    "name": ".text",
    "vma": 134217964,
    "lma": 134217964,
-   "size": 3368,
+   "size": 3372,
    "load": true
   },
   {
    "name": ".data",
    "vma": 536870912,
-   "lma": 134221332,
+   "lma": 134221336,
    "size": 4,
    "load": true
   },
   {
    "name": ".bss",
    "vma": 536870916,
-   "lma": 134221336,
+   "lma": 134221340,
    "size": 4,
    "load": false
   },
   {
    "name": ".noinit",
    "vma": 536870920,
-   "lma": 134221340,
+   "lma": 134221344,
    "size": 0,
    "load": false
   },
   {
    "name": "._user_heap_stack",
    "vma": 536870920,
-   "lma": 134221336,
+   "lma": 134221340,
    "size": 1024,
    "load": false
   }
@@ -76,11 +76,11 @@ window.MCU_DATA = window.MCU_DATA || {};
   },
   {
    "name": "_etext",
-   "value": 134221332
+   "value": 134221336
   },
   {
    "name": "_sidata",
-   "value": 134221332
+   "value": 134221336
   },
   {
    "name": "SystemCoreClock",
@@ -116,7 +116,7 @@ window.MCU_DATA = window.MCU_DATA || {};
   {
    "name": "proto_feed",
    "value": 134219718,
-   "size": 354
+   "size": 358
   },
   {
    "name": "main",
@@ -135,7 +135,7 @@ window.MCU_DATA = window.MCU_DATA || {};
   },
   {
    "name": "flash_program",
-   "value": 134220328,
+   "value": 134220332,
    "size": 176
   },
   {

@@ -4,16 +4,16 @@
 // [region:crc]
 uint32_t crc32_update(uint32_t crc, const uint8_t *p, uint32_t n)
 {
-    crc = ~crc;                                                   /* same result as zlib.crc32() */  // «1»
+    uint32_t c = ~crc;                                            /* same result as zlib.crc32() */  // «1»
     for (uint32_t i = 0U; i < n; ++i)
     {
-        crc ^= p[i];
+        c ^= p[i];
         for (uint32_t k = 0U; k < 8U; ++k)
         {
-            crc = (crc >> 1) ^ (0xEDB88320UL & (0UL - (crc & 1UL)));   /* reflected polynomial */
+            c = (c >> 1) ^ (0xEDB88320UL & (0UL - (c & 1UL)));   /* reflected polynomial */
         }
     }
-    return ~crc;
+    return ~c;
 }
 // [endregion]
 
@@ -59,7 +59,8 @@ proto_event_t proto_feed(proto_parser_t *p, uint8_t byte)
         p->state = (p->frame.len == 0U) ? 5U : 4U;
         return PROTO_NONE;
     case 4U:
-        p->frame.data[p->got++] = byte;
+        p->frame.data[p->got] = byte;
+        p->got++;
         if (p->got == p->frame.len)
         {
             p->got = 0U;

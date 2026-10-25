@@ -4,12 +4,13 @@
 #include "shell.h"
 #include "unity.h"
 
+// [region:seam]
 static char out[512];
 static uint32_t calls;
 static uint32_t last_argc;
 static char last_arg1[16];
 
-static void capture(const char *s) { strncat(out, s, sizeof out - strlen(out) - 1U); }
+static void capture(const char *s) { strncat(out, s, sizeof out - strlen(out) - 1U); }   /* instead of the UART */ // «3»
 static void cmd_led(uint32_t argc, const char *const argv[])
 {
     calls++;
@@ -37,9 +38,10 @@ void setUp(void)
     calls = 0U;
     last_argc = 0U;
     memset(last_arg1, 0, sizeof last_arg1);
-    shell_init(&sh, cmds, 1U, capture);
+    shell_init(&sh, cmds, 1U, capture);                                                     // «4»
 }
 void tearDown(void) {}
+// [endregion]
 
 static void test_dispatches_with_arguments(void)
 {
@@ -62,12 +64,14 @@ static void test_backspace_edits_the_line(void)
     TEST_ASSERT_EQUAL_STRING("off", last_arg1);
 }
 
+// [region:test]
 static void test_unknown_command_is_reported(void)
 {
-    type("blink\r");
-    TEST_ASSERT_EQUAL_UINT32(0U, calls);
-    TEST_ASSERT_NOT_NULL(strstr(out, "unknown command: blink"));
+    type("blink\r");                                     /* arrange + act */                    // «5»
+    TEST_ASSERT_EQUAL_UINT32(0U, calls);                 /* assert: nothing dispatched ... */   // «6»
+    TEST_ASSERT_NOT_NULL(strstr(out, "unknown command: blink"));   /* ... and a message printed */
 }
+// [endregion]
 
 static void test_overlong_line_is_truncated_not_overflowed(void)
 {

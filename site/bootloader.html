@@ -255,7 +255,7 @@ __attribute__((noreturn)) static void jump_to_app(void)
           </table></div>
           <p>Build a frame and watch the CRC change with every byte:</p>
           <div id="frame-builder" class="calc-host glass"></div>
-          <script type="text/plain" id="src-12-parser" data-src="examples/12-uart-bootloader/src/proto.c" data-region="parser" data-lang="c" data-file="examples/12-uart-bootloader/src/proto.c" data-start="33" data-end="83" data-sha="1f80f15d7434">
+          <script type="text/plain" id="src-12-parser" data-src="examples/12-uart-bootloader/src/proto.c" data-region="parser" data-lang="c" data-file="examples/12-uart-bootloader/src/proto.c" data-start="33" data-end="84" data-sha="fe73642b215a">
 proto_event_t proto_feed(proto_parser_t *p, uint8_t byte)
 {
     switch (p->state)
@@ -285,7 +285,8 @@ proto_event_t proto_feed(proto_parser_t *p, uint8_t byte)
         p->state = (p->frame.len == 0U) ? 5U : 4U;
         return PROTO_NONE;
     case 4U:
-        p->frame.data[p->got++] = byte;
+        p->frame.data[p->got] = byte;
+        p->got++;
         if (p->got == p->frame.len)
         {
             p->got = 0U;

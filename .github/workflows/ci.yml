@@ -112,6 +112,16 @@ jobs:
       - name: Configure, build and run
         run: cmake --preset host-tests && cmake --build --preset host-tests && ctest --preset host-tests
 
+  static-analysis:
+    name: Static analysis (cppcheck + MISRA C:2012 addon, ratchet)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install cppcheck (the Ubuntu 24.04 package, version in tools/versions.json)
+        run: sudo apt-get update -q && sudo apt-get install -y -q cppcheck && cppcheck --version
+      - name: No new findings compared with tools/misra-baseline.json
+        run: python3 tools/run-misra.py
+
   renode-tests:
     name: Renode simulation tests (Robot Framework)
     runs-on: ubuntu-latest

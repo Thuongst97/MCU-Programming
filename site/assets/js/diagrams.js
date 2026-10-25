@@ -228,7 +228,7 @@
 
     // edge endpoints (attachment points spread along each side)
     const ends = [];
-    const edges = spec.edges.filter((e) => nodes[e.from] && nodes[e.to]).map((e, i) => {
+    const edges = (spec.edges || []).filter((e) => nodes[e.from] && nodes[e.to]).map((e, i) => {
       const a = nodes[e.from], b = nodes[e.to];
       const aB = a._y + a._h, bB = b._y + b._h;
       let sa, sb;

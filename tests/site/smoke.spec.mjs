@@ -91,7 +91,7 @@ test("global search finds glossary terms and Ctrl+K focuses it", async ({ browse
   await page.keyboard.press("Control+k");
   await expect(page.locator("#gs-input")).toBeFocused();
   await page.keyboard.type("NVIC");
-  const hit = page.locator("#gs-results a", { hasText: "NVIC" }).first();
+  const hit = page.locator(`#gs-results a[href$="glossary.html#g-nvic"]`).first();   // pages match too; pick the glossary hit
   await expect(hit).toBeVisible();
   await hit.click();
   await expect(page).toHaveURL(/glossary\.html#g-nvic$/);

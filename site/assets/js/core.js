@@ -225,7 +225,7 @@
         ["protocol", "A tiny update protocol", "crc32 packet ack nack"],
         ["protection", "Read-out and write protection", "rdp wrp option bytes"],
       ] },
-    { id: "quality", status: "planned", phase: 5, file: "quality.html", num: "17", group: "Embedded engineering",
+    { id: "quality", status: "ready", phase: 5, file: "quality.html", num: "17", group: "Embedded engineering",
       title: "Testing, Static Analysis and MISRA C", short: "Quality & MISRA", icon: "✅", accent: "#3fb68b",
       desc: "Unit tests on the host with Unity, hardware abstraction for testability, cppcheck with the MISRA addon, and what MISRA rules are for.",
       sections: [
@@ -456,10 +456,18 @@
     pm0075Prog: { t: "PM0075 — flash program/erase controller: unlock, page erase, programming, option bytes", url: ST + "programming_manual/pm0075-stm32f10xxx-flash-memory-microcontrollers-stmicroelectronics.pdf", doc: "PM0075", kind: "st" },
     pm0056Vtor: { t: "PM0056 — vector table offset register (VTOR)", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", sec: "4.4.4", kind: "st" },
     ds5319Flash: { t: "STM32F103x8/xB datasheet — flash memory characteristics (erase/program time, endurance)", url: ST + "datasheet/stm32f103c8.pdf", doc: "DS5319", kind: "st" },
+    unity: { t: "Unity — unit testing for C (ThrowTheSwitch)", url: "https://www.throwtheswitch.org/unity", kind: "tool" },
+    cmock: { t: "CMock — mock generation for C (ThrowTheSwitch)", url: "https://www.throwtheswitch.org/cmock", kind: "tool" },
+    cppcheckManual: { t: "Cppcheck manual (including the MISRA addon)", url: "https://cppcheck.sourceforge.io/manual.pdf", kind: "tool" },
+    misraC: { t: "MISRA C:2012 guidelines and amendments (MISRA, purchase required)", url: "https://misra.org.uk/product/misra-c2012-third-edition-first-revision/", doc: "MISRA C:2012", kind: "spec" },
+    misraCompliance: { t: "MISRA Compliance:2020 — deviations and guideline re-categorisation (free download)", url: "https://misra.org.uk/app/uploads/2021/06/MISRA-Compliance-2020.pdf", doc: "MISRA Compliance:2020", kind: "spec" },
+    ctest: { t: "ctest(1) — CMake test driver", url: "https://cmake.org/cmake/help/latest/manual/ctest.1.html", kind: "tool" },
+    gccAnalyzer: { t: "GCC manual — static analyzer options (-fanalyzer)", url: "https://gcc.gnu.org/onlinedocs/gcc/Static-Analyzer-Options.html", kind: "tool" },
     stm32Base: { t: "STM32-base — Blue Pill board page and schematic notes", url: "https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html", kind: "community" },
   };
   const REFS = {
-                "bootloader": ["an2606", "an3155", "pm0075Prog", "pm0056Vtor", "ddi0403Reset", "ds5319Flash", "rm0008Boot", "ldManual"],
+                    "quality": ["misraC", "misraCompliance", "cppcheckManual", "unity", "cmock", "ctest", "gccAnalyzer", "gccArm"],
+    "bootloader": ["an2606", "an3155", "pm0075Prog", "pm0056Vtor", "ddi0403Reset", "ds5319Flash", "rm0008Boot", "ldManual"],
     "faults-debug": ["pm0056Fault", "ddi0403Fault", "ddi0403Stack", "ddi0337Debug", "rm0008Debug", "gdbManual", "armSemihosting", "um1075"],
     "rtos": ["pm0056Exc", "ddi0403Stack", "pm0056Nvic", "freertosCm3", "freertosConfig", "freertosStack", "freertosMutex", "freertosKernel"],
     "power-wdg": ["rm0008Pwr", "rm0008Iwdg", "rm0008Wwdg", "rm0008Rcc", "rm0008Debug", "ds5319Elec", "pm0056"],

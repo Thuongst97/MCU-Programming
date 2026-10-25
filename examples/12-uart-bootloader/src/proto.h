@@ -37,7 +37,9 @@ typedef enum { PROTO_NONE, PROTO_FRAME, PROTO_BAD_CRC, PROTO_TOO_LONG } proto_ev
 
 typedef struct
 {
-    uint32_t state, got, crc_rx;
+    uint32_t state;
+    uint32_t got;
+    uint32_t crc_rx;
     proto_frame_t frame;
 } proto_parser_t;
 
