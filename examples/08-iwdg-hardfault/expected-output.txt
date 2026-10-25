@@ -1,0 +1,11 @@
+Example 08 boot, reset cause: power-on
+keys: d = divide by 0, u = undefined instruction, i = invalid state, b = bus fault,
+      w = stop feeding the watchdog, h = this help
+
+*** HardFault at pc 0x080003B2: DIVBYZERO FORCED
+*** resetting
+
+Example 08 boot, reset cause: software (SYSRESETREQ)
+last fault: pc 0x080003B2 DIVBYZERO FORCED
+keys: d = divide by 0, u = undefined instruction, i = invalid state, b = bus fault,
+      w = stop feeding the watchdog, h = this help

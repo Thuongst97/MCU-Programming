@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Blue Pill · example 00 (ST-Link + OpenOCD)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "openocd",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf",
+      "configFiles": ["${workspaceFolder}/examples/common/openocd/bluepill.cfg"],
+      "svdFile": "${workspaceFolder}/.cache/svd/STM32F103.svd",
+      "runToEntryPoint": "main",
+      "preLaunchTask": "build: bluepill-debug"
+    },
+    {
+      "name": "Blue Pill clone (IDCODE 0x2ba01477) · example 00",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "openocd",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf",
+      "configFiles": ["${workspaceFolder}/examples/common/openocd/bluepill-clone.cfg"],
+      "svdFile": "${workspaceFolder}/.cache/svd/STM32F103.svd",
+      "runToEntryPoint": "main",
+      "preLaunchTask": "build: bluepill-debug"
+    },
+    {
+      "name": "Renode · attach to GDB server on :3333",
+      "type": "cortex-debug",
+      "request": "attach",
+      "servertype": "external",
+      "gdbTarget": "localhost:3333",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf",
+      "svdFile": "${workspaceFolder}/.cache/svd/STM32F103.svd"
+    }
+  ]
+}

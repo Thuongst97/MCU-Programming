@@ -8,3 +8,6 @@ __pycache__/
 *.pyc
 _site/
 .DS_Store
+log.html
+report.html
+robot_output.xml

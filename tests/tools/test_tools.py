@@ -2,6 +2,7 @@
 """Unit tests for the authoring and check tools. Run: python3 -m unittest discover -s tests/tools -v"""
 import importlib.util
 import shutil
+import re
 import subprocess
 import sys
 import tempfile
@@ -112,9 +113,20 @@ class SiteToolsTest(unittest.TestCase):
         r = self.run_tool(ROOT, "check-site.py")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
+    @staticmethod
+    def make_planned(repo, page_id):
+        """Turn a ready page back into a planned one in a scratch copy (all pages may be ready)."""
+        core = repo / "site/assets/js/core.js"
+        text = core.read_text(encoding="utf-8").replace(f'{{ id: "{page_id}", status: "ready"', f'{{ id: "{page_id}", status: "planned"')
+        text = re.sub(rf'^\s*"?{re.escape(page_id)}"?: \[[^\]]*\],\n', "", text, count=1, flags=re.M)   # its REFS entry
+        core.write_text(text, encoding="utf-8")
+        for f in (repo / f"site/{page_id}.html", repo / f"site/assets/js/pages/{page_id}.js"):
+            f.unlink(missing_ok=True)
+
     def test_check_site_catches_problems(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = copy_repo(tmp)
+            self.make_planned(repo, "setup")
             idx = repo / "site/index.html"
             idx.write_text(idx.read_text(encoding="utf-8").replace('href="#path"', 'href="#nowhere"').replace("</main>", '<a href="setup.html">x</a></main>'), encoding="utf-8")
             r = self.run_tool(repo, "check-site.py")
@@ -125,6 +137,7 @@ class SiteToolsTest(unittest.TestCase):
     def test_new_module_scaffold_is_blocked_until_written(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = copy_repo(tmp)
+            self.make_planned(repo, "board")
             r = self.run_tool(repo, "new-module.py", "board")
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             html = (repo / "site/board.html").read_text(encoding="utf-8")
@@ -135,6 +148,35 @@ class SiteToolsTest(unittest.TestCase):
             self.assertEqual(r.returncode, 1)
             self.assertIn("[placeholders]", r.stdout)
             self.assertIn("needs >= 3 primary sources", r.stdout)
+
+
+class AutosarToolsTest(unittest.TestCase):
+    def test_check_autosar_passes_on_repo(self):
+        r = subprocess.run([sys.executable, str(ROOT / "tools/check-autosar.py")], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_check_autosar_catches_problems(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dst = Path(tmp) / "repo"
+            shutil.copytree(ROOT / "tools", dst / "tools")
+            shutil.copytree(ROOT / "autosar", dst / "autosar")
+            shutil.copytree(ROOT / "capstone/turnlight/stage3-autosar", dst / "capstone/turnlight/stage3-autosar")
+            dio = dst / "autosar/mcal/dio/Dio.c"
+            dio.write_text(dio.read_text(encoding="utf-8").replace("#define DIO_STOP_SEC_CODE", "#define DIO_STOP_SEC_CONST", 1), encoding="utf-8")
+            swc = dst / "capstone/turnlight/stage3-autosar/asw/TurnLight/TurnLight.c"
+            swc.write_text(swc.read_text(encoding="utf-8").replace('#include "Rte_TurnLight.h"', '#include "Rte_TurnLight.h"\n#include "Dio.h"'), encoding="utf-8")
+            hdr = dst / "autosar/mcal/pwm/Pwm.h"
+            hdr.write_text(hdr.read_text(encoding="utf-8").replace("FUNC(void, PWM_CODE) Pwm_DeInit(void);", "FUNC(void, PWM_CODE) PwmDeInit(void);"), encoding="utf-8")
+            r = subprocess.run([sys.executable, str(dst / "tools/check-autosar.py")], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("[memmap]", r.stdout)
+            self.assertIn("includes Dio.h", r.stdout)
+            self.assertIn("PwmDeInit does not start with Pwm_", r.stdout)
+
+    def test_gen_autosar_cfg_is_up_to_date(self):
+        r = subprocess.run([sys.executable, str(ROOT / "tools/gen-autosar-cfg.py"), "--check",
+                            str(ROOT / "capstone/turnlight/stage3-autosar/cfg")], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 
 if __name__ == "__main__":

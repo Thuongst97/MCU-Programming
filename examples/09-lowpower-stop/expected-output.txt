@@ -1,0 +1,5 @@
+Example 09: Sleep and Stop modes
+sleep mode: 1000 wake-ups in 1 s (one per SysTick interrupt)
+stop mode: press the button on PA0 to wake up
+wake 1: back at 72 MHz
+stop mode: press the button on PA0 to wake up

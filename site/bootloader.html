@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bootloaders and Flash Programming — MCU Academy</title>
+  <meta name="description" content="ST&#x27;s system bootloader, writing your own UART bootloader, splitting flash, VTOR relocation and safe jump to application.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="bootloader">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 16</span><span>/</span><span>Bootloaders</span></nav>
+          <div class="eyebrow">Module 16 · Embedded engineering</div>
+          <h1>Bootloaders and Flash Programming</h1>
+          <p class="lead">A product in the field needs new firmware without an ST-Link. This module starts with the bootloader ST put into every STM32, then builds our own: programming the chip's flash from code, splitting flash between a bootloader and an application, moving the vector table, jumping safely, and checking every byte with a CRC before it runs.</p>
+          <div class="page-meta"><span>⏱ 55 min read</span><span>🎯 Advanced</span><span>📂 examples/12-uart-bootloader</span></div>
+        </header>
+
+        <section class="doc-section" id="system-bl" data-title="The built-in system bootloader">
+          <div class="sec-head"><h2><span class="sec-num">16.1</span>The built-in system bootloader</h2></div>
+          <p>Every STM32F103 contains a <b>system bootloader</b> in a 2 KB ROM area called system memory (<code>0x1FFFF000</code>), written by ST and not erasable. With <code>BOOT0 = 1</code> and <code>BOOT1 = 0</code> at reset, the chip runs it instead of your program (<a href="boot.html">module 03</a>). On the F103 it listens on <b>USART1</b>, PA9 (TX) and PA10 (RX), the same pins as the course's log output (AN2606).</p>
+          <ul>
+            <li>The host sends <code>0x7F</code>; the bootloader measures the bit time to detect the baud rate and answers ACK <code>0x79</code>.</li>
+            <li>Frames use 8 data bits and <b>even parity</b>. Every command is followed by its complement as a check byte, and every step is answered with ACK <code>0x79</code> or NACK <code>0x1F</code> (AN3155).</li>
+            <li>Commands read, write and erase flash, set the protection levels and jump to an address.</li>
+          </ul>
+          <p>The open-source <code>stm32flash</code> and ST's STM32CubeProgrammer both speak this protocol, so a USB-UART adapter is enough to recover a board whose SWD pins you locked (<a href="troubleshooting.html">Troubleshooting</a>). Our own bootloader below reuses the ACK and NACK values, so the idea is familiar.</p>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Why write your own?</span><p>The system bootloader needs the BOOT0 jumper, accepts any image and has no notion of "is the new firmware complete?". A product needs updates triggered by software, over whatever link it has (UART, CAN, USB), with integrity checks and a fallback when an update is interrupted.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="flash-prog" data-title="Programming the F1 flash">
+          <div class="sec-head"><h2><span class="sec-num">16.2</span>Programming the F1 flash</h2></div>
+          <p>The flash is programmed through the flash program/erase controller (FPEC), a few registers at <code>0x40022000</code> (PM0075). The rules on a medium-density F103:</p>
+          <ul>
+            <li>The control register is <b>locked</b> after reset. Writing the two keys from the reference manual to <code>FLASH_KEYR</code> unlocks it; a wrong key locks it until the next reset.</li>
+            <li>Erase works on <b>1 KB pages</b>, sets every bit to 1 (<code>0xFF</code>), and takes about 20–40 ms per page (DS5319).</li>
+            <li>Programming writes one <b>16-bit half-word</b> at a time, tens of microseconds each, and can only change 1s to 0s: writing a non-erased half-word sets <code>PGERR</code>.</li>
+            <li>While an operation runs (<code>BSY</code>), every read from flash, including instruction fetches, <b>stalls the CPU</b>. Code running from flash simply waits.</li>
+            <li>Each page survives about 10 000 erase cycles (DS5319). Don't use flash like RAM.</li>
+          </ul>
+          <div id="reg-flashcr"></div>
+          <div id="reg-flashsr"></div>
+          <script type="text/plain" id="src-12-unlock" data-src="examples/12-uart-bootloader/src/flash.c" data-region="unlock" data-lang="c" data-file="examples/12-uart-bootloader/src/flash.c" data-start="23" data-end="35" data-sha="991aa9a94ed4">
+void flash_unlock(void)
+{
+    if ((FLASH->CR & FLASH_CR_LOCK) != 0U)
+    {
+        FLASH->KEYR = FLASH_KEY1;                                 /* PM0075 key sequence; a wrong key locks the FPEC until reset */ // «1»
+        FLASH->KEYR = FLASH_KEY2;
+    }
+}
+
+void flash_lock(void)
+{
+    FLASH->CR |= FLASH_CR_LOCK;
+}
+</script>
+          <div id="ex-unlock"></div>
+          <script type="text/plain" id="src-12-ferase" data-src="examples/12-uart-bootloader/src/flash.c" data-region="erase" data-lang="c" data-file="examples/12-uart-bootloader/src/flash.c" data-start="39" data-end="51" data-sha="991aa9a94ed4">
+bool flash_erase_page(uint32_t addr)
+{
+    if (!wait_done())
+    {
+        return false;
+    }
+    FLASH->CR |= FLASH_CR_PER;                                    /* page erase */                     // «2»
+    FLASH->AR = addr;                                             /* any address inside the page */
+    FLASH->CR |= FLASH_CR_STRT;
+    const bool ok = wait_done();                                  /* the CPU stalls on flash reads meanwhile */
+    FLASH->CR &= ~FLASH_CR_PER;
+    return ok;
+}
+</script>
+          <div id="ex-ferase"></div>
+          <script type="text/plain" id="src-12-program" data-src="examples/12-uart-bootloader/src/flash.c" data-region="program" data-lang="c" data-file="examples/12-uart-bootloader/src/flash.c" data-start="55" data-end="74" data-sha="991aa9a94ed4">
+bool flash_program(uint32_t addr, const uint8_t *data, uint32_t len)
+{
+    for (uint32_t i = 0U; i < len; i += 2U)
+    {
+        const uint16_t hw = (uint16_t)(data[i] | ((uint16_t)data[i + 1U] << 8));
+        if (!wait_done())
+        {
+            return false;
+        }
+        FLASH->CR |= FLASH_CR_PG;                                 /* program mode */                   // «3»
+        *(volatile uint16_t *)(addr + i) = hw;                    /* the F1 writes 16 bits at a time */ // «4»
+        const bool ok = wait_done();
+        FLASH->CR &= ~FLASH_CR_PG;
+        if (!ok || (*(volatile const uint16_t *)(addr + i) != hw)) /* verify every half-word */        // «5»
+        {
+            return false;
+        }
+    }
+    return true;
+}
+</script>
+          <div id="ex-program"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Don't erase the page you are running from</span><p>A bootloader that erases its own pages, or an address calculation that is off by one page, deletes the code that is executing. The next instruction fetch reads <code>0xFFFF</code>, an undefined instruction, and only SWD or the system bootloader can bring the board back. Example 12's <code>WRITE</code> handler checks every offset against the application slot before touching flash.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="layout" data-title="Splitting flash: bootloader + app">
+          <div class="sec-head"><h2><span class="sec-num">16.3</span>Splitting flash: bootloader + app</h2></div>
+          <p>Example 12 splits the 64 KB into two independent programs. Each has its own linker script; both include the same section rules (<code>stm32f103_sections.ld</code>), so only the <code>MEMORY</code> block differs:</p>
+          <div id="part-bar" class="part-host glass"></div>
+          <div class="code-pair">
+          <script type="text/plain" data-code data-src="examples/12-uart-bootloader/ld/bootloader.ld" data-lang="ld" data-file="ld/bootloader.ld" data-start="1" data-end="12" data-sha="964ba0b61e88">
+/* SPDX-License-Identifier: MIT
+ * Example 12, bootloader image: the first 15 KB of flash. The last 1 KB page of the 16 KB
+ * bootloader slot (0x08003C00) holds the image record written after a verified update. */
+ENTRY(Reset_Handler)
+
+MEMORY
+{
+  FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 15K   /* «1» */
+  RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 20K
+}
+
+INCLUDE stm32f103_sections.ld
+</script>
+          <script type="text/plain" data-code data-src="examples/12-uart-bootloader/ld/application.ld" data-lang="ld" data-file="ld/application.ld" data-start="1" data-end="12" data-sha="1fbfc26af0e1">
+/* SPDX-License-Identifier: MIT
+ * Example 12, application image: starts after the 16 KB bootloader slot and gets the remaining
+ * 48 KB. Everything else (sections, stack) is the same as any other example. */
+ENTRY(Reset_Handler)
+
+MEMORY
+{
+  FLASH (rx)  : ORIGIN = 0x08004000, LENGTH = 48K   /* «2» */
+  RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 20K
+}
+
+INCLUDE stm32f103_sections.ld
+</script>
+          </div>
+          <p>The application is an ordinary program: same startup code, same BSP. The shared <code>SystemInit()</code> already points <code>VTOR</code> at the image's own vector table, wherever the linker put it. Its memory map, generated from the build:</p>
+          <div id="mm-app"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>A bootloader is the transfer desk at an airport. It checks your ticket (the image record and CRC) before letting you board the connecting flight (jump to the application). A passenger without a valid ticket stays at the desk until one is issued (update mode).</p></div></div>
+        </section>
+
+        <section class="doc-section" id="vtor" data-title="Relocating the vector table">
+          <div class="sec-head"><h2><span class="sec-num">16.4</span>Relocating the vector table</h2></div>
+          <p>The core finds every exception handler through the vector table. After reset it reads the table at address 0 (the flash alias), which is the bootloader's. The application's table lives at <code>0x08004000</code>; without telling the core, the first SysTick interrupt in the application would run the <i>bootloader's</i> handler.</p>
+          <p><code>SCB-&gt;VTOR</code> (PM0056 §4.4.4) holds the table's base address. Its low bits are not implemented, so the table must be aligned to a power of two at least as large as the table: 59 entries × 4 bytes needs <b>256-byte alignment</b>. Slot boundaries like <code>0x08004000</code> are fine; an arbitrary address is not.</p>
+          <script type="text/plain" id="src-12-app" data-src="examples/12-uart-bootloader/src/application.c" data-region="main" data-lang="c" data-file="examples/12-uart-bootloader/src/application.c" data-start="18" data-end="41" data-sha="b0556e648cd9">
+int main(void)
+{
+    const clock_status_t clk = clock_init_72mhz();   /* the bootloader left the reset clock */   // «1»
+    led_init();
+    systick_init_1ms();
+    uart_log_init(115200U);
+    uart_puts("app: version ");
+    uart_put_dec(APP_VERSION);
+    uart_puts(", vector table at ");
+    uart_put_hex(SCB->VTOR);                                                                    // «2»
+    uart_puts(clk == CLOCK_OK ? ", 72 MHz\n" : ", clock fault, HSI\n");
+    uart_puts("app: send r to reboot into the bootloader\n");
+    for (;;)
+    {
+        delay_ms(500U);
+        led_toggle();
+        if (uart_getc_nonblocking() == 'r')
+        {
+            uart_puts("app: reboot\n");
+            delay_ms(2U);
+            NVIC_SystemReset();                      /* the bootloader runs again, with its window */ // «3»
+        }
+    }
+}
+</script>
+          <div id="ex-app"></div>
+        </section>
+
+        <section class="doc-section" id="jump" data-title="Jumping to the application safely">
+          <div class="sec-head"><h2><span class="sec-num">16.5</span>Jumping to the application safely</h2></div>
+          <p>Jumping to the application is more than a function call. The application expects the chip as it is after a reset; whatever the bootloader changed and left running can bite it. Step through the sequence:</p>
+          <div id="seq-jump"></div>
+          <script type="text/plain" id="src-12-validate" data-src="examples/12-uart-bootloader/src/bootloader.c" data-region="validate" data-lang="c" data-file="examples/12-uart-bootloader/src/bootloader.c" data-start="36" data-end="59" data-sha="2d9e9b67fbfd">
+static bool app_valid(void)
+{
+    const image_record_t *rec = (const image_record_t *)RECORD_ADDR;
+    if ((rec->magic != RECORD_MAGIC) || (rec->check != ~(rec->magic ^ rec->size ^ rec->crc)))   // «1»
+    {
+        return false;
+    }
+    if ((rec->size < 8U) || (rec->size > APP_SIZE_MAX))
+    {
+        return false;
+    }
+    const uint32_t *vt = (const uint32_t *)APP_BASE;
+    const uint32_t sp = vt[0];
+    const uint32_t pc = vt[1];
+    if ((sp < SRAM_BASE) || (sp > (SRAM_BASE + (20UL * 1024UL))) || ((sp & 3U) != 0U))         // «2»
+    {
+        return false;
+    }
+    if ((pc < APP_BASE) || (pc >= (APP_BASE + rec->size)) || ((pc & 1U) == 0U))                 // «3»
+    {
+        return false;
+    }
+    return crc32_update(0U, (const uint8_t *)APP_BASE, rec->size) == rec->crc;                  // «4»
+}
+</script>
+          <div id="ex-validate"></div>
+          <script type="text/plain" id="src-12-jump" data-src="examples/12-uart-bootloader/src/bootloader.c" data-region="jump" data-lang="c" data-file="examples/12-uart-bootloader/src/bootloader.c" data-start="63" data-end="88" data-sha="2d9e9b67fbfd">
+__attribute__((noreturn)) static void jump_to_app(void)
+{
+    const uint32_t *vt = (const uint32_t *)APP_BASE;
+    __disable_irq();                                                                            // «5»
+    SysTick->CTRL = 0U;                                                  /* stop our time base */
+    SysTick->VAL = 0U;
+    SCB->ICSR = SCB_ICSR_PENDSTCLR_Msk;
+    for (uint32_t i = 0U; i < 8U; ++i)
+    {
+        NVIC->ICER[i] = 0xFFFFFFFFUL;                                    /* disable every IRQ ... */ // «6»
+        NVIC->ICPR[i] = 0xFFFFFFFFUL;                                    /* ... and forget pending ones */
+    }
+    RCC->APB2RSTR |= RCC_APB2RSTR_USART1RST | RCC_APB2RSTR_IOPARST | RCC_APB2RSTR_IOPCRST;   // «7»
+    RCC->APB2RSTR &= ~(RCC_APB2RSTR_USART1RST | RCC_APB2RSTR_IOPARST | RCC_APB2RSTR_IOPCRST);
+    RCC->APB2ENR = 0U;
+    SCB->VTOR = APP_BASE;                                                /* the app's vector table */ // «8»
+    __DSB();
+    __ISB();
+    __set_MSP(vt[0]);                                                    /* the app's initial SP */   // «9»
+    __enable_irq();                                                      /* as after a real reset */
+    void (*const entry)(void) = (void (*)(void))(uintptr_t)vt[1];
+    entry();                                                             /* never returns */          // «10»
+    for (;;)
+    {
+    }
+}
+</script>
+          <div id="ex-jump"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The classic jump bugs</span><p>A pending SysTick or UART interrupt fires in the application before it has set up its handlers' data. A peripheral left enabled keeps running with the bootloader's configuration. Code after <code>__set_MSP()</code> that still uses local variables on the old stack. Interrupts left disabled (<code>PRIMASK = 1</code>) so the application never gets a tick. Each line of <code>jump_to_app()</code> prevents one of these.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="protocol" data-title="A tiny update protocol">
+          <div class="sec-head"><h2><span class="sec-num">16.6</span>A tiny update protocol</h2></div>
+          <p>The update protocol is deliberately small. Every frame carries its own CRC-32, and every frame gets exactly one answer byte:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Byte</th><th>0</th><th>1</th><th>2–3</th><th>4…</th><th>last 4</th></tr></thead>
+            <tbody><tr><td>Field</td><td>SOF <code>0xA5</code></td><td>command</td><td>length, little-endian</td><td>payload</td><td>CRC-32 of command + length + payload</td></tr></tbody>
+          </table></div>
+          <p>Build a frame and watch the CRC change with every byte:</p>
+          <div id="frame-builder" class="calc-host glass"></div>
+          <script type="text/plain" id="src-12-parser" data-src="examples/12-uart-bootloader/src/proto.c" data-region="parser" data-lang="c" data-file="examples/12-uart-bootloader/src/proto.c" data-start="33" data-end="84" data-sha="fe73642b215a">
+proto_event_t proto_feed(proto_parser_t *p, uint8_t byte)
+{
+    switch (p->state)
+    {
+    case 0U:                                                      /* hunt for start of frame */      // «2»
+        if (byte == PROTO_SOF)
+        {
+            p->state = 1U;
+        }
+        return PROTO_NONE;
+    case 1U:
+        p->frame.cmd = byte;
+        p->state = 2U;
+        return PROTO_NONE;
+    case 2U:
+        p->frame.len = byte;
+        p->state = 3U;
+        return PROTO_NONE;
+    case 3U:
+        p->frame.len = (uint16_t)(p->frame.len | ((uint16_t)byte << 8));
+        p->got = 0U;
+        if (p->frame.len > PROTO_MAX_DATA)
+        {
+            proto_reset(p);
+            return PROTO_TOO_LONG;                                /* never overflow the buffer */    // «3»
+        }
+        p->state = (p->frame.len == 0U) ? 5U : 4U;
+        return PROTO_NONE;
+    case 4U:
+        p->frame.data[p->got] = byte;
+        p->got++;
+        if (p->got == p->frame.len)
+        {
+            p->got = 0U;
+            p->state = 5U;
+        }
+        return PROTO_NONE;
+    default:                                                      /* 4 CRC bytes */
+    {
+        p->crc_rx |= (uint32_t)byte << (8U * p->got);
+        if (++p->got < 4U)
+        {
+            return PROTO_NONE;
+        }
+        const uint8_t hdr[3] = {p->frame.cmd, (uint8_t)p->frame.len, (uint8_t)(p->frame.len >> 8)};
+        const uint32_t crc = crc32_update(crc32_update(0U, hdr, 3U), p->frame.data, p->frame.len);
+        const uint32_t rx = p->crc_rx;
+        proto_reset(p);
+        return (crc == rx) ? PROTO_FRAME : PROTO_BAD_CRC;                                             // «4»
+    }
+    }
+}
+</script>
+          <div id="ex-parser"></div>
+          <script type="text/plain" id="src-12-handle" data-src="examples/12-uart-bootloader/src/bootloader.c" data-region="handle" data-lang="c" data-file="examples/12-uart-bootloader/src/bootloader.c" data-start="111" data-end="161" data-sha="2d9e9b67fbfd">
+static bool handle(const proto_frame_t *f, bool *run)
+{
+    switch (f->cmd)
+    {
+    case CMD_HELLO:
+        return f->len == 0U;
+    case CMD_ERASE:
+        return (f->len == 0U) && erase_slot();
+    case CMD_WRITE:
+    {
+        if ((f->len < 6U) || ((f->len & 1U) != 0U))                      /* offset + even data */
+        {
+            return false;
+        }
+        const uint32_t off = get_u32le(f->data);
+        const uint32_t n = (uint32_t)f->len - 4U;
+        if (((off & 1U) != 0U) || (off > APP_SIZE_MAX) || (n > (APP_SIZE_MAX - off)))           // «12»
+        {
+            return false;                                                /* never outside the slot */
+        }
+        flash_unlock();
+        const bool ok = flash_program(APP_BASE + off, &f->data[4], n);
+        flash_lock();
+        return ok;
+    }
+    case CMD_DONE:
+    {
+        if (f->len != 8U)
+        {
+            return false;
+        }
+        const uint32_t size = get_u32le(f->data);
+        const uint32_t crc = get_u32le(&f->data[4]);
+        if ((size == 0U) || (size > APP_SIZE_MAX) ||
+            (crc32_update(0U, (const uint8_t *)APP_BASE, size) != crc))  /* check what is in flash */ // «13»
+        {
+            return false;
+        }
+        const image_record_t rec = {RECORD_MAGIC, size, crc, ~(RECORD_MAGIC ^ size ^ crc)};
+        flash_unlock();
+        const bool ok = flash_program(RECORD_ADDR, (const uint8_t *)&rec, sizeof rec);         // «14»
+        flash_lock();
+        return ok && app_valid();
+    }
+    case CMD_RUN:
+        *run = app_valid();
+        return *run;
+    default:
+        return false;
+    }
+}
+</script>
+          <div id="ex-handle"></div>
+          <script type="text/plain" id="src-12-blerase" data-src="examples/12-uart-bootloader/src/bootloader.c" data-region="erase" data-lang="c" data-file="examples/12-uart-bootloader/src/bootloader.c" data-start="97" data-end="107" data-sha="2d9e9b67fbfd">
+static bool erase_slot(void)
+{
+    flash_unlock();
+    bool ok = flash_erase_page(RECORD_ADDR);                             /* the record goes first */  // «11»
+    for (uint32_t p = 0U; ok && (p < APP_PAGES); ++p)
+    {
+        ok = flash_erase_page(APP_BASE + (p * FLASH_PAGE_SIZE));
+    }
+    flash_lock();
+    return ok;
+}
+</script>
+          <div id="ex-blerase"></div>
+          <p>The order makes an interrupted update safe: the record is erased <i>first</i> and written <i>last</i>, after the bootloader has recomputed the CRC from what is really in flash. Power lost at any point in between leaves no valid record, so the next reset stays in the bootloader instead of starting half an image.</p>
+          <script type="text/plain" id="src-12-main" data-src="examples/12-uart-bootloader/src/bootloader.c" data-region="main" data-lang="c" data-file="examples/12-uart-bootloader/src/bootloader.c" data-start="165" data-end="219" data-sha="2d9e9b67fbfd">
+int main(void)
+{
+    led_init();
+    button_init();
+    systick_init_1ms();
+    uart_log_init(115200U);                                              /* HSI 8 MHz: -0.6 % error */
+
+    const bool valid = app_valid();
+    bool update = !valid || button_held();                                                     // «15»
+    uart_puts(valid ? "boot: application valid\n" : "boot: no valid application\n");
+
+    proto_parser_t parser;
+    proto_reset(&parser);
+    const uint32_t t0 = millis();
+    uint32_t blink = t0;
+    for (;;)
+    {
+        if (!update && ((millis() - t0) >= HELLO_WINDOW_MS))
+        {
+            uart_puts("boot: starting application\n");
+            delay_ms(2U);                                                /* let the text leave */
+            jump_to_app();
+        }
+        if (update && ((millis() - blink) >= 100U))
+        {
+            blink = millis();
+            led_toggle();                                                /* fast blink: update mode */
+        }
+        const int c = uart_getc_nonblocking();
+        if (c < 0)
+        {
+            continue;
+        }
+        const proto_event_t ev = proto_feed(&parser, (uint8_t)c);
+        if (ev == PROTO_FRAME)
+        {
+            bool run = false;
+            update = true;                                               /* any valid frame: stay */  // «16»
+            reply(handle(&parser.frame, &run));
+            if (run)
+            {
+                delay_ms(2U);
+                jump_to_app();
+            }
+        }
+        else if (ev != PROTO_NONE)
+        {
+            reply(false);                                                /* bad CRC or too long */
+        }
+        else
+        {
+            /* byte consumed, frame not complete yet */
+        }
+    }
+}
+</script>
+          <div id="ex-main"></div>
+          <script type="text/plain" data-code data-src="examples/12-uart-bootloader/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="7" data-sha="17c68a17804c">
+boot: no valid application
+yyyyyyyyyyyyyapp: version 1, vector table at 0x08004000, 72 MHz
+app: send r to reboot into the bootloader
+app: reboot
+boot: application valid
+boot: starting application
+app: version 1, vector table at 0x08004000, 72 MHz
+</script>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 12)</span><p>✅ The protocol, CRC checks, record validation, the jump with <code>VTOR</code> and MSP, and the reboot into the bootloader are tested in Renode. ⚠️ Renode does not model flash erase (erased flash does not read <code>0xFF</code>) or its timing, and the course's flash-interface model never reports an error. ❌ Not tested on a Blue Pill yet.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="protection" data-title="Read-out and write protection">
+          <div class="sec-head"><h2><span class="sec-num">16.7</span>Read-out and write protection</h2></div>
+          <p>Option bytes (a small flash area at <code>0x1FFFF800</code>, PM0075) set two kinds of protection on the F103:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th><span class="sr-only">Aspect</span></th><th>Read-out protection (RDP)</th><th>Write protection (WRP)</th></tr></thead>
+            <tbody>
+              <tr><td>Protects against</td><td>reading the firmware through SWD or the system bootloader</td><td>accidental erase or programming</td></tr>
+              <tr><td>Granularity</td><td>whole flash</td><td>4 KB (4 pages) per bit on medium-density devices</td></tr>
+              <tr><td>Removing it</td><td>going back to unprotected <b>mass-erases</b> the flash</td><td>reprogram the option bytes</td></tr>
+              <tr><td>Use in example 12</td><td>for a product, once development is finished</td><td>protect the first 16 KB so the application can never erase the bootloader</td></tr>
+            </tbody>
+          </table></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Test protection on a spare board</span><p>A wrong option byte can leave a board that refuses to be debugged. Removing RDP always works, but erases everything. Write down how to undo each setting (OpenOCD's <code>stm32f1x unlock</code>, or STM32CubeProgrammer) before you set it.</p></div></div>
+          <div id="ck-bootloader"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/memmap/12-bootloader.js?v=__BUILD__"></script>
+  <script src="assets/js/data/memmap/12-application.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/memorymap.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/bootloader.js?v=__BUILD__"></script>
+</body>
+</html>

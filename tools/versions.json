@@ -7,7 +7,9 @@
       "version": "15.2.Rel1",
       "alt": "xPack arm-none-eabi-gcc 15.2.1-1.1",
       "url": "https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads",
-      "verified": false
+      "verified": false,
+      "linux_x64_url": "https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v15.2.1-1.1/xpack-arm-none-eabi-gcc-15.2.1-1.1-linux-x64.tar.gz",
+      "linux_x64_dir": "xpack-arm-none-eabi-gcc-15.2.1-1.1/bin"
     },
     "cmake": {
       "name": "CMake",
@@ -54,20 +56,30 @@
       "verified": false
     },
     "stm32cubef1": {
-      "name": "STM32CubeF1 (HAL, used only by examples/00/hal)",
-      "version": "v1.8.7",
-      "url": "https://github.com/STMicroelectronics/STM32CubeF1",
+      "name": "STM32F1 HAL/LL drivers (examples/00 hal + ll variants only)",
+      "version": "stm32f1xx-hal-driver v1.1.10",
+      "url": "https://github.com/STMicroelectronics/stm32f1xx-hal-driver",
+      "commit": "77fbb30b7a1d02533980400083e48c559aae5a4f",
       "verified": true
     },
     "renode": {
       "name": "Renode",
       "version": "1.17.0",
       "url": "https://github.com/renode/renode/releases",
-      "verified": true
+      "verified": true,
+      "linux_x64_url": "https://github.com/renode/renode/releases/download/v1.17.0/renode-1.17.0.linux-portable.tar.gz",
+      "linux_x64_dir": "renode_1.17.0-portable",
+      "python_requirements": [
+        "robotframework==6.1",
+        "robotframework-retryfailed==0.2.0",
+        "psutil",
+        "pyyaml",
+        "telnetlib3==2.0.*"
+      ]
     },
     "cppcheck": {
-      "name": "Cppcheck",
-      "version": "2.22.0",
+      "name": "Cppcheck (Ubuntu 24.04 package in CI)",
+      "version": "2.13",
       "url": "https://cppcheck.sourceforge.io/",
       "verified": true
     },
@@ -88,6 +100,12 @@
       "version": ">= V2J24",
       "url": "https://www.st.com/en/development-tools/stsw-link007.html",
       "verified": false
+    },
+    "robotframework": {
+      "name": "Robot Framework (Renode tests)",
+      "version": "6.1",
+      "url": "https://robotframework.org/",
+      "verified": true
     }
   },
   "specs": {
@@ -110,8 +128,8 @@
         "url": "https://raw.githubusercontent.com/modm-io/cmsis-svd-stm32/e79021accd49bf19bd0b16065f5471fb073ff3ac/stm32f1/STM32F103.svd"
       }
     ],
-    "sha256": null,
-    "_note": "Not committed: licence unclear (PLAN.md section 2.4). sha256 is pinned when tools/fetch-svd.py is added in Phase 2."
+    "sha256": "ff632bd0d75d0bc807d787967cdf62512d6438be53d6a77d2d78ab8ba2110015",
+    "_note": "Not committed: licence unclear (PLAN.md section 2.4). Downloaded by tools/fetch-svd.py and verified against sha256."
   },
   "third_party": {
     "cmsis_core": {
@@ -151,17 +169,23 @@
       "commit": "8a76309ed1250d817e9c888c4417171d2ba3ba63",
       "licence": "Apache-2.0",
       "licence_file": "License.md",
-      "base": "Include",
+      "base": ".",
       "files": [
-        "stm32f1xx.h",
-        "stm32f103xb.h",
-        "system_stm32f1xx.h"
+        "Include/stm32f1xx.h",
+        "Include/stm32f103xb.h",
+        "Include/system_stm32f1xx.h",
+        "Source/Templates/gcc/startup_stm32f103xb.s",
+        "Source/Templates/gcc/linker/STM32F103XB_FLASH.ld",
+        "Source/Templates/system_stm32f1xx.c"
       ],
-      "dest": "Include",
+      "dest": ".",
       "sha256": {
-        "stm32f1xx.h": "05e93fa3ddefb2e83d762b9ca4de36e3bba9cd8e9690400fe9f2c11fc0a3cef5",
-        "stm32f103xb.h": "d9c7c613d9fea74220892b4fbc3e80617493acad82a04bafadab2b4a7198399c",
-        "system_stm32f1xx.h": "a54dfbb3480c672f532d472a6e84bcf34df6551771d2e9966c5a3503c676b6ab"
+        "Include/stm32f1xx.h": "05e93fa3ddefb2e83d762b9ca4de36e3bba9cd8e9690400fe9f2c11fc0a3cef5",
+        "Include/stm32f103xb.h": "d9c7c613d9fea74220892b4fbc3e80617493acad82a04bafadab2b4a7198399c",
+        "Include/system_stm32f1xx.h": "a54dfbb3480c672f532d472a6e84bcf34df6551771d2e9966c5a3503c676b6ab",
+        "Source/Templates/gcc/startup_stm32f103xb.s": "a9a5fc7ed5ff617527dd98b3092830f4d17ed4bf57c99eac2c53bdb514ce138c",
+        "Source/Templates/gcc/linker/STM32F103XB_FLASH.ld": "ab4ff980794c0f9ea8935a4a3e0c20a9102c7f2ccbc33cad4deab159703563e9",
+        "Source/Templates/system_stm32f1xx.c": "6f13b57054f33b4dcb8f3f23fa05b2942d9dca8abd9a2a08ecde6f99693505a5"
       }
     },
     "unity": {
@@ -182,6 +206,74 @@
         "unity.c": "a6cc4b143075a03317d72c760b5ed67a4a12eeda1242f575464ad23f34042275",
         "unity.h": "b30ba4db1e0be1a1f6c862d359d73c91025a114977e41d3dad17103363804334",
         "unity_internals.h": "35bffad23ebc533977291e7a848c646027513572268fbfa9bd03d5ec21ee818a"
+      }
+    },
+    "freertos_kernel": {
+      "name": "FreeRTOS-Kernel (example 10, capstone stage 2, AUTOSAR OS shim)",
+      "repo": "https://github.com/FreeRTOS/FreeRTOS-Kernel",
+      "tag": "V11.3.2",
+      "commit": "640d0c43705e64cd53f46b31d882de6cd8433933",
+      "licence": "MIT",
+      "licence_file": "LICENSE.md",
+      "base": ".",
+      "files": [
+        "tasks.c",
+        "queue.c",
+        "list.c",
+        "timers.c",
+        "event_groups.c",
+        "include/FreeRTOS.h",
+        "include/StackMacros.h",
+        "include/atomic.h",
+        "include/deprecated_definitions.h",
+        "include/event_groups.h",
+        "include/list.h",
+        "include/message_buffer.h",
+        "include/mpu_prototypes.h",
+        "include/mpu_syscall_numbers.h",
+        "include/mpu_wrappers.h",
+        "include/newlib-freertos.h",
+        "include/picolibc-freertos.h",
+        "include/portable.h",
+        "include/projdefs.h",
+        "include/queue.h",
+        "include/semphr.h",
+        "include/stack_macros.h",
+        "include/stream_buffer.h",
+        "include/task.h",
+        "include/timers.h",
+        "portable/GCC/ARM_CM3/port.c",
+        "portable/GCC/ARM_CM3/portmacro.h"
+      ],
+      "dest": ".",
+      "sha256": {
+        "tasks.c": "6de295f333f31818de546d6eb72b877c5a6964980f14f80bc1e17b19b7ff9fc4",
+        "queue.c": "94edfd1f3e1f11d44fc4a794f603a3dccb6156e57929fec6abf3e0ebadafb6c1",
+        "list.c": "a08aa113300743e92a63efb66ab23bd69d9012f05e60b56163603b90b060ba24",
+        "timers.c": "e7d68bd10425168cb97d97de95bd3a84c118af881e673cfd80270f5a5b801cb7",
+        "event_groups.c": "3ae3a8fc6abfa055be34f791a52ba98f2c8c2839cd4c184d2562f76faba36c45",
+        "include/FreeRTOS.h": "63c896ca6bc687092ce19ff863a370b85e3f07b7ff6463161348f8434953b96f",
+        "include/StackMacros.h": "07bd7d3472f21b7d82e27afc38ccd391c18893ebf221d8de03f73ad5ba4ed5bd",
+        "include/atomic.h": "6f783503c5990ce140bd5d61fd137327ce5f0d636c063c293934e2537a368f41",
+        "include/deprecated_definitions.h": "449466948eab32ac1e42b001b93d5710bf6d837668150a5adf394ba4b38c3dc1",
+        "include/event_groups.h": "fcbfcaebe0494aa331f03d1026e83d7ef419e659b9080f64d41c6e5c1bfb2f14",
+        "include/list.h": "a7525d1622f63f365316b68e5fb8cc0837a54b872eba20bf0ec80f564442d045",
+        "include/message_buffer.h": "09bcff530cdd67f089e0d58d6c062ca6a69bb0de84b147a76e69b0f54caaf388",
+        "include/mpu_prototypes.h": "417a384adfa066e4a0d94108dc86a12cdd2c2222744403ee5b35f8bce2688f32",
+        "include/mpu_syscall_numbers.h": "8961d3e8b8d0c358ec88121cd89cf46f3382efc4d6026c95bda3909294fc2fbe",
+        "include/mpu_wrappers.h": "796173bd79af0261425f5d82311091e8a00117f51caaa9ca1141829d93d3f296",
+        "include/newlib-freertos.h": "6ec7ca529e929cfb16f226b499ac038f6a362c8b1bf103fde3bb6fbfe1de431c",
+        "include/picolibc-freertos.h": "550dac607b53e3b4be3e0aeb341dfe04c9f68c197c93ac27ac9ef49c5847b403",
+        "include/portable.h": "4c3cb09def505aaead06e07aa3e5be5be8e155fc79554f19a1e0d36c31b5c3e7",
+        "include/projdefs.h": "87e8328c5d844abde3593291b36a2c235b2ae6e41402c0314fb54f933d32c4b9",
+        "include/queue.h": "c3a73b048fc71a3649636601ac07787ee9f1f5da4325056dc8c91c78c352459e",
+        "include/semphr.h": "0c57582d2b2d6920ad1d2955ccb8cf12a8140d22bed03af1e5878730048fd3a3",
+        "include/stack_macros.h": "d4f57393081765dbf0ff97dde216122909960046fac1fe3737886b50a7aba168",
+        "include/stream_buffer.h": "7befd8b5857f215fe5acae33e0d5fc61edb8c3867f989da8aaa1a6ef78ee51ec",
+        "include/task.h": "463d29016b1c11dd7c5f9e67b41bf8c1897d9c2dcc510cdc37e3158f32584222",
+        "include/timers.h": "aff317a330935160abbd00a3a60a973653921e3a022216dcb04d804678c375b8",
+        "portable/GCC/ARM_CM3/port.c": "93bf85385a2679aa1b4e3086db909ed078835d89d359b82b7db6c74f4a2a67e3",
+        "portable/GCC/ARM_CM3/portmacro.h": "748eafdd960e73bbc90c05bed486ac725676076d9acd063480ca01ce41e5e1d5"
       }
     }
   }

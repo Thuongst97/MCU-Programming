@@ -1,0 +1,5 @@
+Example 06: SSD1306 on I2C1 (PB6/PB7, 400 kHz)
+probe 0x3C: OK
+ssd1306 init: OK
+frames 15, errors 0
+frames 30, errors 0

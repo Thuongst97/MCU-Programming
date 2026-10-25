@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MIT
 # Checks for every change (PLAN.md §10.1). Also called by pages.yml before each deploy.
-# Example builds, Renode tests, host unit tests and static analysis join in Phase 2+.
 name: CI
 
 on:
@@ -31,14 +30,26 @@ jobs:
         run: python3 tools/embed-code.py --check
       - name: Register data matches the CMSIS header
         run: python3 tools/check-regs.py
+      - name: Page-weight budget (≤ 400 KB transferred per page, fonts excluded)
+        run: python3 tools/check-budget.py
       - name: Hero art is up to date
         run: python3 tools/hero-art.py --check
       - name: Vendored third-party code is intact
         run: python3 tools/update-third-party.py --check
       - name: Tool unit tests
         run: python3 -m unittest discover -s tests/tools -v
-      - name: Runtime unit tests (lib/code.js)
+      - name: Runtime and engine unit tests
         run: node --test tests/site/*.test.mjs
+      - name: Example wiring diagrams match the pin data
+        run: node tools/export-wiring.mjs --check
+      - name: Example catalog and tool-version data are up to date
+        run: python3 tools/gen-catalog.py --check
+      - name: Generated font for example 06 is up to date
+        run: python3 tools/gen-font.py --check
+      - name: AUTOSAR conventions (naming, MemMap, DET, banners, SWC includes)
+        run: python3 tools/check-autosar.py
+      - name: Generated AUTOSAR configuration headers are up to date
+        run: python3 tools/gen-autosar-cfg.py --check capstone/turnlight/stage3-autosar/cfg
 
   browser-smoke:
     name: Browser smoke test (Playwright)
@@ -64,4 +75,84 @@ jobs:
         with:
           name: playwright-report
           path: tests/site/playwright-report
+          retention-days: 7
+
+  firmware:
+    name: Firmware build (all examples, debug + release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Cache toolchain
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/mcu-tools
+          key: mcu-tools-gcc-${{ hashFiles('tools/versions.json') }}
+      - name: Install the pinned Arm GCC
+        run: python3 tools/install-tools.py --dest ~/mcu-tools gcc >> "$GITHUB_PATH"
+      - name: Install Ninja
+        run: sudo apt-get install -y -q ninja-build
+      - name: Build (debug, -Og)
+        run: cmake --preset bluepill-debug && cmake --build --preset bluepill-debug
+      - name: Build (release, -Os)
+        run: cmake --preset bluepill-release && cmake --build --preset bluepill-release
+      - name: Memory maps on the site match the built ELFs
+        run: python3 tools/elf2memmap.py --all --check
+      - name: Upload firmware
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: firmware
+          path: |
+            build/bluepill-*/examples/**/*.elf
+            build/bluepill-*/examples/**/*.hex
+            build/bluepill-*/examples/**/*.map
+            build/bluepill-*/capstone/**/*.elf
+          retention-days: 14
+
+  host-tests:
+    name: Host unit tests (Unity + CTest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Ninja
+        run: sudo apt-get install -y -q ninja-build
+      - name: Configure, build and run
+        run: cmake --preset host-tests && cmake --build --preset host-tests && ctest --preset host-tests
+
+  static-analysis:
+    name: Static analysis (cppcheck + MISRA C:2012 addon, ratchet)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install cppcheck (the Ubuntu 24.04 package, version in tools/versions.json)
+        run: sudo apt-get update -q && sudo apt-get install -y -q cppcheck && cppcheck --version
+      - name: No new findings compared with tools/misra-baseline.json
+        run: python3 tools/run-misra.py
+
+  renode-tests:
+    name: Renode simulation tests (Robot Framework)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Cache toolchain and Renode
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/mcu-tools
+          key: mcu-tools-gcc-renode-${{ hashFiles('tools/versions.json') }}
+      - name: Install the pinned Arm GCC and Renode
+        run: python3 tools/install-tools.py --dest ~/mcu-tools gcc renode >> "$GITHUB_PATH"
+      - name: Install Ninja
+        run: sudo apt-get install -y -q ninja-build
+      - name: Build (debug)
+        run: cmake --preset bluepill-debug && cmake --build --preset bluepill-debug
+      - name: Run every Robot suite
+        run: python3 tools/run-renode-tests.py
+      - name: Upload Renode results on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: renode-results
+          path: build/renode-results
           retention-days: 7

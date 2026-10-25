@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clocks: RCC, HSE, PLL and Flash Wait States — MCU Academy</title>
+  <meta name="description" content="The STM32F1 clock tree end to end, why 72 MHz needs two flash wait states, and how every peripheral clock is derived.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="clocks">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 04</span><span>/</span><span>Clock Tree</span></nav>
+          <div class="eyebrow">Module 04 · From reset to main</div>
+          <h1>Clocks: RCC, HSE, PLL and Flash Wait States</h1>
+          <p class="lead">Every peripheral on the chip counts time in clock cycles. Get the clock tree right and baud rates, timer periods and ADC samples come out exactly as calculated. Get it wrong and things fail in ways that look unrelated. This module covers the STM32F1 clock system end to end.</p>
+          <div class="page-meta"><span>⏱ 40 min read</span><span>🎯 Intermediate</span><span>📂 examples/common/bsp/clock.c</span></div>
+        </header>
+
+        <section class="doc-section" id="why-clocks" data-title="Why clocks matter">
+          <div class="sec-head"><h2><span class="sec-num">4.1</span>Why clocks matter</h2></div>
+          <p>A clock is a square wave that tells digital logic when to take its next step. On the STM32F103 one clock source feeds a tree of dividers, and each branch drives a group of peripherals. Three reasons to care:</p>
+          <ul>
+            <li><b>Speed.</b> The core runs at up to 72 MHz, nine times faster than after reset.</li>
+            <li><b>Correct timing.</b> A UART's baud rate, a timer's period and a CAN bit time are all divided down from a bus clock. If you assume the wrong clock, every derived rate is wrong by the same factor.</li>
+            <li><b>Power.</b> Current consumption grows roughly with clock frequency, and every peripheral with its clock off costs (almost) nothing (DS5319, supply current tables).</li>
+          </ul>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The clock tree is a gearbox. One motor (the oscillator) turns a main shaft (SYSCLK); gears (prescalers) make slower shafts for the slower machines. If you change the motor speed, every machine changes speed with it, unless you also change the gears.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="sources" data-title="Clock sources">
+          <div class="sec-head"><h2><span class="sec-num">4.2</span>Clock sources</h2></div>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Source</th><th>Frequency</th><th>Where</th><th>Used for</th></tr></thead>
+            <tbody>
+              <tr><td><b>HSI</b></td><td>8 MHz RC</td><td>inside the chip</td><td>The clock after reset. Starts instantly, but only about 1 % accurate at room temperature and worse over temperature (DS5319).</td></tr>
+              <tr><td><b>HSE</b></td><td>4–16 MHz crystal; 8 MHz on the Blue Pill</td><td>PD0/PD1</td><td>Accurate reference (crystals are typically within tens of ppm). Needed for USB and recommended for CAN and precise UART timing.</td></tr>
+              <tr><td><b>PLL</b></td><td>input × 2…16, output ≤ 72 MHz</td><td>inside</td><td>Multiplies HSE (or HSI ÷ 2) up to the full speed.</td></tr>
+              <tr><td><b>LSI</b></td><td>about 40 kHz RC</td><td>inside</td><td>Independent watchdog, optionally the RTC. Very inaccurate (30–60 kHz).</td></tr>
+              <tr><td><b>LSE</b></td><td>32.768 kHz crystal</td><td>PC14/PC15</td><td>RTC: 2<sup>15</sup> cycles = 1 s.</td></tr>
+            </tbody>
+          </table></div>
+          <p>The <b>clock security system</b> (<code>RCC_CR.CSSON</code>) watches the HSE: if the crystal stops, hardware switches SYSCLK back to HSI and raises a non-maskable interrupt (RM0008 §7.2.7).</p>
+        </section>
+
+        <section class="doc-section" id="clock-tree" data-title="Interactive clock tree">
+          <div class="sec-head"><h2><span class="sec-num">4.3</span>Interactive clock tree</h2></div>
+          <p>Change any setting: the frequencies on every branch update, illegal combinations turn red with the limit they break, and the <code>RCC_CFGR</code> value below follows. Start from <i>After reset</i>, then build the course setup yourself.</p>
+          <div id="clk-tree"></div>
+          <div id="reg-cfgr-clk"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The ×2 timer rule</span><p>When an APB prescaler is not 1, the timers on that bus get <b>twice</b> the bus clock (RM0008 §7.2). At the course setup, APB1 runs at 36 MHz but TIM2–TIM4 count at 72 MHz. Forgetting this halves or doubles every timer period. <a href="timers.html#timer-clock">Module 07</a> builds on it.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="flash-latency" data-title="Flash wait states and prefetch">
+          <div class="sec-head"><h2><span class="sec-num">4.4</span>Flash wait states and prefetch</h2></div>
+          <p>Flash memory needs time to deliver data. At high clock speeds the CPU would ask for the next instruction before the flash has it, so the flash interface inserts <b>wait states</b> (PM0075 §3.1):</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>SYSCLK</th><th><code>FLASH_ACR.LATENCY</code></th></tr></thead>
+            <tbody><tr><td>≤ 24 MHz</td><td>0</td></tr><tr><td>24–48 MHz</td><td>1</td></tr><tr><td>48–72 MHz</td><td>2</td></tr></tbody>
+          </table></div>
+          <p>The <b>prefetch buffer</b> reads 64 bits ahead while the CPU executes, so straight-line code rarely waits. Branches and data reads from flash still pay the wait states. This is the register right after <code>clock_init_72mhz()</code>:</p>
+          <div id="reg-acr"></div>
+          <script type="text/plain" id="src-clk-flash" data-src="examples/common/bsp/clock.c" data-region="flash" data-lang="c" data-file="examples/common/bsp/clock.c" data-start="32" data-end="34" data-sha="865a29cc7d41">
+/* 72 MHz needs 2 wait states: the LATENCY *field* value 2, i.e. (2U << Pos).
+ * FLASH_ACR_LATENCY_2 would be the mask 0x4, which is not two wait states. */
+FLASH->ACR = FLASH_ACR_PRFTBE | (2U << FLASH_ACR_LATENCY_Pos);   // «3»
+</script>
+          <div id="ex-flash"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct"><code>FLASH_ACR_LATENCY_2</code> means bit 2, not two wait states</span><p>The CMSIS header defines <code>FLASH_ACR_LATENCY_0</code>, <code>_1</code> and <code>_2</code> as the individual bits of the field (values 1, 2 and 4). Writing <code>FLASH_ACR_LATENCY_2</code> sets the field to 4, which the F1 does not define. Write the number: <code>(2U &lt;&lt; FLASH_ACR_LATENCY_Pos)</code>. Set it <b>before</b> raising the clock, and lower the clock before reducing it.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="switching" data-title="Switching clocks safely">
+          <div class="sec-head"><h2><span class="sec-num">4.5</span>Switching clocks safely</h2></div>
+          <p>Switching from HSI to the PLL is a sequence of requests and confirmations. Every confirmation is a status bit set by hardware, and every wait has a timeout. Drive the sequence yourself:</p>
+          <div id="sm-switch"></div>
+          <p>The course's board-support code does it in four steps. Start the crystal:</p>
+          <script type="text/plain" id="src-clk-hse" data-src="examples/common/bsp/clock.c" data-region="hse" data-lang="c" data-file="examples/common/bsp/clock.c" data-start="24" data-end="28" data-sha="865a29cc7d41">
+RCC->CR |= RCC_CR_HSEON;                                   // «1»
+if (!wait_flag(&RCC->CR, RCC_CR_HSERDY, RCC_CR_HSERDY))    // «2»
+{
+    return CLOCK_HSE_TIMEOUT;
+}
+</script>
+          <div id="ex-hse"></div>
+          <p>Configure and start the PLL while it is still off:</p>
+          <script type="text/plain" id="src-clk-pll" data-src="examples/common/bsp/clock.c" data-region="pll" data-lang="c" data-file="examples/common/bsp/clock.c" data-start="38" data-end="50" data-sha="865a29cc7d41">
+RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2 | RCC_CFGR_ADCPRE |
+                           RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL))
+            | RCC_CFGR_HPRE_DIV1      /* AHB  = 72 MHz */            // «4»
+            | RCC_CFGR_PPRE1_DIV2     /* APB1 = 36 MHz (max 36) */   // «5»
+            | RCC_CFGR_PPRE2_DIV1     /* APB2 = 72 MHz */
+            | RCC_CFGR_ADCPRE_DIV6    /* ADC  = 12 MHz (max 14) */
+            | RCC_CFGR_PLLSRC         /* PLL input = HSE */          // «6»
+            | RCC_CFGR_PLLMULL9;      /* 8 MHz x 9 = 72 MHz */       // «7»
+RCC->CR |= RCC_CR_PLLON;
+if (!wait_flag(&RCC->CR, RCC_CR_PLLRDY, RCC_CR_PLLRDY))
+{
+    return CLOCK_PLL_TIMEOUT;
+}
+</script>
+          <div id="ex-pll"></div>
+          <p>Switch and confirm:</p>
+          <script type="text/plain" id="src-clk-switch" data-src="examples/common/bsp/clock.c" data-region="switch" data-lang="c" data-file="examples/common/bsp/clock.c" data-start="54" data-end="59" data-sha="865a29cc7d41">
+RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;                    // «8»
+if (!wait_flag(&RCC->CFGR, RCC_CFGR_SWS, RCC_CFGR_SWS_PLL))                // «9»
+{
+    return CLOCK_SWITCH_TIMEOUT;
+}
+SystemCoreClockUpdate();                                                    // «10»
+</script>
+          <div id="ex-switch"></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity</span><p>Renode's stock STM32F103 model has no clock controller behaviour, so the wait for <code>SWS</code> times out there. The course's platform (<code>bluepill.repl</code>) models the ready and status bits, so the switch logic is tested in CI. ⚠️ Neither changes how fast the simulated CPU runs.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="peripheral-clocks" data-title="Peripheral clock enables">
+          <div class="sec-head"><h2><span class="sec-num">4.6</span>Peripheral clock enables</h2></div>
+          <p>Each peripheral has an enable bit in one of three registers, by bus: <code>RCC_AHBENR</code> (DMA, CRC, flash interface), <code>RCC_APB2ENR</code> and <code>RCC_APB1ENR</code>. Until its bit is set, a peripheral ignores writes and reads back zeros, which is the most common reason for "my register writes don't do anything".</p>
+          <div id="reg-apb2"></div>
+          <div id="reg-apb1"></div>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Which bus is it on?</span><p>Look the peripheral up in the enable registers above, or in the <a href="fundamentals.html#inside-f103">block diagram</a>. GPIO ports, AFIO, USART1, SPI1, ADC and TIM1 are on APB2; everything else used in this course is on APB1.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="mco" data-title="Measuring the clock (MCO on PA8)">
+          <div class="sec-head"><h2><span class="sec-num">4.7</span>Measuring the clock (MCO on PA8)</h2></div>
+          <p>To check a clock with real instruments, route it to pin <b>PA8</b> with <code>RCC_CFGR.MCO</code>. The pin can switch at 50 MHz at most, so output HSE (8 MHz) or PLL ÷ 2 (36 MHz), not the 72 MHz SYSCLK (RM0008 §7.2.10).</p>
+          <script type="text/plain" id="src-clk-mco" data-src="examples/common/bsp/clock.c" data-region="mco" data-lang="c" data-file="examples/common/bsp/clock.c" data-start="65" data-end="84" data-sha="865a29cc7d41">
+void clock_mco(clock_mco_t src)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+    /* PA8: alternate-function push-pull, 50 MHz edges: the fastest the pin allows */
+    GPIOA->CRH = (GPIOA->CRH & ~(GPIO_CRH_MODE8 | GPIO_CRH_CNF8)) | GPIO_CRH_MODE8 | GPIO_CRH_CNF8_1;  // «11»
+    uint32_t mco = RCC_CFGR_MCO_NOCLOCK;
+    if (src == CLOCK_MCO_HSE)
+    {
+        mco = RCC_CFGR_MCO_HSE;                                                                     // «12»
+    }
+    else if (src == CLOCK_MCO_PLL_DIV2)
+    {
+        mco = RCC_CFGR_MCO_PLLCLK_DIV2;
+    }
+    else
+    {
+        /* CLOCK_MCO_OFF */
+    }
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_MCO) | mco;
+}
+</script>
+          <div id="ex-mco"></div>
+          <p>Example 04's shell has an <code>mco</code> command. Type <code>mco hse</code> and measure PA8 with an oscilloscope, a logic analyser that samples fast enough, or a frequency counter: you should see 8 MHz, and its accuracy tells you how good the crystal is.</p>
+          <div id="ck-clocks"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/clocktree.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/clocks.js?v=__BUILD__"></script>
+</body>
+</html>

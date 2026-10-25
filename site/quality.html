@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Testing, Static Analysis and MISRA C — MCU Academy</title>
+  <meta name="description" content="Unit tests on the host with Unity, hardware abstraction for testability, cppcheck with the MISRA addon, and what MISRA rules are for.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="quality">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 17</span><span>/</span><span>Quality &amp; MISRA</span></nav>
+          <div class="eyebrow">Module 17 · Embedded engineering</div>
+          <h1>Testing, Static Analysis and MISRA C</h1>
+          <p class="lead">Firmware bugs are expensive to find on hardware and very expensive to find in the field. This module moves as much checking as possible to your PC: logic tested on the host with Unity, the compiler and cppcheck reading every line, and MISRA C as a shared list of what tends to go wrong in C. Every technique here runs in the course's CI on every push.</p>
+          <div class="page-meta"><span>⏱ 45 min read</span><span>🎯 Intermediate</span><span>📂 tests/host, examples/common/gallery, tools/run-misra.py</span></div>
+        </header>
+
+        <section class="doc-section" id="testable" data-title="Designing for testability">
+          <div class="sec-head"><h2><span class="sec-num">17.1</span>Designing for testability</h2></div>
+          <p>Code that reads registers directly can only run on the chip. Code that turns inputs into outputs can run anywhere. The trick is to keep the two apart: a thin layer touches the hardware, and everything interesting sits behind it as plain C. The course's examples are built that way: debouncing, the scheduler, the ring buffer, the shell, ADC scaling, the font renderer, the JEDEC decoder, the fault decoder and the bootloader's protocol are all pure functions with host tests.</p>
+          <div id="lg-pyramid"></div>
+          <p>Three ways to cut the hardware out of a unit under test:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Seam</th><th>How</th><th>Course example</th></tr></thead>
+            <tbody>
+              <tr><td><b>Pure function</b></td><td>pass values in, get values out; the caller does the I/O</td><td><code>debounce_update(state, raw_level, now)</code>, <code>proto_feed(parser, byte)</code></td></tr>
+              <tr><td><b>Injected dependency</b></td><td>the module receives a function pointer (or a struct of them) for its I/O</td><td>the shell's <code>write</code> function, below</td></tr>
+              <tr><td><b>Link seam</b></td><td>the test links a different <code>.c</code> file that provides the same functions (a fake or a CMock mock)</td><td>the capstone's driver interfaces (modules 24–26)</td></tr>
+            </tbody>
+          </table></div>
+          <script type="text/plain" id="src-04-seam" data-src="examples/04-uart-shell-ringbuffer/src/shell.h" data-region="seam" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/shell.h" data-start="14" data-end="36" data-sha="a3b27c4e610b">
+typedef void (*shell_write_fn)(const char *s);   /* how the shell talks: injected, not hard-wired */ // «1»
+typedef void (*shell_cmd_fn)(uint32_t argc, const char *const argv[]);
+
+typedef struct
+{
+    const char *name;
+    const char *help;
+    shell_cmd_fn fn;
+} shell_cmd_t;
+
+typedef struct
+{
+    const shell_cmd_t *cmds;
+    size_t ncmds;
+    shell_write_fn write;
+    char line[SHELL_LINE_MAX];
+    uint32_t len;
+    char prev;   /* last character, so CR LF counts as one Enter */
+} shell_t;
+
+void shell_init(shell_t *sh, const shell_cmd_t *cmds, size_t ncmds, shell_write_fn write);   // «2»
+void shell_feed(shell_t *sh, char c);   /* call for every received character */
+void shell_help(const shell_t *sh);
+</script>
+          <div id="ex-seam"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>A flight simulator. Pilots practise engine failures in a simulator because the real thing is too expensive and too rare to train on. A host test is a simulator for your logic: you can feed it the 0xFFFFFFFF tick wrap, the corrupted frame and the full buffer as often as you like.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="unity" data-title="Host unit tests with Unity">
+          <div class="sec-head"><h2><span class="sec-num">17.2</span>Host unit tests with Unity</h2></div>
+          <p><b>Unity</b> is a small C test framework (one <code>.c</code> file, vendored in <code>third_party/unity</code>). Each test is a function; <code>TEST_ASSERT_…</code> macros check results; <code>setUp()</code> runs before every test. The course compiles tests with the host's GCC and registers them with CTest, so one command builds and runs all of them:</p>
+          <script type="text/plain" data-code data-src="tests/host/CMakeLists.txt" data-lines="13-28" data-lang="cmake" data-file="tests/host/CMakeLists.txt" data-start="13" data-end="28" data-sha="b4b03f1ee8db">
+# Paths are relative to the folder of the host.cmake that calls it.
+function(add_host_test name)
+  cmake_parse_arguments(T "" "" "SOURCES;INCLUDES;DEFINES" ${ARGN})
+  set(srcs "")
+  foreach(s IN LISTS T_SOURCES)
+    list(APPEND srcs "${HOST_TEST_DIR}/${s}")
+  endforeach()
+  set(incs "")
+  foreach(i IN LISTS T_INCLUDES)
+    list(APPEND incs "${HOST_TEST_DIR}/${i}")
+  endforeach()
+  add_executable(test-${name} ${srcs})
+  target_include_directories(test-${name} PRIVATE ${incs})
+  target_compile_definitions(test-${name} PRIVATE ${T_DEFINES} HOST_TEST=1)
+  target_compile_options(test-${name} PRIVATE ${HOST_C_FLAGS})
+  target_link_libraries(test-${name} PRIVATE unity)
+</script>
+          <p>A test for the shell, with the UART replaced by a function that collects the output in a string:</p>
+          <script type="text/plain" id="src-04-tseam" data-src="examples/04-uart-shell-ringbuffer/test/test_shell.c" data-region="seam" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/test/test_shell.c" data-start="8" data-end="43" data-sha="0843ef52c9a4">
+static char out[512];
+static uint32_t calls;
+static uint32_t last_argc;
+static char last_arg1[16];
+
+static void capture(const char *s) { strncat(out, s, sizeof out - strlen(out) - 1U); }   /* instead of the UART */ // «3»
+static void cmd_led(uint32_t argc, const char *const argv[])
+{
+    calls++;
+    last_argc = argc;
+    last_arg1[0] = '\0';
+    if (argc > 1U)
+    {
+        strncpy(last_arg1, argv[1], sizeof last_arg1 - 1U);
+    }
+}
+static const shell_cmd_t cmds[] = {{"led", "led on|off", cmd_led}};
+static shell_t sh;
+
+static void type(const char *s)
+{
+    for (; *s != '\0'; ++s)
+    {
+        shell_feed(&sh, *s);
+    }
+}
+
+void setUp(void)
+{
+    out[0] = '\0';
+    calls = 0U;
+    last_argc = 0U;
+    memset(last_arg1, 0, sizeof last_arg1);
+    shell_init(&sh, cmds, 1U, capture);                                                     // «4»
+}
+void tearDown(void) {}
+</script>
+          <div id="ex-tseam"></div>
+          <script type="text/plain" id="src-04-ttest" data-src="examples/04-uart-shell-ringbuffer/test/test_shell.c" data-region="test" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/test/test_shell.c" data-start="68" data-end="73" data-sha="0843ef52c9a4">
+static void test_unknown_command_is_reported(void)
+{
+    type("blink\r");                                     /* arrange + act */                    // «5»
+    TEST_ASSERT_EQUAL_UINT32(0U, calls);                 /* assert: nothing dispatched ... */   // «6»
+    TEST_ASSERT_NOT_NULL(strstr(out, "unknown command: blink"));   /* ... and a message printed */
+}
+</script>
+          <div id="ex-ttest"></div>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">CMock, only when you need it</span><p>When a module calls another module whose behaviour the test must control (a driver that returns errors, a function that must be called exactly twice), CMock generates a mock from the header. Its generator needs Ruby on the author's machine; the generated files are committed so CI does not need Ruby. Hand-written fakes like <code>capture()</code> above are simpler and cover most cases.</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The host is not the target</span><p>Your PC has 64-bit pointers, a different <code>long</code> and maybe a different <code>char</code> signedness. Use the fixed-width types from <code>&lt;stdint.h&gt;</code> everywhere, and never test timing or register behaviour on the host: that is what Renode and the board are for.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="static" data-title="Static analysis">
+          <div class="sec-head"><h2><span class="sec-num">17.3</span>Static analysis</h2></div>
+          <p>Static analysis reads code without running it. Turn on everything cheap first:</p>
+          <ul>
+            <li><b>Compiler warnings</b>: the course builds with <code>-Wall -Wextra -Werror -Wshadow -Wconversion</code> and friends (<a href="setup.html#cmake-under-hood">module 02</a>). Every warning is a build failure, so warnings never pile up.</li>
+            <li><b>cppcheck</b>: finds undefined behaviour, out-of-bounds indexes, uninitialised variables, and with its MISRA addon checks a large share of the MISRA C rules. Run in CI by <code>tools/run-misra.py</code>.</li>
+            <li><b>GCC's <code>-fanalyzer</code></b> and <b>clang-tidy</b>: deeper path-sensitive checks; slower, useful before a release.</li>
+          </ul>
+          <script type="text/plain" data-code data-src="tools/run-misra.py" data-lines="1-17" data-lang="sh" data-file="tools/run-misra.py" data-start="1" data-end="17" data-sha="c52a5a2ae423">
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+"""Static analysis with cppcheck and its MISRA C:2012 addon, as a ratchet (PLAN.md §10, CLAUDE.md rule 7).
+
+  python3 tools/run-misra.py            # fail if any file has more findings of a rule than the baseline
+  python3 tools/run-misra.py --update   # rewrite tools/misra-baseline.json after fixing findings
+  python3 tools/run-misra.py --list     # print every finding
+
+The addon runs WITHOUT a rule-texts file: findings name the rule number only. Rules disapplied for
+the whole project are listed in DISAPPLIED, each with its record in docs/misra/. Deviations limited to
+one place are listed in SCOPED with their record. A single deviation in code uses an inline
+suppression that names its record:
+    // cppcheck-suppress misra-c2012-11.5 ; DEV-002
+New code must be clean; the baseline only shrinks.
+"""
+import argparse
+import json
+</script>
+          <p>The tool works as a <b>ratchet</b>: the findings that existed when the check was introduced are counted per file and rule in <code>tools/misra-baseline.json</code>. CI fails when any count goes up, so new code must be clean while old findings are fixed one by one.</p>
+        </section>
+
+        <section class="doc-section" id="misra" data-title="MISRA C in practice">
+          <div class="sec-head"><h2><span class="sec-num">17.4</span>MISRA C in practice</h2></div>
+          <p><b>MISRA C</b> is a set of guidelines for C in critical systems, first written for the motor industry and now used across automotive, rail, medical and aerospace. It restricts the language to a subset with fewer surprises: no undefined behaviour, no reliance on implementation-defined behaviour without documenting it, explicit types, simple control flow.</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Category</th><th>Meaning</th><th>Example rule numbers</th></tr></thead>
+            <tbody>
+              <tr><td><b>Mandatory</b></td><td>always followed; no deviation allowed</td><td>Rule 9.1 (reading a variable before it is set), Rule 17.3 (implicitly declared functions)</td></tr>
+              <tr><td><b>Required</b></td><td>followed, or a formal deviation is recorded</td><td>Rule 10.4 (mixing essential types in one operation), Rule 21.3 (dynamic memory)</td></tr>
+              <tr><td><b>Advisory</b></td><td>good practice; may be disapplied for a project, with a record</td><td>Rule 15.5 (where a function returns), Rule 12.1 (implicit operator precedence)</td></tr>
+            </tbody>
+          </table></div>
+          <p>Two kinds of guideline: <b>rules</b>, which a tool can check from the code, and <b>directives</b>, which need documents or reviews (for example, that run-time failures are minimised by design). The course uses <b>MISRA C:2012 numbering including its amendments</b>, because that is what industry projects and the cppcheck addon use. The guideline texts are copyrighted: the course names rule numbers and explains their intent in its own words. Buy the document from MISRA if you work to it.</p>
+          <div class="callout note"><div class="ci">📘</div><div><span class="ct">About the newer edition</span><p>MISRA has since published a consolidated edition of MISRA C that folds the 2012 amendments into one document. Its rule numbers largely follow the 2012 scheme. Projects usually stay on the edition in their contract; check which one yours names before citing rule numbers.</p></div></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>MISRA is a traffic code. Most of its rules exist because someone crashed: "no overtaking on a hill" looks arbitrary until you meet a truck. The deviation process is the police escort: you may break a rule, but only with a recorded reason and someone who signed off.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="bad-good" data-title="Bad vs good: common findings">
+          <div class="sec-head"><h2><span class="sec-num">17.5</span>Bad vs good: common findings</h2></div>
+          <p>Four defects that warnings and MISRA rules catch. The "before" code compiles with the matching warnings switched off, and the gallery's host tests prove it gives the wrong answer (<code>examples/common/gallery</code>).</p>
+          <div class="cmp-host" id="cmp-sign"></div>
+          <div class="cmp-host" id="cmp-prec"></div>
+          <div class="cmp-host" id="cmp-narrow"></div>
+          <div class="cmp-host" id="cmp-wrap"></div>
+          <script type="text/plain" id="src-bad-sign" data-src="examples/common/gallery/src/bad.c" data-region="sign" data-lang="c" data-file="examples/common/gallery/src/bad.c" data-start="9" data-end="12" data-sha="48ab34f25a46">
+bool bad_below_limit(int32_t temp, uint32_t limit)
+{
+    return temp < limit;                 /* temp is converted to unsigned: -1 becomes 4294967295 */
+}
+</script>
+          <script type="text/plain" id="src-good-sign" data-src="examples/common/gallery/src/good.c" data-region="sign" data-lang="c" data-file="examples/common/gallery/src/good.c" data-start="8" data-end="15" data-sha="f72c866bc0df">
+bool good_below_limit(int32_t temp, uint32_t limit)
+{
+    if (temp < 0)
+    {
+        return true;                     /* every negative value is below any unsigned limit */
+    }
+    return (uint32_t)temp < limit;       /* now both operands are unsigned, by intent */
+}
+</script>
+          <script type="text/plain" id="src-bad-prec" data-src="examples/common/gallery/src/bad.c" data-region="prec" data-lang="c" data-file="examples/common/gallery/src/bad.c" data-start="16" data-end="19" data-sha="48ab34f25a46">
+bool bad_txe_set(uint32_t sr)
+{
+    return sr & TXE != 0U;               /* parsed as sr & (TXE != 0U), i.e. sr & 1 */
+}
+</script>
+          <script type="text/plain" id="src-good-prec" data-src="examples/common/gallery/src/good.c" data-region="prec" data-lang="c" data-file="examples/common/gallery/src/good.c" data-start="19" data-end="22" data-sha="f72c866bc0df">
+bool good_txe_set(uint32_t sr)
+{
+    return (sr & TXE) != 0U;             /* parentheses say what is meant */
+}
+</script>
+          <script type="text/plain" id="src-bad-narrow" data-src="examples/common/gallery/src/bad.c" data-region="narrow" data-lang="c" data-file="examples/common/gallery/src/bad.c" data-start="23" data-end="26" data-sha="48ab34f25a46">
+uint8_t bad_remaining(uint32_t total, uint32_t sent)
+{
+    return total - sent;                 /* 300 bytes left becomes 44 */
+}
+</script>
+          <script type="text/plain" id="src-good-narrow" data-src="examples/common/gallery/src/good.c" data-region="narrow" data-lang="c" data-file="examples/common/gallery/src/good.c" data-start="26" data-end="34" data-sha="f72c866bc0df">
+bool good_remaining(uint32_t total, uint32_t sent, uint8_t *out)
+{
+    if ((sent > total) || ((total - sent) > UINT8_MAX))
+    {
+        return false;                    /* the caller must handle "doesn't fit" */
+    }
+    *out = (uint8_t)(total - sent);      /* explicit cast after the range check */
+    return true;
+}
+</script>
+          <script type="text/plain" id="src-bad-wrap" data-src="examples/common/gallery/src/bad.c" data-region="wrap" data-lang="c" data-file="examples/common/gallery/src/bad.c" data-start="30" data-end="33" data-sha="48ab34f25a46">
+bool bad_expired(uint32_t now, uint32_t start, uint32_t period)
+{
+    return now >= start + period;        /* start + period can wrap past 0xFFFFFFFF */
+}
+</script>
+          <script type="text/plain" id="src-good-wrap" data-src="examples/common/gallery/src/good.c" data-region="wrap" data-lang="c" data-file="examples/common/gallery/src/good.c" data-start="38" data-end="41" data-sha="f72c866bc0df">
+bool good_expired(uint32_t now, uint32_t start, uint32_t period)
+{
+    return (now - start) >= period;      /* unsigned subtraction is correct across the wrap */
+}
+</script>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The bugs that pass casual tests</span><p>Every "before" version works for the obvious inputs: positive temperatures, small buffers, the first 49 days of uptime. They fail on the edge, in the field. Write tests for the edges on purpose: zero, the maximum, negative values, the wrap-around.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="deviations" data-title="Writing a deviation record">
+          <div class="sec-head"><h2><span class="sec-num">17.6</span>Writing a deviation record</h2></div>
+          <p>Sometimes a rule cannot be followed. Accessing a peripheral register means converting an integer address into a pointer, which a required rule restricts; the CMSIS headers do exactly that in every <code>GPIOA-&gt;ODR</code>. MISRA's answer is not "ignore it" but a <b>deviation</b>: a written record that says which rule, where, why it cannot be followed, and why the result is still safe, approved by someone other than the author.</p>
+          <script type="text/plain" data-code data-src="docs/misra/deviations/DEV-000-template.md" data-lang="text" data-file="docs/misra/deviations/DEV-000-template.md" data-start="1" data-end="21" data-sha="fe5cd555bc83">
+# DEV-nnn: <one-line summary in your own words>
+
+| Field | Value |
+|---|---|
+| Rule | MISRA C:2012 Rule x.y (category: required / advisory) — number only, never the rule text |
+| Scope | file(s) and function(s), or "project" for a disapplication |
+| Raised by / date | |
+| Approved by / date | |
+
+## Why the rule cannot be followed here
+What the code must do, and why the compliant alternatives are worse (for example: hardware
+register access needs an integer-to-pointer conversion; the CMSIS headers are the reference).
+
+## Why it is safe
+What prevents the problem the rule is about: the reasoning, the tests, review evidence.
+
+## How it is marked in code
+`// cppcheck-suppress misra-c2012-x.y ; DEV-nnn` on the line before each occurrence.
+
+## Review
+When this deviation is re-examined (for example at every release, or when the code changes).
+</script>
+          <p>The course's own stance (<code>docs/misra/compliance.md</code>): mandatory and required rules are never disapplied, advisory Rule 15.5 is disapplied for the whole project with a recorded reason (early returns in guard clauses), and any single exception is marked in the code with an inline suppression naming its record, such as <code>// cppcheck-suppress misra-c2012-11.5 ; DEV-002</code>.</p>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">A good deviation is rare and boring</span><p>If you write the same deviation five times, change the design instead (wrap the construct in one function with one deviation). Reviewers trust a project with three precise deviations more than one with three hundred vague ones.</p></div></div>
+          <div id="ck-quality"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/compare.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/quality.js?v=__BUILD__"></script>
+</body>
+</html>

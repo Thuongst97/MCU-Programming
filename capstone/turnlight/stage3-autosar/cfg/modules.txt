@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: MIT
+# Modules of TurnLight stage 3: <Msn> <MSN>. tools/gen-autosar-cfg.py writes their MemMap headers
+# and Compiler_Cfg.h from this list.
+Det DET
+Mcu MCU
+Port PORT
+Dio DIO
+Pwm PWM
+Adc ADC
+Wdg WDG
+Can CAN
+CanIf CANIF
+PduR PDUR
+Com COM
+Dem DEM
+WdgM WDGM
+EcuM ECUM
+IoHwAb IOHWAB
+Os OS
+Rte RTE
+TurnLight TURNLIGHT
+LampMonitor LAMPMONITOR

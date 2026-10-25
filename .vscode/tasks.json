@@ -1,0 +1,18 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build: bluepill-debug",
+      "type": "shell",
+      "command": "cmake --preset bluepill-debug && cmake --build --preset bluepill-debug",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "flash: example 00",
+      "type": "shell",
+      "command": "cmake --build --preset bluepill-debug --target flash-00-bluepill-blink-uart",
+      "problemMatcher": []
+    }
+  ]
+}

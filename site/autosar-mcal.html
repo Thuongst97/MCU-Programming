@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Writing MCAL Drivers the AUTOSAR Way — MCU Academy</title>
+  <meta name="description" content="Std_Types, compiler abstraction, MemMap, config structures, DET error reporting and naming rules, applied to Port, Dio, Pwm, Adc, Gpt, Wdg and Can on the F1.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="autosar-mcal">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 20</span><span>/</span><span>MCAL Conventions</span></nav>
+          <div class="eyebrow">Module 20 · AUTOSAR Classic</div>
+          <h1>Writing MCAL Drivers the AUTOSAR Way</h1>
+          <p class="lead">The MCAL is where AUTOSAR meets the registers you have been programming since module 05. The register work does not change; what changes is everything around it: standard names and types, configuration kept out of the code, memory sections, and a defined way to report misuse. This module applies those conventions to Port, Dio, Pwm, Adc, Wdg and Can on the STM32F103, using the course's own drivers in <code>autosar/mcal</code>.</p>
+          <div class="page-meta"><span>⏱ 60 min read</span><span>🎯 Advanced</span><span>📂 autosar/mcal, autosar/include, stage3-autosar/cfg</span></div>
+        </header>
+
+        <section class="doc-section" id="file-layout" data-title="Module file layout">
+          <div class="sec-head"><h2><span class="sec-num">20.1</span>Module file layout</h2></div>
+          <div class="callout warn"><div class="ci">🔎</div><div><span class="ct">Verification status</span><p>Every API, type and rule on this page names its AUTOSAR R25-11 document. The requirement IDs and exact values are still being checked against the R25-11 PDFs; until then they come from the R4.x-era specifications, and no requirement ID is quoted, because the course never makes one up. Progress is tracked in <a href="https://github.com/Thuongst97/MCU-Programming/blob/main/docs/autosar-self-review.md">the self-review log</a>.</p></div></div>
+          <p>Every module is a fixed set of files, so integrators and tools always know where to look (AUTOSAR_CP_SRS_BSWGeneral):</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>File</th><th>Holds</th><th>Dio in this course</th></tr></thead>
+            <tbody>
+              <tr><td><code>&lt;Ma&gt;.h</code></td><td>public API, types, published information (version macros), error codes</td><td><code>autosar/mcal/dio/Dio.h</code></td></tr>
+              <tr><td><code>&lt;Ma&gt;.c</code></td><td>the implementation; never configuration values</td><td><code>autosar/mcal/dio/Dio.c</code></td></tr>
+              <tr><td><code>&lt;Ma&gt;_Cfg.h</code></td><td>pre-compile configuration: switches, sizes, symbolic names</td><td><code>stage3-autosar/cfg/Dio_Cfg.h</code></td></tr>
+              <tr><td><code>&lt;Ma&gt;_PBcfg.c</code> / <code>_Lcfg.c</code></td><td>post-build / link-time configuration: <code>const</code> tables passed to <code>&lt;Ma&gt;_Init</code></td><td><code>Port_PBcfg.c</code> (Dio has no init)</td></tr>
+              <tr><td><code>&lt;Ma&gt;_MemMap.h</code></td><td>memory mapping for the module's sections</td><td><code>stage3-autosar/cfg/Dio_MemMap.h</code></td></tr>
+              <tr><td><code>&lt;Ma&gt;_Cbk.h</code></td><td>callbacks other modules call</td><td><code>CanIf_Cbk.h</code></td></tr>
+            </tbody>
+          </table></div>
+          <p>The library files (<code>Dio.h</code>, <code>Dio.c</code>) are the same in every ECU; the configuration files are generated per ECU and live with the project. That split is why the capstone keeps them in <code>cfg/</code>.</p>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The MCAL is a universal power adapter: the plug on top is the same everywhere (<code>Dio_WriteChannel</code>), the pins underneath fit one country's socket (<code>GPIOB-&gt;BSRR</code>). Software above the adapter never learns which country it is in.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="std-types" data-title="Std_Types and Platform_Types">
+          <div class="sec-head"><h2><span class="sec-num">20.2</span>Std_Types and Platform_Types</h2></div>
+          <p>BSW interfaces use the AUTOSAR types, not <code>&lt;stdint.h&gt;</code>: <code>uint8</code> … <code>uint32</code>, <code>sint16</code>, <code>boolean</code> with <code>TRUE</code>/<code>FALSE</code>, and <code>Std_ReturnType</code> with <code>E_OK</code>/<code>E_NOT_OK</code> (AUTOSAR_CP_SWS_PlatformTypes, AUTOSAR_CP_SWS_StandardTypes). <code>Platform_Types.h</code> is written once per CPU and compiler, so the rest of the stack never depends on what <code>int</code> is.</p>
+          <script type="text/plain" data-code data-src="autosar/include/Platform_Types.h" data-lines="24-34" data-lang="c" data-file="autosar/include/Platform_Types.h" data-start="24" data-end="34" data-sha="ad5dca25f7f9">
+typedef signed char         sint8;
+typedef unsigned char       uint8;
+typedef signed short        sint16;
+typedef unsigned short      uint16;
+typedef signed long         sint32;
+typedef unsigned long       uint32;
+typedef signed long long    sint64;
+typedef unsigned long long  uint64;
+typedef signed long         sint8_least;    /* "at least N bits", fastest type: the native word */
+typedef unsigned long       uint8_least;
+typedef signed long         sint16_least;
+</script>
+          <p>Error handling then has one vocabulary: a function that can fail returns <code>Std_ReturnType</code>; modules may add their own codes from <code>0x02</code> upwards (Can's <code>CAN_BUSY</code>). Compare a home-made convention with the standard one:</p>
+          <div class="cmp-host" id="cmp-ret"></div>
+          <script type="text/plain" id="src-g-ret-bad" data-src="autosar/gallery/gallery.c" data-region="ret-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="32" data-end="45" data-sha="1d96068ded30">
+/* Error codes invented per module: -1, 0, 1, 2 ... every caller must know this module's meaning */
+int lamp_set_duty(int channel, int percent)
+{
+    if ((channel < 0) || (channel > 1))
+    {
+        return -1;
+    }
+    if ((percent < 0) || (percent > 100))
+    {
+        return -2;
+    }
+    TIM3->CCR1 = (uint32)percent * 10U;
+    return 0;
+}
+</script>
+          <script type="text/plain" id="src-g-ret-good" data-src="autosar/mcal/pwm/Pwm.c" data-region="duty" data-lang="c" data-file="autosar/mcal/pwm/Pwm.c" data-start="94" data-end="109" data-sha="376971bb02ce">
+FUNC(void, PWM_CODE) Pwm_SetDutyCycle(Pwm_ChannelType ChannelNumber, uint16 DutyCycle)
+{
+    if (Pwm_ConfigPtr == NULL_PTR)
+    {
+        PWM_DET(PWM_SETDUTYCYCLE_SID, PWM_E_UNINIT);
+        return;
+    }
+    if (ChannelNumber >= Pwm_ConfigPtr->numChannels)
+    {
+        PWM_DET(PWM_SETDUTYCYCLE_SID, PWM_E_PARAM_CHANNEL);
+        return;
+    }
+    P2CONST(Pwm_ChannelConfigType, AUTOMATIC, PWM_APPL_CONST) c = &Pwm_ConfigPtr->channels[ChannelNumber];
+    const uint32 duty = (DutyCycle > 0x8000U) ? 0x8000UL : (uint32)DutyCycle;      /* 0x8000 = 100 % */   // «3»
+    *Pwm_Ccr(Pwm_Timer(c->timer), c->tchannel) = (duty * Pwm_ConfigPtr->period) >> 15;   /* next period */   // «4»
+}
+</script>
+        </section>
+
+        <section class="doc-section" id="naming" data-title="API naming: &lt;Ma&gt;_&lt;Api&gt;">
+          <div class="sec-head"><h2><span class="sec-num">20.3</span>API naming: &lt;Ma&gt;_&lt;Api&gt;</h2></div>
+          <p>Every public symbol carries the module abbreviation from the BSW module list (AUTOSAR_CP_TR_BSWModuleList): functions <code>&lt;Ma&gt;_&lt;Api&gt;</code> (<code>Dio_WriteChannel</code>, <code>Can_Write</code>), macros and error codes <code>&lt;MA&gt;_…</code> (<code>DIO_E_PARAM_INVALID_CHANNEL_ID</code>), types <code>&lt;Ma&gt;_…Type</code> (<code>Dio_ChannelType</code>). Configured objects get symbolic names with the <code>&lt;Ma&gt;Conf_</code> prefix, generated into <code>&lt;Ma&gt;_Cfg.h</code>:</p>
+          <script type="text/plain" data-code data-src="capstone/turnlight/stage3-autosar/cfg/Dio_Cfg.h" data-lines="12-16" data-lang="c" data-file="cfg/Dio_Cfg.h" data-start="12" data-end="16" data-sha="359d5735432b">
+/* Symbolic channel names (channel = 16 * port + pin) */
+#define DioConf_DioChannel_StalkLeft    ((Dio_ChannelType)28U)   /* PB12 */
+#define DioConf_DioChannel_StalkRight   ((Dio_ChannelType)29U)   /* PB13 */
+#define DioConf_DioChannel_Hazard       ((Dio_ChannelType)30U)   /* PB14 */
+#define DioConf_DioChannel_Heartbeat    ((Dio_ChannelType)45U)   /* PC13, LED active-low */
+</script>
+          <p>Each module header also publishes who made it and for which release: <code>DIO_VENDOR_ID</code>, <code>DIO_MODULE_ID</code>, <code>DIO_AR_RELEASE_MAJOR_VERSION</code> and so on. Every <code>.c</code> file checks at compile time that the headers it includes belong to the same release. <code>tools/check-autosar.py</code> checks naming and version macros in CI.</p>
+        </section>
+
+        <section class="doc-section" id="config" data-title="Configuration structures and Init">
+          <div class="sec-head"><h2><span class="sec-num">20.4</span>Configuration structures and Init</h2></div>
+          <p>Configuration is data, not code. A module's <code>Init</code> receives a pointer to a <code>const</code> configuration structure, and the driver keeps only that pointer:</p>
+          <script type="text/plain" id="src-ar-port" data-src="autosar/mcal/port/Port.c" data-region="init" data-lang="c" data-file="autosar/mcal/port/Port.c" data-start="48" data-end="72" data-sha="2534fbb53683">
+FUNC(void, PORT_CODE) Port_Init(P2CONST(Port_ConfigType, AUTOMATIC, PORT_APPL_CONST) ConfigPtr)
+{
+    if (ConfigPtr == NULL_PTR)
+    {
+        PORT_DET(PORT_INIT_SID, PORT_E_PARAM_POINTER);   // «1»
+        return;
+    }
+    if ((ConfigPtr->afioMapr & AFIO_MAPR_SWJ_CFG) == AFIO_MAPR_SWJ_CFG_DISABLE)
+    {
+        PORT_DET(PORT_INIT_SID, PORT_E_PARAM_CONFIG);    /* would lock out the debugger: refuse */   // «2»
+        return;
+    }
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPCEN | RCC_APB2ENR_AFIOEN;
+    AFIO->MAPR = ConfigPtr->afioMapr;   // «3»
+    for (uint8 i = 0U; i < ConfigPtr->numPins; ++i)
+    {
+        if (ConfigPtr->pins[i].pin >= PORT_NUM_PINS)
+        {
+            PORT_DET(PORT_INIT_SID, PORT_E_PARAM_PIN);
+            continue;
+        }
+        Port_ApplyPin(&ConfigPtr->pins[i]);   // «4»
+    }
+    Port_ConfigPtr = ConfigPtr;   // «5»
+}
+</script>
+          <div id="ex-port"></div>
+          <script type="text/plain" data-code data-src="capstone/turnlight/stage3-autosar/cfg/Port_PBcfg.c" data-lines="9-25" data-lang="c" data-file="cfg/Port_PBcfg.c" data-start="9" data-end="25" data-sha="bb94057763e4">
+#define PORT_START_SEC_CONFIG_DATA_UNSPECIFIED
+#include "Port_MemMap.h"
+static CONST(Port_PinConfigType, PORT_CONST) Port_Pins[] = {
+    {1U, PORT_F1_ANALOG, STD_LOW},          /* PA1  lamp current (ADC1 IN1) */
+    {6U, PORT_F1_AF_PP_2MHZ, STD_LOW},      /* PA6  lamp left, TIM3 CH1 */
+    {7U, PORT_F1_AF_PP_2MHZ, STD_LOW},      /* PA7  lamp right, TIM3 CH2 */
+    {24U, PORT_F1_IN_PULL, STD_HIGH},       /* PB8  CAN RX (remapped), pull-up */
+    {25U, PORT_F1_AF_PP_50MHZ, STD_HIGH},   /* PB9  CAN TX (remapped) */
+    {28U, PORT_F1_IN_PULL, STD_HIGH},       /* PB12 stalk left, to GND, pull-up */
+    {29U, PORT_F1_IN_PULL, STD_HIGH},       /* PB13 stalk right */
+    {30U, PORT_F1_IN_PULL, STD_HIGH},       /* PB14 hazard */
+    {45U, PORT_F1_OUT_PP_2MHZ, STD_HIGH},   /* PC13 heartbeat LED, active-low: starts off; <= 2 MHz */
+};
+CONST(Port_ConfigType, PORT_CONST) Port_Config = {
+    Port_Pins, (uint8)(sizeof Port_Pins / sizeof Port_Pins[0]),
+    AFIO_MAPR_CAN_REMAP_REMAP2,             /* bxCAN on PB8/PB9; SWJ_CFG left at full SWJ */
+};
+</script>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Configuration class</th><th>Fixed when</th><th>Where</th></tr></thead>
+            <tbody>
+              <tr><td>Pre-compile</td><td>compiling the module</td><td><code>&lt;Ma&gt;_Cfg.h</code> (<code>DIO_DEV_ERROR_DETECT</code>)</td></tr>
+              <tr><td>Link-time</td><td>linking</td><td><code>&lt;Ma&gt;_Lcfg.c</code></td></tr>
+              <tr><td>Post-build</td><td>after building: a new table can be flashed without recompiling the module</td><td><code>&lt;Ma&gt;_PBcfg.c</code> (<code>Port_Config</code>)</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="doc-section" id="memmap" data-title="MemMap and compiler abstraction">
+          <div class="sec-head"><h2><span class="sec-num">20.5</span>MemMap and compiler abstraction</h2></div>
+          <p>Two conventions let the same source compile for very different compilers and memories. <b>Compiler abstraction</b> wraps declarations in macros that carry memory classes (AUTOSAR_CP_SWS_CompilerAbstraction). On a Cortex-M every class is empty, so the macros expand to plain C:</p>
+          <script type="text/plain" id="src-ar-cmp" data-src="autosar/include/Compiler.h" data-region="macros" data-lang="c" data-file="autosar/include/Compiler.h" data-start="24" data-end="33" data-sha="1c1424b314e1">
+#define FUNC(rettype, memclass)                         rettype   // «1»
+#define FUNC_P2CONST(rettype, ptrclass, memclass)       const rettype *
+#define FUNC_P2VAR(rettype, ptrclass, memclass)         rettype *
+#define P2VAR(ptrtype, memclass, ptrclass)              ptrtype *   // «2»
+#define P2CONST(ptrtype, memclass, ptrclass)            const ptrtype *   // «3»
+#define CONSTP2VAR(ptrtype, memclass, ptrclass)         ptrtype * const
+#define CONSTP2CONST(ptrtype, memclass, ptrclass)       const ptrtype * const
+#define P2FUNC(rettype, ptrclass, fctname)              rettype (*fctname)
+#define CONST(consttype, memclass)                      const consttype
+#define VAR(vartype, memclass)                          vartype
+</script>
+          <div id="ex-cmp"></div>
+          <p><b>Memory mapping</b> places code and data in sections by bracketing them with <code>&lt;MSN&gt;_START_SEC_&lt;X&gt;</code> / <code>STOP</code> defines and including the module's MemMap header (AUTOSAR_CP_SWS_MemoryMapping). A production MemMap emits compiler pragmas; the course's version checks the brackets, because GCC on ARM has no pragma to move what follows into a section:</p>
+          <script type="text/plain" data-code data-src="capstone/turnlight/stage3-autosar/cfg/Dio_MemMap.h" data-lines="7-14" data-lang="c" data-file="cfg/Dio_MemMap.h" data-start="7" data-end="14" data-sha="af54e6e21fb5">
+/* Memory mapping of Dio. No include guard: included before and after every section. */
+#if defined(DIO_START_SEC_CODE)
+#  undef DIO_START_SEC_CODE
+#  define MEMMAP_DO_START
+#elif defined(DIO_STOP_SEC_CODE)
+#  undef DIO_STOP_SEC_CODE
+#  define MEMMAP_DO_STOP
+#elif defined(DIO_START_SEC_VAR_CLEARED_UNSPECIFIED)
+</script>
+          <div class="callout prod" data-doc="AUTOSAR_SWS_CompilerAbstraction R4.4.0"><div class="ci">🏭</div><div><span class="ct">In production (R4.x)</span><p>R4.x code uses the macros with all their parameters, exactly as shown here, and you will meet them in every vendor MCAL. Newer releases simplified some of them; check the release your project is pinned to before copying a signature.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="det" data-title="Development errors with DET">
+          <div class="sec-head"><h2><span class="sec-num">20.6</span>Development errors with DET</h2></div>
+          <p>Calling an API with an invalid channel, a NULL pointer or before <code>Init</code> is a programming error. During development such errors go to the <b>Default Error Tracer</b>: <code>Det_ReportError(ModuleId, InstanceId, ApiId, ErrorId)</code> (AUTOSAR_CP_SWS_DefaultErrorTracer). The checks are compiled only when <code>&lt;MA&gt;_DEV_ERROR_DETECT</code> is <code>STD_ON</code>, so production code pays nothing for them.</p>
+          <script type="text/plain" id="src-ar-det" data-src="autosar/det/Det.c" data-region="report" data-lang="c" data-file="autosar/det/Det.c" data-start="30" data-end="42" data-sha="00ddb92e52b3">
+FUNC(Std_ReturnType, DET_CODE) Det_ReportError(uint16 ModuleId, uint8 InstanceId, uint8 ApiId, uint8 ErrorId)
+{
+    P2VAR(Det_ErrorType, AUTOMATIC, DET_VAR) e = &Det_Log[Det_Count % DET_LOG_SIZE];
+    e->moduleId = ModuleId;                               /* who, which instance, which API, what */   // «1»
+    e->instanceId = InstanceId;
+    e->apiId = ApiId;
+    e->errorId = ErrorId;
+    Det_Count++;
+#ifdef DET_CALLOUT
+    DET_CALLOUT(ModuleId, InstanceId, ApiId, ErrorId);   /* e.g. print it, or halt for the debugger */   // «2»
+#endif
+    return E_OK;                                          /* development errors never fail the caller */   // «3»
+}
+</script>
+          <div id="ex-det"></div>
+          <div class="cmp-host" id="cmp-det"></div>
+          <script type="text/plain" id="src-g-det-bad" data-src="autosar/gallery/gallery.c" data-region="det-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="49" data-end="58" data-sha="1d96068ded30">
+/* Development checks always on, and a production error reported as a development error */
+Std_ReturnType Lamp_Init(const uint8 *config)
+{
+    (void)Det_ReportError(254U, 0U, 0U, 0x10U);   /* unconditional: costs time and flash in production */
+    if (*config == 0U)                             /* no NULL check before the dereference */
+    {
+        return E_NOT_OK;
+    }
+    return E_OK;
+}
+</script>
+          <script type="text/plain" id="src-g-det-good" data-src="autosar/mcal/port/Port.c" data-region="init" data-lang="c" data-file="autosar/mcal/port/Port.c" data-start="48" data-end="72" data-sha="2534fbb53683">
+FUNC(void, PORT_CODE) Port_Init(P2CONST(Port_ConfigType, AUTOMATIC, PORT_APPL_CONST) ConfigPtr)
+{
+    if (ConfigPtr == NULL_PTR)
+    {
+        PORT_DET(PORT_INIT_SID, PORT_E_PARAM_POINTER);   // «1»
+        return;
+    }
+    if ((ConfigPtr->afioMapr & AFIO_MAPR_SWJ_CFG) == AFIO_MAPR_SWJ_CFG_DISABLE)
+    {
+        PORT_DET(PORT_INIT_SID, PORT_E_PARAM_CONFIG);    /* would lock out the debugger: refuse */   // «2»
+        return;
+    }
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPCEN | RCC_APB2ENR_AFIOEN;
+    AFIO->MAPR = ConfigPtr->afioMapr;   // «3»
+    for (uint8 i = 0U; i < ConfigPtr->numPins; ++i)
+    {
+        if (ConfigPtr->pins[i].pin >= PORT_NUM_PINS)
+        {
+            PORT_DET(PORT_INIT_SID, PORT_E_PARAM_PIN);
+            continue;
+        }
+        Port_ApplyPin(&ConfigPtr->pins[i]);   // «4»
+    }
+    Port_ConfigPtr = ConfigPtr;   // «5»
+}
+</script>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">DET is not DEM</span><p>DET is for bugs that tests must find before release; it is usually off in production. Faults of the running system (a lamp that fails, a crystal that does not start, a bus that goes silent) are <b>production errors</b>: they go to the Diagnostic Event Manager and become DTCs a workshop can read (module 22).</p></div></div>
+        </section>
+
+        <section class="doc-section" id="dio-port" data-title="Port and Dio on the F1">
+          <div class="sec-head"><h2><span class="sec-num">20.7</span>Port and Dio on the F1</h2></div>
+          <p><b>Port</b> configures every pin once at start-up from its configuration table; <b>Dio</b> reads and writes the pins. Dio has no init function and must be safe to call from any context. On the F1, <code>GPIOx_BSRR</code> sets or clears pins atomically, so Dio needs no critical section:</p>
+          <script type="text/plain" id="src-ar-dio" data-src="autosar/mcal/dio/Dio.c" data-region="channel" data-lang="c" data-file="autosar/mcal/dio/Dio.c" data-start="42" data-end="60" data-sha="c50540f03485">
+FUNC(Dio_LevelType, DIO_CODE) Dio_ReadChannel(Dio_ChannelType ChannelId)
+{
+    if (!Dio_ValidChannel(ChannelId, DIO_READCHANNEL_SID))   // «1»
+    {
+        return STD_LOW;                                   /* the SWS asks for a defined value */   // «2»
+    }
+    const uint32 bit = 1UL << (ChannelId % 16U);
+    return ((Dio_Gpio(ChannelId / 16U)->IDR & bit) != 0U) ? (Dio_LevelType)STD_HIGH : (Dio_LevelType)STD_LOW;
+}
+
+FUNC(void, DIO_CODE) Dio_WriteChannel(Dio_ChannelType ChannelId, Dio_LevelType Level)
+{
+    if (!Dio_ValidChannel(ChannelId, DIO_WRITECHANNEL_SID))
+    {
+        return;
+    }
+    const uint32 n = (uint32)ChannelId % 16U;
+    Dio_Gpio(ChannelId / 16U)->BSRR = (Level == STD_HIGH) ? (1UL << n) : (1UL << (n + 16U));   /* atomic */   // «3»
+}
+</script>
+          <div id="ex-dio"></div>
+          <div class="cmp-host" id="cmp-dio"></div>
+          <script type="text/plain" id="src-g-dio-bad" data-src="autosar/gallery/gallery.c" data-region="dio-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="17" data-end="28" data-sha="1d96068ded30">
+/* "Driver" written without the SWS: ad-hoc name, int levels, read-modify-write on ODR */
+void lamp_write(int pin, int level)
+{
+    if (level)
+    {
+        GPIOB->ODR |= (1UL << pin);          /* read, modify, write: an ISR writing ODR in between is lost */
+    }
+    else
+    {
+        GPIOB->ODR &= ~(1UL << pin);
+    }
+}
+</script>
+          <script type="text/plain" id="src-g-dio-good" data-src="autosar/mcal/dio/Dio.c" data-region="channel" data-lang="c" data-file="autosar/mcal/dio/Dio.c" data-start="42" data-end="60" data-sha="c50540f03485">
+FUNC(Dio_LevelType, DIO_CODE) Dio_ReadChannel(Dio_ChannelType ChannelId)
+{
+    if (!Dio_ValidChannel(ChannelId, DIO_READCHANNEL_SID))   // «1»
+    {
+        return STD_LOW;                                   /* the SWS asks for a defined value */   // «2»
+    }
+    const uint32 bit = 1UL << (ChannelId % 16U);
+    return ((Dio_Gpio(ChannelId / 16U)->IDR & bit) != 0U) ? (Dio_LevelType)STD_HIGH : (Dio_LevelType)STD_LOW;
+}
+
+FUNC(void, DIO_CODE) Dio_WriteChannel(Dio_ChannelType ChannelId, Dio_LevelType Level)
+{
+    if (!Dio_ValidChannel(ChannelId, DIO_WRITECHANNEL_SID))
+    {
+        return;
+    }
+    const uint32 n = (uint32)ChannelId % 16U;
+    Dio_Gpio(ChannelId / 16U)->BSRR = (Level == STD_HIGH) ? (1UL << n) : (1UL << (n + 16U));   /* atomic */   // «3»
+}
+</script>
+          <p>Channel IDs are <code>16 × port + pin</code>, so <code>DioConf_DioChannel_StalkLeft</code> = 28 is PB12. The mapping lives in the driver, not in the application.</p>
+        </section>
+
+        <section class="doc-section" id="pwm-adc-gpt" data-title="Pwm, Adc and Gpt on the F1">
+          <div class="sec-head"><h2><span class="sec-num">20.8</span>Pwm, Adc and Gpt on the F1</h2></div>
+          <p><b>Pwm</b> expresses duty cycles on a fixed scale, <code>0x0000</code> = 0 % to <code>0x8000</code> = 100 % (AUTOSAR_CP_SWS_PWMDriver), and converts to timer counts itself, using the timer clock from the configuration (the ×2 rule of module 07):</p>
+          <script type="text/plain" id="src-ar-pwm" data-src="autosar/mcal/pwm/Pwm.c" data-region="duty" data-lang="c" data-file="autosar/mcal/pwm/Pwm.c" data-start="94" data-end="109" data-sha="376971bb02ce">
+FUNC(void, PWM_CODE) Pwm_SetDutyCycle(Pwm_ChannelType ChannelNumber, uint16 DutyCycle)
+{
+    if (Pwm_ConfigPtr == NULL_PTR)
+    {
+        PWM_DET(PWM_SETDUTYCYCLE_SID, PWM_E_UNINIT);
+        return;
+    }
+    if (ChannelNumber >= Pwm_ConfigPtr->numChannels)
+    {
+        PWM_DET(PWM_SETDUTYCYCLE_SID, PWM_E_PARAM_CHANNEL);
+        return;
+    }
+    P2CONST(Pwm_ChannelConfigType, AUTOMATIC, PWM_APPL_CONST) c = &Pwm_ConfigPtr->channels[ChannelNumber];
+    const uint32 duty = (DutyCycle > 0x8000U) ? 0x8000UL : (uint32)DutyCycle;      /* 0x8000 = 100 % */   // «3»
+    *Pwm_Ccr(Pwm_Timer(c->timer), c->tchannel) = (duty * Pwm_ConfigPtr->period) >> 15;   /* next period */   // «4»
+}
+</script>
+          <div id="ex-pwm"></div>
+          <p><b>Adc</b> works in <b>groups</b> of channels that are converted together, with results written into a buffer the caller provides (AUTOSAR_CP_SWS_ADCDriver). The course's Adc-lite converts one-shot, software-triggered groups and advances them by polling:</p>
+          <script type="text/plain" id="src-ar-adc" data-src="autosar/mcal/adc/Adc.c" data-region="start" data-lang="c" data-file="autosar/mcal/adc/Adc.c" data-start="120" data-end="171" data-sha="c7eec6921f32">
+FUNC(void, ADC_CODE) Adc_StartGroupConversion(Adc_GroupType Group)
+{
+    if (Adc_ConfigPtr == NULL_PTR)
+    {
+        ADC_DET(ADC_STARTGROUPCONVERSION_SID, ADC_E_UNINIT);
+        return;
+    }
+    if (Group >= Adc_ConfigPtr->numGroups)
+    {
+        ADC_DET(ADC_STARTGROUPCONVERSION_SID, ADC_E_PARAM_GROUP);
+        return;
+    }
+    if (Adc_State[Group].buffer == NULL_PTR)
+    {
+        ADC_DET(ADC_STARTGROUPCONVERSION_SID, ADC_E_BUFFER_UNINIT);   // «1»
+        return;
+    }
+    if (Adc_Active >= 0)
+    {
+        ADC_DET(ADC_STARTGROUPCONVERSION_SID, ADC_E_BUSY);   // «2»
+        return;
+    }
+    Adc_State[Group].status = ADC_BUSY;
+    Adc_State[Group].next = 0U;
+    Adc_Active = (sint16)Group;
+    Adc_StartChannel(Adc_ConfigPtr->groups[Group].channels[0]);
+}
+
+FUNC(Adc_StatusType, ADC_CODE) Adc_GetGroupStatus(Adc_GroupType Group)
+{
+    if ((Adc_ConfigPtr == NULL_PTR) || (Group >= Adc_ConfigPtr->numGroups))
+    {
+        ADC_DET(ADC_GETGROUPSTATUS_SID, (Adc_ConfigPtr == NULL_PTR) ? ADC_E_UNINIT : ADC_E_PARAM_GROUP);
+        return ADC_IDLE;
+    }
+    P2VAR(Adc_GroupStateType, AUTOMATIC, ADC_VAR) st = &Adc_State[Group];
+    if ((st->status == ADC_BUSY) && ((ADC1->SR & ADC_SR_EOC) != 0U))      /* polling advances the group */   // «3»
+    {
+        st->buffer[st->next] = (Adc_ValueGroupType)(ADC1->DR & 0xFFFU);
+        st->next++;
+        if (st->next < Adc_ConfigPtr->groups[Group].numChannels)
+        {
+            Adc_StartChannel(Adc_ConfigPtr->groups[Group].channels[st->next]);
+        }
+        else
+        {
+            st->status = ADC_STREAM_COMPLETED;            /* one-shot group: completed and stream completed */   // «4»
+            Adc_Active = -1;
+        }
+    }
+    return st->status;
+}
+</script>
+          <div id="ex-adc"></div>
+          <p><b>Gpt</b> (general-purpose timer) provides time bases and notifications to other modules. The capstone does not need it: the OS counter is the only time base. It is listed as not implemented rather than stubbed.</p>
+        </section>
+
+        <section class="doc-section" id="can-wdg" data-title="Can and Wdg on the F1">
+          <div class="sec-head"><h2><span class="sec-num">20.9</span>Can and Wdg on the F1</h2></div>
+          <p>The <b>Can</b> driver moves frames between hardware mailboxes and CanIf. It is called with <i>hardware object handles</i> (HTH for transmit, HRH for receive) and reports back through callbacks (AUTOSAR_CP_SWS_CANDriver). Can-lite runs in polling mode: the main functions do the work in task context, never in an interrupt:</p>
+          <script type="text/plain" id="src-ar-canw" data-src="autosar/mcal/can/Can.c" data-region="write" data-lang="c" data-file="autosar/mcal/can/Can.c" data-start="116" data-end="158" data-sha="5f3b680fe071">
+FUNC(Std_ReturnType, CAN_CODE) Can_Write(Can_HwHandleType Hth, P2CONST(Can_PduType, AUTOMATIC, CAN_APPL_DATA) PduInfo)
+{
+    if (Can_State == CAN_CS_UNINIT)
+    {
+        CAN_DET(CAN_WRITE_SID, CAN_E_UNINIT);
+        return E_NOT_OK;
+    }
+    if (Hth != CanConf_CanHardwareObject_Tx)
+    {
+        CAN_DET(CAN_WRITE_SID, CAN_E_PARAM_HANDLE);
+        return E_NOT_OK;
+    }
+    if ((PduInfo == NULL_PTR) || ((PduInfo->sdu == NULL_PTR) && (PduInfo->length != 0U)))
+    {
+        CAN_DET(CAN_WRITE_SID, CAN_E_PARAM_POINTER);
+        return E_NOT_OK;
+    }
+    if (PduInfo->length > 8U)
+    {
+        CAN_DET(CAN_WRITE_SID, CAN_E_PARAM_DATA_LENGTH);
+        return E_NOT_OK;
+    }
+    const uint32 tme[CAN_MAILBOXES] = {CAN_TSR_TME0, CAN_TSR_TME1, CAN_TSR_TME2};
+    for (uint8 m = 0U; m < CAN_MAILBOXES; ++m)
+    {
+        if (((CAN1->TSR & tme[m]) != 0U) && (Can_TxBusy[m] == FALSE))
+        {
+            uint8 d[8] = {0U};
+            for (uint8 i = 0U; i < PduInfo->length; ++i)
+            {
+                d[i] = PduInfo->sdu[i];
+            }
+            CAN1->sTxMailBox[m].TDTR = PduInfo->length;
+            CAN1->sTxMailBox[m].TDLR = (uint32)d[0] | ((uint32)d[1] << 8) | ((uint32)d[2] << 16) | ((uint32)d[3] << 24);
+            CAN1->sTxMailBox[m].TDHR = (uint32)d[4] | ((uint32)d[5] << 8) | ((uint32)d[6] << 16) | ((uint32)d[7] << 24);
+            Can_TxPdu[m] = PduInfo->swPduHandle;
+            Can_TxBusy[m] = TRUE;
+            CAN1->sTxMailBox[m].TIR = ((PduInfo->id & 0x7FFU) << CAN_TI0R_STID_Pos) | CAN_TI0R_TXRQ;   /* send */   // «2»
+            return E_OK;
+        }
+    }
+    return CAN_BUSY;                                         /* CanIf may buffer and retry */   // «1»
+}
+</script>
+          <div id="ex-canw"></div>
+          <script type="text/plain" id="src-ar-canm" data-src="autosar/mcal/can/Can.c" data-region="mainfunctions" data-lang="c" data-file="autosar/mcal/can/Can.c" data-start="162" data-end="209" data-sha="5f3b680fe071">
+FUNC(void, CAN_CODE) Can_MainFunction_Write(void)
+{
+    const uint32 rqcp[CAN_MAILBOXES] = {CAN_TSR_RQCP0, CAN_TSR_RQCP1, CAN_TSR_RQCP2};
+    const uint32 txok[CAN_MAILBOXES] = {CAN_TSR_TXOK0, CAN_TSR_TXOK1, CAN_TSR_TXOK2};
+    for (uint8 m = 0U; m < CAN_MAILBOXES; ++m)
+    {
+        const uint32 tsr = CAN1->TSR;
+        if ((Can_TxBusy[m] == TRUE) && ((tsr & rqcp[m]) != 0U))
+        {
+            CAN1->TSR = rqcp[m];                             /* write 1 to clear */
+            Can_TxBusy[m] = FALSE;
+            if ((tsr & txok[m]) != 0U)
+            {
+                CanIf_TxConfirmation(Can_TxPdu[m]);          /* acknowledged on the bus */   // «3»
+            }
+        }
+    }
+}
+
+FUNC(void, CAN_CODE) Can_MainFunction_Read(void)
+{
+    if (Can_State != CAN_CS_STARTED)
+    {
+        return;
+    }
+    for (uint8 guard = 0U; (guard < 3U) && ((CAN1->RF0R & CAN_RF0R_FMP0) != 0U); ++guard)   /* FIFO depth 3 */
+    {
+        const uint32 rir = CAN1->sFIFOMailBox[0].RIR;
+        const uint32 rdtr = CAN1->sFIFOMailBox[0].RDTR;
+        const uint32 lo = CAN1->sFIFOMailBox[0].RDLR;
+        const uint32 hi = CAN1->sFIFOMailBox[0].RDHR;
+        CAN1->RF0R = CAN_RF0R_RFOM0;                         /* release the FIFO slot */
+        if ((rir & CAN_RI0R_IDE) != 0U)
+        {
+            continue;                                        /* extended IDs are not configured */
+        }
+        uint8 data[8];
+        for (uint8 i = 0U; i < 4U; ++i)
+        {
+            data[i] = (uint8)(lo >> (8U * i));
+            data[i + 4U] = (uint8)(hi >> (8U * i));
+        }
+        const Can_HwType mailbox = {(rir >> CAN_RI0R_STID_Pos) & 0x7FFU, CanConf_CanHardwareObject_Rx, 0U};
+        const uint8 dlc = (uint8)(rdtr & CAN_RDT0R_DLC);
+        const PduInfoType pdu = {data, NULL_PTR, (PduLengthType)((dlc > 8U) ? 8U : dlc)};
+        CanIf_RxIndication(&mailbox, &pdu);                  /* up the stack, in task context */   // «4»
+    }
+}
+</script>
+          <div id="ex-canm"></div>
+          <div class="callout prod" data-doc="AUTOSAR_SWS_CANDriver R4.2.2"><div class="ci">🏭</div><div><span class="ct">In production (R4.x)</span><p>Before R4.4 the Can driver returned <code>Can_ReturnType</code> (<code>CAN_OK</code>, <code>CAN_NOT_OK</code>, <code>CAN_BUSY</code>) and used <code>Can_StateTransitionType</code> for mode changes, and <code>CanIf_RxIndication</code> took the HRH, CAN ID, DLC and data pointer as separate arguments. Older vendor MCALs you meet will look like that.</p></div></div>
+          <p>The <b>Wdg</b> driver owns the IWDG. Its API sets a mode and a trigger condition; the decision whether to trigger belongs to WdgM (module 21):</p>
+          <script type="text/plain" id="src-ar-wdg" data-src="autosar/mcal/wdg/Wdg.c" data-region="trigger" data-lang="c" data-file="autosar/mcal/wdg/Wdg.c" data-start="69" data-end="85" data-sha="e06f0e833896">
+FUNC(void, WDG_CODE) Wdg_SetTriggerCondition(uint16 timeout)
+{
+    if (Wdg_ConfigPtr == NULL_PTR)
+    {
+        WDG_DET(WDG_SETTRIGGERCONDITION_SID, WDG_E_DRIVER_STATE);
+        return;
+    }
+    if (timeout > Wdg_ConfigPtr->maxTimeoutMs)
+    {
+        WDG_DET(WDG_SETTRIGGERCONDITION_SID, WDG_E_PARAM_TIMEOUT);
+        return;
+    }
+    if (timeout != 0U)
+    {
+        IWDG->KR = WDG_KEY_RELOAD;                        /* timeout 0: stop triggering, reset follows */   // «1»
+    }
+}
+</script>
+          <div id="ex-wdg"></div>
+          <div id="ck-mcal"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/compare.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/autosar-mcal.js?v=__BUILD__"></script>
+</body>
+</html>

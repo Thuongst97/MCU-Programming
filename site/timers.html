@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Timers, PWM and Input Capture — MCU Academy</title>
+  <meta name="description" content="General-purpose timers, prescaler/ARR math, PWM output compare, input capture and the APB1 ×2 timer-clock rule.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="timers">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 07</span><span>/</span><span>Timers &amp; PWM</span></nav>
+          <div class="eyebrow">Module 07 · From reset to main</div>
+          <h1>Timers, PWM and Input Capture</h1>
+          <p class="lead">Hardware timers count clock cycles while the CPU does other work. With them you get exact periods, PWM signals that dim LEDs or drive motors, and precise measurements of incoming signals. The F103 has one advanced timer (TIM1) and three general-purpose timers (TIM2–TIM4); this module uses TIM3 and TIM2.</p>
+          <div class="page-meta"><span>⏱ 45 min read</span><span>🎯 Intermediate</span><span>📂 examples/03-tim-pwm-dimming</span></div>
+        </header>
+
+        <section class="doc-section" id="timebase" data-title="Prescaler, ARR and update events">
+          <div class="sec-head"><h2><span class="sec-num">7.1</span>Prescaler, ARR and update events</h2></div>
+          <p>A general-purpose timer is a 16-bit counter with a prescaler in front of it (RM0008 §15.3):</p>
+          <ul>
+            <li>The <b>prescaler</b> <code>PSC</code> divides the timer clock by <code>PSC + 1</code>. Each resulting tick advances the counter <code>CNT</code> by one.</li>
+            <li>When <code>CNT</code> reaches the <b>auto-reload</b> value <code>ARR</code>, it goes back to 0 and raises an <b>update event</b> (UEV), which can trigger an interrupt or DMA request.</li>
+          </ul>
+          <div class="formula">f<sub>update</sub> = f<sub>TIM</sub> ÷ ((PSC + 1) × (ARR + 1))</div>
+          <p>For 1 kHz from a 72 MHz timer clock: 72 000 000 ÷ 1000 = 72 000 = (PSC + 1) × (ARR + 1). PSC = 71 and ARR = 999 gives 1 µs ticks and 1000 steps per period, which is handy for PWM. Both registers are 16 bits, so each factor must be ≤ 65 536. Try other values:</p>
+          <div id="calc-timer"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The prescaler is a gear that turns the fast motor shaft into slow, regular steps; the counter is a clock face with ARR + 1 positions. Each time the hand passes 12 o'clock, a bell rings: the update event.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="timer-clock" data-title="The ×2 timer clock rule">
+          <div class="sec-head"><h2><span class="sec-num">7.2</span>The ×2 timer clock rule</h2></div>
+          <p>Which clock reaches the timer? TIM2–TIM4 are on APB1, TIM1 on APB2. The rule (RM0008 §7.2): <b>if the APB prescaler is 1, the timer clock equals the bus clock; otherwise it is twice the bus clock.</b></p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Setup</th><th>PCLK1</th><th>TIM2–4 clock</th><th>PCLK2</th><th>TIM1 clock</th></tr></thead>
+            <tbody>
+              <tr><td>After reset (HSI 8 MHz, all ÷ 1)</td><td>8 MHz</td><td>8 MHz</td><td>8 MHz</td><td>8 MHz</td></tr>
+              <tr><td>Course setup (72 MHz, APB1 ÷ 2)</td><td>36 MHz</td><td><b>72 MHz</b></td><td>72 MHz</td><td>72 MHz</td></tr>
+            </tbody>
+          </table></div>
+          <p>Example 03 computes its prescaler from the bus clock instead of hard-coding it, so it stays correct if the clock changes: <code>PSC = 2 × PCLK1 ÷ 1 MHz − 1</code>.</p>
+          <div id="reg-tim-cr1"></div>
+        </section>
+
+        <section class="doc-section" id="pwm" data-title="PWM with output compare">
+          <div class="sec-head"><h2><span class="sec-num">7.3</span>PWM with output compare</h2></div>
+          <p>In <b>PWM mode 1</b>, each channel compares the counter with its capture/compare register <code>CCRx</code>: the output is active while <code>CNT &lt; CCRx</code> and inactive for the rest of the period. The period is set by ARR, the duty cycle by CCRx ÷ (ARR + 1).</p>
+          <script type="text/plain" id="src-03-pwm" data-src="examples/03-tim-pwm-dimming/src/main.c" data-region="pwm" data-lang="c" data-file="examples/03-tim-pwm-dimming/src/main.c" data-start="17" data-end="39" data-sha="aeaa978b483f">
+/* TIM3 CH1 on PA6, 1 kHz PWM with 1000 duty steps. */
+static void pwm_init(void)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+    RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;                                       // «1»
+    GPIOA->CRL = (GPIOA->CRL & ~(GPIO_CRL_MODE6 | GPIO_CRL_CNF6))
+                 | GPIO_CRL_MODE6_1 | GPIO_CRL_CNF6_1;   /* AF push-pull, 2 MHz */  // «2»
+
+    /* Timer clock = 2 x PCLK1 = 72 MHz, because the APB1 prescaler is not 1 (RM0008 §7.2). */
+    TIM3->PSC = (uint16_t)((2U * clock_pclk1() / 1000000U) - 1U);  /* 1 MHz count rate */  // «3»
+    TIM3->ARR = PWM_TOP - 1U;                                      /* 1000 counts = 1 kHz */ // «4»
+    TIM3->CCR1 = 0U;
+    TIM3->CCMR1 = (6U << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE;    /* PWM mode 1, preload */ // «5»
+    TIM3->CCER = TIM_CCER_CC1E;                                    /* drive the pin */      // «6»
+    TIM3->CR1 = TIM_CR1_ARPE;
+    TIM3->EGR = TIM_EGR_UG;                                        /* load PSC/ARR/CCR now */ // «7»
+    TIM3->CR1 |= TIM_CR1_CEN;
+}
+
+static void pwm_set(uint32_t duty)
+{
+    TIM3->CCR1 = (duty > PWM_TOP) ? PWM_TOP : duty;   /* applied at the next update event */ // «8»
+}
+</script>
+          <div id="ex-pwm"></div>
+          <div id="reg-ccmr1"></div>
+          <p>The brightness curve itself is pure arithmetic, tested on your PC:</p>
+          <script type="text/plain" id="src-03-breath" data-src="examples/03-tim-pwm-dimming/src/breath.c" data-region="breath" data-lang="c" data-file="examples/03-tim-pwm-dimming/src/breath.c" data-start="5" data-end="16" data-sha="55f0f6aaa114">
+uint32_t breath_duty(uint32_t step, uint32_t period, uint32_t top)
+{
+    if ((period < 2U) || (top == 0U))
+    {
+        return 0U;
+    }
+    const uint32_t half = period / 2U;
+    step %= period;
+    const uint32_t x = (step < half) ? step : (period - step);    /* triangle 0..half..0 */  // «1»
+    /* (x / half)^2 * top in integers; 64-bit intermediate so top * half^2 cannot overflow */
+    return (uint32_t)(((uint64_t)top * x * x) / ((uint64_t)half * half));                  // «2»
+}
+</script>
+          <div id="ex-breath"></div>
+        </section>
+
+        <section class="doc-section" id="pwm-wave" data-title="Interactive PWM waveform">
+          <div class="sec-head"><h2><span class="sec-num">7.4</span>Interactive PWM waveform</h2></div>
+          <p>Move the sliders: the counter (sawtooth) climbs to ARR and wraps; the output OC is high while the counter is below CCR (the dashed line).</p>
+          <div id="wv-pwm"></div>
+          <div class="wv-controls">
+            <label for="pwm-ccr">CCR <input id="pwm-ccr" type="range" min="0" max="1000" value="250"></label>
+            <label for="pwm-arr">ARR <select id="pwm-arr"><option>99</option><option selected>999</option><option>4999</option></select></label>
+            <span id="pwm-out" class="mono small"></span>
+          </div>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Why preload matters</span><p>With <code>OC1PE</code> and <code>ARPE</code> set, new CCR and ARR values wait in a shadow register until the next update event. Without preload, writing a smaller CCR just after the counter passed it would leave the output high for a whole extra period: a visible glitch on a dimmed LED or a jolt on a motor.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="capture" data-title="Input capture">
+          <div class="sec-head"><h2><span class="sec-num">7.5</span>Input capture</h2></div>
+          <p>In <b>input capture</b>, an edge on a timer input copies the running counter into CCRx. The difference between two captures is a period in timer ticks. The F1 timers have a <b>PWM input mode</b> that measures period and high time in one go: channel 1 captures on the rising edge, channel 2 on the falling edge of the same pin, and the slave controller resets the counter on each rising edge (RM0008 §15.3.6).</p>
+          <script type="text/plain" id="src-03-capture" data-src="examples/03-tim-pwm-dimming/src/main.c" data-region="capture" data-lang="c" data-file="examples/03-tim-pwm-dimming/src/main.c" data-start="43" data-end="57" data-sha="aeaa978b483f">
+/* TIM2 PWM-input mode on PA0 (TI1): CCR1 captures the period, CCR2 the high time.
+ * RM0008 §15.3.6. The counter is reset on every rising edge by the slave-mode controller. */
+static void capture_init(void)
+{
+    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+    GPIOA->CRL = (GPIOA->CRL & ~(GPIO_CRL_MODE0 | GPIO_CRL_CNF0)) | GPIO_CRL_CNF0_0;  /* floating input */
+    TIM2->PSC = (uint16_t)((2U * clock_pclk1() / 1000000U) - 1U);  /* 1 µs per count */
+    TIM2->ARR = 0xFFFFU;
+    TIM2->CCMR1 = (1U << TIM_CCMR1_CC1S_Pos)      /* IC1 <- TI1 (rising edge) */            // «9»
+                | (2U << TIM_CCMR1_CC2S_Pos);     /* IC2 <- TI1 too (falling edge) */
+    TIM2->CCER = TIM_CCER_CC1E | TIM_CCER_CC2E | TIM_CCER_CC2P;                             // «10»
+    TIM2->SMCR = (5U << TIM_SMCR_TS_Pos)          /* trigger: filtered TI1 */                // «11»
+               | (4U << TIM_SMCR_SMS_Pos);        /* reset mode: CNT = 0 on each trigger */
+    TIM2->CR1 = TIM_CR1_CEN;
+}
+</script>
+          <div id="ex-capture"></div>
+          <p>With a wire from PA6 to PA0, example 03 measures its own PWM signal:</p>
+          <script type="text/plain" data-code data-src="examples/03-tim-pwm-dimming/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="5" data-sha="9be2ee2768b4">
+Example 03: TIM3 PWM on PA6, TIM2 capture on PA0
+clock status: 0
+duty 250/1000; capture: 1000 us period, 240 us high
+duty 1000/1000; capture: 1000 us period, 980 us high
+duty 250/1000; capture: 1000 us period, 260 us high
+</script>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 03)</span><p>✅ Timer registers, the duty sequence and the UART report are tested in Renode. ⚠️ Renode drives no PWM waveform onto the pin and generates no capture edges, so the capture reads "no edges" in simulation. ❌ LED brightness is not simulated; not tested on a Blue Pill yet.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="remap" data-title="Timer pins and remaps">
+          <div class="sec-head"><h2><span class="sec-num">7.6</span>Timer pins and remaps</h2></div>
+          <p>Timer channels come out on fixed pins, and AFIO remaps move some of them (RM0008 §9.3.7). The Blue Pill pinout shows them: search for <code>TIM3</code> or <code>TIM2</code>.</p>
+          <div id="po-tim"></div>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Timer</th><th>Default pins (CH1–CH4)</th><th>Partial remap</th></tr></thead>
+            <tbody>
+              <tr><td>TIM2</td><td>PA0, PA1, PA2, PA3</td><td>PA15, PB3 (CH1, CH2) or PB10, PB11 (CH3, CH4)</td></tr>
+              <tr><td>TIM3</td><td>PA6, PA7, PB0, PB1</td><td>PB4, PB5 (CH1, CH2)</td></tr>
+              <tr><td>TIM4</td><td>PB6, PB7, PB8, PB9</td><td>(full remap to port D only)</td></tr>
+              <tr><td>TIM1</td><td>PA8, PA9, PA10, PA11</td><td>(port E only)</td></tr>
+            </tbody>
+          </table></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Pin conflicts</span><p>PA9/PA10 are both TIM1 CH2/CH3 and USART1 TX/RX; PA11/PA12 are TIM1 CH4/ETR, USB and CAN. Remaps of TIM2 and TIM3 onto PA15, PB3 and PB4 also need <code>SWJ_CFG = JTAGDISABLE</code> first (<a href="gpio.html#swj">module 05</a>).</p></div></div>
+          <div id="ck-timers"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/calc.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/timers.js?v=__BUILD__"></script>
+</body>
+</html>

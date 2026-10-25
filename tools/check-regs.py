@@ -27,6 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 HEADER = ROOT / "third_party/cmsis_device_f1/Include/stm32f103xb.h"
+CORE_HEADER = ROOT / "third_party/cmsis_core/Include/core_cm3.h"   # SCB, SysTick, NVIC
 DATA = ROOT / "site/assets/js/data/regs-stm32f103.js"
 SIZES = {"uint32_t": 4, "uint16_t": 2, "uint8_t": 1}
 
@@ -36,7 +37,7 @@ class Header:
         text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
         self.defines = dict(re.findall(r"^\s*#define\s+(\w+)\s+(.+?)\s*$", text, re.M))
         self.structs = {}
-        for body, name in re.findall(r"typedef\s+struct\s*\{(.*?)\}\s*(\w+)_TypeDef\s*;", text, re.S):
+        for body, name in re.findall(r"typedef\s+struct\s*\{([^{}]*?)\}\s*(\w+?)_Type(?:Def)?\s*;", text, re.S):
             off, members = 0, {}
             for typ, mname, arr in re.findall(r"(?:__IO|__I|__O|volatile|const|\s)*\b(uint32_t|uint16_t|uint8_t)\s+(\w+)\s*(?:\[\s*(\w+)\s*\])?\s*;", body):
                 n = int(self.value(arr)) if arr else 1
@@ -115,16 +116,22 @@ def check_data(h, regs):
                 bad.append(f"{key}: addr 0x{r.get('addr', 0):08X} != header 0x{want:08X}")
             prefix = r.get("macro", f"{typedef}_{reg}")
             for f in r.get("fields", []):
+                if f.get("reserved"):
+                    continue
                 hi_lo = h.field(prefix, f.get("cmsis", f["name"]))
                 if tuple(f["bits"]) != hi_lo:
                     bad.append(f"{key}.{f['name']}: bits {f['bits']} != header {list(hi_lo)}")
+                # every named value macro the viewer prints must expand to (value << field position)
+                for v, macro in (f.get("macros") or {}).items():
+                    if h.value(macro) != (int(v) << hi_lo[1]):
+                        bad.append(f"{key}.{f['name']}: {macro} = 0x{h.value(macro):X}, expected {v} << {hi_lo[1]}")
         except (KeyError, ValueError) as e:
             bad.append(f"{key}: {e}")
     return bad
 
 
 def main():
-    h = Header(HEADER.read_text(encoding="utf-8"))
+    h = Header(HEADER.read_text(encoding="utf-8") + "\n" + CORE_HEADER.read_text(encoding="utf-8"))
     errors, n = selftest(h)
     checked = 0
     if "--selftest" not in sys.argv and DATA.is_file():

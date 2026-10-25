@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diagnostics (DCM/DEM, UDS) and NvM — MCU Academy</title>
+  <meta name="description" content="UDS services, DTCs and event debouncing in DEM, the DCM request path, and storing data with NvM over Fee on the F1 flash.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="autosar-diag-nvm">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 22</span><span>/</span><span>Diagnostics &amp; NvM</span></nav>
+          <div class="eyebrow">Module 22 · AUTOSAR Classic</div>
+          <h1>Diagnostics (DCM/DEM, UDS) and NvM</h1>
+          <p class="lead">When a lamp fails in the field, someone in a workshop plugs in a tester and asks the car what went wrong. This module covers that conversation: UDS, the diagnostic protocol; DEM, which turns monitor results into trouble codes; DCM, which answers the tester; ISO-TP, which carries long messages over 8-byte CAN frames; and NvM over Fee, which keeps the codes when the power is off.</p>
+          <div class="page-meta"><span>⏱ 50 min read</span><span>🎯 Advanced</span><span>📂 autosar/services/dem, stage3-autosar</span></div>
+        </header>
+
+        <section class="doc-section" id="uds" data-title="UDS in one page">
+          <div class="sec-head"><h2><span class="sec-num">22.1</span>UDS in one page</h2></div>
+          <div class="callout warn"><div class="ci">🔎</div><div><span class="ct">Verification status</span><p>Every API, type and rule on this page names its AUTOSAR R25-11 document. The requirement IDs and exact values are still being checked against the R25-11 PDFs; until then they come from the R4.x-era specifications, and no requirement ID is quoted, because the course never makes one up. Progress is tracked in <a href="https://github.com/Thuongst97/MCU-Programming/blob/main/docs/autosar-self-review.md">the self-review log</a>.</p></div></div>
+          <p><b>UDS</b> (Unified Diagnostic Services, ISO 14229-1) is a request/response protocol between a tester and an ECU. Each request starts with a service ID (SID); a positive response echoes SID + <code>0x40</code>, a negative one is <code>0x7F</code>, the SID and a negative response code (NRC). The services you meet first:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>SID</th><th>Service</th><th>Example</th></tr></thead>
+            <tbody>
+              <tr><td><code>0x10</code></td><td>DiagnosticSessionControl</td><td><code>10 03</code>: extended session</td></tr>
+              <tr><td><code>0x22</code></td><td>ReadDataByIdentifier</td><td><code>22 F1 90</code>: read the VIN (DID <code>0xF190</code>)</td></tr>
+              <tr><td><code>0x2E</code></td><td>WriteDataByIdentifier</td><td>write a configuration value</td></tr>
+              <tr><td><code>0x19</code></td><td>ReadDTCInformation</td><td><code>19 02 09</code>: DTCs whose status matches mask <code>0x09</code></td></tr>
+              <tr><td><code>0x14</code></td><td>ClearDiagnosticInformation</td><td><code>14 FF FF FF</code>: clear all</td></tr>
+              <tr><td><code>0x3E</code></td><td>TesterPresent</td><td>keeps a non-default session alive</td></tr>
+            </tbody>
+          </table></div>
+          <p>Step through a tester asking the TurnLight ECU for its stored faults (the DTC numbers in the course are hypothetical):</p>
+          <div id="seq-uds"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>DEM is the car's diary of complaints: every monitor writes what it saw, and the diary decides what counts as a real problem. DCM is the receptionist who answers the workshop's questions by reading from the diary.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="dem" data-title="DEM: events and DTCs">
+          <div class="sec-head"><h2><span class="sec-num">22.2</span>DEM: events and DTCs</h2></div>
+          <p><b>Monitors</b> (here LampMonitor and TurnLight) test something and report <code>PASSED</code> or <code>FAILED</code>, or <code>PREPASSED</code>/<code>PREFAILED</code> when Dem should debounce. Dem keeps, for every event, the UDS <b>status byte</b>. Click the bits to read their meaning:</p>
+          <div id="dtc-bits" class="dtcb-host glass"></div>
+          <script type="text/plain" id="src-dem-set" data-src="autosar/services/dem/Dem.c" data-region="set" data-lang="c" data-file="autosar/services/dem/Dem.c" data-start="41" data-end="97" data-sha="fa8b1a05db4c">
+FUNC(Std_ReturnType, DEM_CODE) Dem_SetEventStatus(Dem_EventIdType EventId, Dem_EventStatusType EventStatus)
+{
+    if (Dem_ConfigPtr == NULL_PTR)
+    {
+        DEM_DET(DEM_SETEVENTSTATUS_SID, DEM_E_UNINIT);
+        return E_NOT_OK;
+    }
+    if ((EventId == 0U) || (EventId > Dem_ConfigPtr->numEvents) || (EventStatus > DEM_EVENT_STATUS_PREFAILED))
+    {
+        DEM_DET(DEM_SETEVENTSTATUS_SID, DEM_E_PARAM_DATA);
+        return E_NOT_OK;
+    }
+    const uint16 i = (uint16)(EventId - 1U);
+    P2CONST(Dem_EventParameterType, AUTOMATIC, DEM_APPL_CONST) p = &Dem_ConfigPtr->events[i];
+    SchM_Enter_Dem_DEM_EXCLUSIVE_AREA_0();
+    sint16 c = Dem_Counter[i];
+    switch (EventStatus)                                               /* counter-based debouncing */   // «1»
+    {
+    case DEM_EVENT_STATUS_PREFAILED:
+        c = ((c + p->stepUp) > p->failThreshold) ? p->failThreshold : (sint16)(c + p->stepUp);
+        break;
+    case DEM_EVENT_STATUS_PREPASSED:
+        c = ((c - p->stepDown) < p->passThreshold) ? p->passThreshold : (sint16)(c - p->stepDown);
+        break;
+    case DEM_EVENT_STATUS_FAILED:
+        c = p->failThreshold;                                          /* qualified at once */   // «2»
+        break;
+    default:
+        c = p->passThreshold;
+        break;
+    }
+    Dem_Counter[i] = c;
+    const Dem_UdsStatusByteType old = Dem_Status[i];
+    Dem_UdsStatusByteType st = old;
+    if (c >= p->failThreshold)   // «3»
+    {
+        st |= DEM_UDS_STATUS_TF | DEM_UDS_STATUS_TFTOC | DEM_UDS_STATUS_PDTC | DEM_UDS_STATUS_CDTC |
+              DEM_UDS_STATUS_TFSLC;                                    /* confirmed at the first failure */
+        st &= (Dem_UdsStatusByteType)~(DEM_UDS_STATUS_TNCSLC | DEM_UDS_STATUS_TNCTOC);
+    }
+    else if (c <= p->passThreshold)
+    {
+        st &= (Dem_UdsStatusByteType)~DEM_UDS_STATUS_TF;               /* the rest stays as history */   // «4»
+        st &= (Dem_UdsStatusByteType)~(DEM_UDS_STATUS_TNCSLC | DEM_UDS_STATUS_TNCTOC);
+    }
+    else
+    {
+        /* still debouncing: no new result */
+    }
+    Dem_Status[i] = st;
+    SchM_Exit_Dem_DEM_EXCLUSIVE_AREA_0();
+    if ((st != old) && (Dem_ConfigPtr->statusChanged != NULL_PTR))
+    {
+        Dem_ConfigPtr->statusChanged(EventId, old, st);   // «5»
+    }
+    return E_OK;
+}
+</script>
+          <div id="ex-dem-set"></div>
+          <p>A status change reaches the integration through a configured callback; the capstone prints it, which is how the Renode tests see <code>dem: TL_E_LAMP_OUT_R failed</code>:</p>
+          <script type="text/plain" id="src-dem-cb" data-src="capstone/turnlight/stage3-autosar/integration/main.c" data-region="callouts" data-lang="c" data-file="capstone/turnlight/stage3-autosar/integration/main.c" data-start="89" data-end="139" data-sha="3bfbe1f6131d">
+boolean Integration_TurnLightStatusTxCallout(PduIdType id, PduInfoType *pdu)
+{
+    static uint8 alive;
+    (void)id;
+    alive++;
+    pdu->SduDataPtr[2] = alive;                          /* byte 2: alive counter, every frame */
+    return TRUE;                                         /* TRUE: send it */
+}
+
+void Integration_DemStatusChanged(uint16 EventId, uint8 oldStatus, uint8 newStatus)
+{
+    if (((oldStatus ^ newStatus) & DEM_UDS_STATUS_TF) != 0U)    /* testFailed changed */   // «3»
+    {
+        uart_puts("dem: ");
+        uart_puts(Dem_Config.events[EventId - 1U].name);
+        uart_puts(((newStatus & DEM_UDS_STATUS_TF) != 0U) ? " failed\n" : " passed\n");
+    }
+}
+
+static void Integration_LogLamp(char side, boolean on, boolean *prev)
+{
+    if (on != *prev)
+    {
+        *prev = on;
+        uart_puts("lamp ");
+        uart_putc(side);
+        uart_puts((on == TRUE) ? " 1\n" : " 0\n");
+    }
+}
+
+void Rte_WriteHook_TurnLight_LampState_Left_Start(boolean data)
+{
+    static boolean prev;
+    Integration_LogLamp('L', data, &prev);
+}
+
+void Rte_WriteHook_TurnLight_LampState_Right_Start(boolean data)
+{
+    static boolean prev;
+    Integration_LogLamp('R', data, &prev);
+}
+
+void Rte_WriteHook_TurnLight_TurnStatus_Hazard_Start(boolean data)
+{
+    static boolean prev;
+    if (data != prev)
+    {
+        prev = data;
+        uart_puts((data == TRUE) ? "tl: hazard on\n" : "tl: hazard off\n");
+    }
+}
+</script>
+          <div id="ex-dem-cb"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Debounce before you blame</span><p>A monitor that reports <code>FAILED</code> on one bad sample turns every electrical spike into a stored fault and a warranty claim. Report <code>PREFAILED</code> per sample and let Dem count (counter-based) or time (time-based) until the fault is qualified. LampMonitor already judges once per on-phase, so it reports qualified results.</p></div></div>
+          <div class="callout prod" data-doc="AUTOSAR_SWS_DiagnosticEventManager R4.2.2"><div class="ci">🏭</div><div><span class="ct">In production (R4.x)</span><p>Older stacks read an event's status with <code>Dem_GetEventStatus</code>; R4.4 introduced <code>Dem_GetEventUdsStatus</code>. Monitors in R4.x projects may also use <code>Dem_ReportErrorStatus</code> for BSW events before Dem is fully initialised.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="dcm" data-title="DCM: request to response">
+          <div class="sec-head"><h2><span class="sec-num">22.3</span>DCM: request to response</h2></div>
+          <p><b>DCM</b> (AUTOSAR_CP_SWS_DiagnosticCommunicationManager) is the ECU's UDS server. It has three sub-layers:</p>
+          <ul>
+            <li><b>DSL</b> (session layer): sessions, timing (P2/P2* server response times), TesterPresent, which connection the request came on.</li>
+            <li><b>DSD</b> (service dispatcher): is this SID supported in this session and security level? If not, NRC <code>0x11</code> or <code>0x7F</code>.</li>
+            <li><b>DSP</b> (service processing): the implementation of each service, calling Dem for DTCs, SWCs (through RTE ports) for DIDs, NvM for stored data.</li>
+          </ul>
+          <p>The capstone stops at Dem: DCM-lite and NvM were planned as a stretch goal and are covered here as concepts. The sequence above shows where they would sit.</p>
+        </section>
+
+        <section class="doc-section" id="iso-tp" data-title="Transport: ISO-TP on CAN">
+          <div class="sec-head"><h2><span class="sec-num">22.4</span>Transport: ISO-TP on CAN</h2></div>
+          <p>A UDS response can be far longer than a CAN frame's 8 bytes. <b>ISO-TP</b> (ISO 15765-2, the CanTp module in AUTOSAR) splits it:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Frame</th><th>First nibble (PCI)</th><th>Use</th></tr></thead>
+            <tbody>
+              <tr><td>Single frame (SF)</td><td><code>0</code> + length</td><td>up to 7 data bytes</td></tr>
+              <tr><td>First frame (FF)</td><td><code>1</code> + 12-bit length</td><td>start of a longer message, 6 data bytes</td></tr>
+              <tr><td>Consecutive frame (CF)</td><td><code>2</code> + sequence number</td><td>7 data bytes each, numbered 1, 2 … 15, 0 …</td></tr>
+              <tr><td>Flow control (FC)</td><td><code>3</code> + status</td><td>receiver's reply to an FF: block size and minimum gap</td></tr>
+            </tbody>
+          </table></div>
+          <p>Enter a message length and see how it is cut into frames:</p>
+          <div id="isotp" class="calc-host glass"></div>
+        </section>
+
+        <section class="doc-section" id="nvm" data-title="NvM, MemIf, Fee, Fls">
+          <div class="sec-head"><h2><span class="sec-num">22.5</span>NvM, MemIf, Fee, Fls</h2></div>
+          <p>Stored DTCs, odometer copies and learned values must survive power-off. AUTOSAR stacks that path in four modules: <b>NvM</b> (blocks with RAM mirrors, CRCs and redundancy) → <b>MemIf</b> (which device) → <b>Fee</b> (Flash EEPROM Emulation) → <b>Fls</b> (the flash driver, the same erase/program work as module 16).</p>
+          <p>Flash can only be erased in pages, and each page survives about 10 000 erase cycles (DS5319). Fee therefore never rewrites in place: it appends new versions of a block to the active page and, when the page is full, copies the latest version of every block to the other page, then erases the old one. Walk through the cycle with two 1 KB pages:</p>
+          <div id="sm-fee"></div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">Power loss in the middle</span><p>Every step of the cycle must leave a recoverable state: page status markers are written in a fixed order, and at start-up Fee scans both pages to decide which one holds valid data. This is the same reasoning as the bootloader's image record in module 16, applied to data.</p></div></div>
+          <div id="ck-diag"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/autosar-diag-nvm.js?v=__BUILD__"></script>
+</body>
+</html>

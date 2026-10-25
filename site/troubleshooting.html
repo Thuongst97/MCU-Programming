@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Troubleshooting — MCU Academy</title>
+  <meta name="description" content="Symptom-first fixes: no ST-Link, wrong IDCODE, cannot halt, inverted LED, garbage UART, flash size mismatch and more.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="troubleshooting">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Reference B</span><span>/</span><span>Troubleshooting</span></nav>
+          <div class="eyebrow">Reference B · Reference</div>
+          <h1>Troubleshooting</h1>
+          <p class="lead">Start from what you see. Each entry lists the likely causes in the order worth checking, and the fix. Most problems are wiring, power or a setting in the debugger configuration.</p>
+          <div class="page-meta"><span>⏱ Reference</span><span>🎯 All levels</span><span>🔎 Symptom first</span></div>
+        </header>
+
+        <section class="doc-section" id="no-stlink" data-title="No ST-Link detected">
+          <div class="sec-head"><h2><span class="sec-num">B.1</span>No ST-Link detected</h2></div>
+          <p><b>You see:</b> <code>Error: open failed</code>, <code>LIBUSB_ERROR_ACCESS</code>, or <code>No ST-Link detected</code>.</p>
+          <ol>
+            <li><b>Is the probe on the bus at all?</b> Linux: <code>lsusb</code> should list <code>0483:3748</code> (STMicroelectronics ST-LINK/V2). Windows: Device Manager should show it under <i>Universal Serial Bus devices</i>. If not, try another cable or port: charge-only cables are common.</li>
+            <li><b>Linux permissions.</b> The <code>openocd</code> package installs udev rules that give the logged-in user access. Reload them and replug the probe:
+              <script type="text/plain" data-code data-lang="console">$ sudo udevadm control --reload-rules && sudo udevadm trigger</script></li>
+            <li><b>Windows driver.</b> Install ST's ST-Link driver package (STSW-LINK009) and replug. If another tool replaced the driver, reinstall ST's.</li>
+            <li><b>Another program holds the probe.</b> Only one tool can own the ST-Link: close STM32CubeIDE, CubeProgrammer or a running OpenOCD.</li>
+          </ol>
+        </section>
+
+        <section class="doc-section" id="idcode" data-title="UNEXPECTED idcode on clone chips">
+          <div class="sec-head"><h2><span class="sec-num">B.2</span>UNEXPECTED idcode on clone chips</h2></div>
+          <p><b>You see:</b> <code>UNEXPECTED idcode: 0x2ba01477</code> and <code>expected 1 of 1: 0x1ba01477</code>.</p>
+          <p>The probe works and the chip answers. It is just not an ST chip: many Blue Pills carry a compatible clone (CKS32, CS32, APM32) whose debug port reports a different ID. OpenOCD's STM32F1 script checks the ID and stops. Tell it what to expect with the clone configuration, which sets <code>CPUTAPID</code> and then loads the normal one:</p>
+          <script type="text/plain" data-code data-src="examples/common/openocd/bluepill-clone.cfg" data-lang="tcl" data-file="examples/common/openocd/bluepill-clone.cfg" data-start="1" data-end="5" data-sha="6ead01701d45">
+# SPDX-License-Identifier: MIT
+# Same as bluepill.cfg, for clone MCUs (CKS32F103, CS32F103) whose SW-DP reports IDCODE 0x2ba01477
+# instead of the genuine STM32F1 value 0x1ba01477. Never edit OpenOCD's installed scripts for this.
+set CPUTAPID 0x2ba01477
+source [file join [file dirname [info script]] bluepill.cfg]
+</script>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Don't edit OpenOCD's installed scripts</span><p>Editing <code>target/stm32f1x.cfg</code> fixes it on your machine only and is undone by the next update. Keep the difference in the project: <code>bluepill-clone.cfg</code>, and the matching entry in <code>.vscode/launch.json</code>.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="cannot-halt" data-title="Cannot halt target / SWD locked out">
+          <div class="sec-head"><h2><span class="sec-num">B.3</span>Cannot halt target / SWD locked out</h2></div>
+          <p><b>You see:</b> the first flash worked, but now <code>Error: init mode failed (unable to connect to the target)</code> or <code>timed out while waiting for target halted</code>.</p>
+          <p>The probe can only talk to the chip while PA13/PA14 are debug pins and the core is awake. Your program probably took that away right after reset: it wrote <code>SWJ_CFG = DISABLE</code>, reconfigured PA13/PA14 as GPIO, entered Stop/Standby mode immediately, or crashed into a loop with the clocks misconfigured.</p>
+          <div id="reg-mapr-ts"></div>
+          <h3>Fix 1: boot into the system bootloader (always works)</h3>
+          <ol>
+            <li>Set the <b>BOOT0 jumper to 1</b> and press reset. The chip now runs ST's ROM bootloader instead of your program, so SWD stays free.</li>
+            <li>Connect and erase everything:
+              <script type="text/plain" data-code data-lang="console">$ openocd -f examples/common/openocd/bluepill.cfg -c "init; reset halt; stm32f1x mass_erase 0; exit"</script></li>
+            <li>Set <b>BOOT0 back to 0</b>, fix the program, flash again.</li>
+          </ol>
+          <h3>Fix 2: connect under reset</h3>
+          <p>If the ST-Link's RST pin is wired to the Blue Pill's <code>R</code> pin, OpenOCD can hold the chip in reset while it connects, before your program runs:</p>
+          <script type="text/plain" data-code data-lang="console">$ openocd -f examples/common/openocd/bluepill.cfg -c "reset_config srst_only srst_nogate connect_assert_srst" -c "init; reset halt"</script>
+          <p>On some ST-Link clones the RST pin does not drive NRST; check yours. Without the wire, holding the reset button, starting the command and releasing the button a moment later often works too.</p>
+        </section>
+
+        <section class="doc-section" id="led" data-title="LED inverted or dim">
+          <div class="sec-head"><h2><span class="sec-num">B.4</span>LED inverted or dim</h2></div>
+          <p><b>You see:</b> the LED is on when your code says "off", or it glows dimly.</p>
+          <ul>
+            <li><b>Inverted:</b> expected. The on-board LED lights when PC13 is <b>low</b>. Write <code>GPIO_BSRR_BR13</code> to turn it on and <code>GPIO_BSRR_BS13</code> to turn it off.</li>
+            <li><b>Dim:</b> PC13 is probably still an input with its pull-up or pull-down, so only a tiny current flows. Check that <code>MODE13</code> in <code>GPIOC_CRH</code> is not <code>00</code>:</li>
+          </ul>
+          <div id="reg-crh-ts"></div>
+          <ul>
+            <li><b>Never lights:</b> the port clock is off (<code>RCC_APB2ENR.IOPCEN</code>), or the code configures CRL instead of CRH (pins 8–15 are in CRH).</li>
+          </ul>
+        </section>
+
+        <section class="doc-section" id="uart-garbage" data-title="Garbage on the UART">
+          <div class="sec-head"><h2><span class="sec-num">B.5</span>Garbage on the UART</h2></div>
+          <p><b>You see:</b> random characters, or text only before or after a certain point.</p>
+          <ol>
+            <li><b>Baud rate:</b> the terminal and the firmware must both use 115200 8N1, with no flow control.</li>
+            <li><b>The clock the firmware assumed:</b> <code>BRR</code> is computed from the peripheral clock. If the code assumes 72 MHz but the switch failed (the chip still runs at 8 MHz), every bit is 9 times too long. Print the clock status, as example 00 does.</li>
+            <li><b>APB1 vs APB2:</b> USART1 is on APB2; USART2 and USART3 are on APB1, which runs at half speed at 72 MHz. Using the wrong bus clock halves or doubles the baud rate.</li>
+            <li><b>Wiring:</b> TX → RX, RX → TX, and a common ground. Without GND the signal has no reference and turns into noise.</li>
+          </ol>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Measure, don't guess</span><p>Send <code>U</code> (0x55) in a loop: on a logic analyser it is a clean square wave whose bit time tells you the real baud rate.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="flash-size" data-title="Flash size mismatch">
+          <div class="sec-head"><h2><span class="sec-num">B.6</span>Flash size mismatch</h2></div>
+          <p><b>You see:</b> OpenOCD reports 128 KB on a "64 KB" chip, or a program that grew past 64 KB behaves strangely.</p>
+          <p>Many C8 chips report 128 KB in their flash size register at <code>0x1FFFF7E0</code> (RM0008 §30). OpenOCD's stock Blue Pill board file assumes 128 KB as well. The course's <code>bluepill.cfg</code> sets <code>FLASH_SIZE 0x10000</code> before loading the target, and the linker script declares 64 KB, so a program that does not fit fails at link time with <code>region `FLASH' overflowed</code>. Don't "fix" that by declaring 128 KB: the upper half is not guaranteed. Shrink the program (<code>bluepill-release</code> builds with <code>-Os</code>) instead.</p>
+        </section>
+
+        <section class="doc-section" id="hangs-at-clock" data-title="Hangs during clock setup">
+          <div class="sec-head"><h2><span class="sec-num">B.7</span>Hangs during clock setup</h2></div>
+          <p><b>You see:</b> the program never gets past clock setup, or reports a non-zero clock status.</p>
+          <ul>
+            <li><b>No crystal oscillation:</b> a cracked or missing 8 MHz crystal never sets <code>HSERDY</code>. Code without a timeout hangs forever; the course's code gives up and stays on HSI. Route SYSCLK to PA8 with <code>MCO</code> to check it with a scope.</li>
+            <li><b>PLL never locks or the switch never happens:</b> the PLL output must stay within the limits in DS5319, and <code>PLLMUL</code>/<code>PLLSRC</code> may only change while the PLL is off.</li>
+            <li><b>In Renode:</b> the stock STM32F103 platform does not model the clock controller's status bits, so code waits for <code>SWS</code> in vain (our firmware times out with status 3). Use the course's <code>bluepill.repl</code>, which does.</li>
+          </ul>
+        </section>
+
+        <section class="doc-section" id="usb" data-title="USB not enumerating">
+          <div class="sec-head"><h2><span class="sec-num">B.8</span>USB not enumerating</h2></div>
+          <p><b>You see:</b> the PC does not detect the Blue Pill as a USB device, or only sometimes.</p>
+          <p>A full-speed USB device announces itself with a 1.5 kΩ pull-up on D+ (PA12). Many Blue Pills fit 10 kΩ (R10) instead, which some hosts tolerate and others ignore, on most boards; check yours. The common fix is an extra resistor of about 1.8 kΩ from PA12 to 3.3 V, giving roughly 1.5 kΩ in parallel. USB examples are not part of this course; remember that USB and CAN cannot run at the same time on this chip.</p>
+        </section>
+
+        <section class="doc-section" id="can-silent" data-title="CAN sends nothing">
+          <div class="sec-head"><h2><span class="sec-num">B.9</span>CAN sends nothing</h2></div>
+          <p><b>You see:</b> nothing on the bus, the transmit mailbox never empties, or the error counters climb.</p>
+          <ol>
+            <li><b>No other node:</b> every CAN frame must be acknowledged by at least one other node. Alone on a bus, the controller resends forever and its transmit error counter rises. Test alone with <b>loopback + silent</b> mode (<code>CAN_BTR.LBKM</code> and <code>SILM</code>) first.</li>
+            <li><b>Stuck in initialization mode:</b> bxCAN leaves initialization only after it sees 11 recessive bits on CAN_RX. A floating or shorted RX pin (no transceiver, wrong pin) keeps it there.</li>
+            <li><b>Wrong pins:</b> on the Blue Pill, CAN is remapped to PB8/PB9 with <code>AFIO_MAPR.CAN_REMAP = 10</code> so that PA11/PA12 stay free.</li>
+            <li><b>Physical layer:</b> both boards need a transceiver (SN65HVD230 at 3.3 V), a twisted pair, a common ground and 120 Ω at each end of the bus.</li>
+            <li><b>Bit timing:</b> both nodes must agree on the bit rate and use a similar sample point. <a href="can.html#bit-timing">Module 12</a> has a calculator.</li>
+          </ol>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/troubleshooting.js?v=__BUILD__"></script>
+</body>
+</html>

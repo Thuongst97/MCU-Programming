@@ -23,7 +23,7 @@
      shown greyed out with their roadmap phase (PLAN.md §11) and never linked. */
   const SITE = [
     /* ───────────── Group: Start here ───────────── */
-    { id: "fundamentals", status: "planned", phase: 3, file: "fundamentals.html", num: "01", group: "Start here",
+    { id: "fundamentals", status: "ready", phase: 3, file: "fundamentals.html", num: "01", group: "Start here",
       title: "What Is a Microcontroller?", short: "MCU Fundamentals", icon: "🧠", accent: "#e8a36b",
       desc: "MCU vs MPU, the Cortex-M3 core, buses, memory map, registers and how C becomes bits on a pin.",
       sections: [
@@ -35,7 +35,7 @@
         ["toolchain", "From C to flash", "compiler assembler linker elf hex bin objcopy arm-none-eabi-gcc"],
         ["takeaways", "Key takeaways", "summary"],
       ] },
-    { id: "setup", status: "planned", phase: 2, file: "setup.html", num: "02", group: "Start here",
+    { id: "setup", status: "ready", phase: 2, file: "setup.html", num: "02", group: "Start here",
       title: "Setting Up and Running a Program on STM32F103C8T6 Blue Pill", short: "Setup & First Program", icon: "🔌", accent: "#3fb68b",
       desc: "Wire an ST-Link, install the toolchain on Windows/Linux/macOS, build two ways, blink PC13, switch to 72 MHz, print over UART, debug, and run it in Renode.",
       sections: [
@@ -57,7 +57,7 @@
       ] },
   
     /* ───────────── Group: From reset to main ───────────── */
-    { id: "boot", status: "planned", phase: 3, file: "boot.html", num: "03", group: "From reset to main",
+    { id: "boot", status: "ready", phase: 3, file: "boot.html", num: "03", group: "From reset to main",
       title: "Startup Code, Vector Table & Linker Scripts", short: "Startup & Linker", icon: "🚀", accent: "#e8a36b",
       desc: "What happens between reset and main(): boot modes, vector table, .data/.bss init, linker script sections and map files.",
       sections: [
@@ -70,7 +70,7 @@
         ["c-vs-asm", "Startup in C vs ST's assembly", "startup_stm32f103xb.s c startup comparison"],
         ["pitfalls", "Pitfalls", "64k vs 128k estack alignment 8-byte aapcs"],
       ] },
-    { id: "clocks", status: "planned", phase: 3, file: "clocks.html", num: "04", group: "From reset to main",
+    { id: "clocks", status: "ready", phase: 3, file: "clocks.html", num: "04", group: "From reset to main",
       title: "Clocks: RCC, HSE, PLL and Flash Wait States", short: "Clock Tree", icon: "⏱️", accent: "#fbbf24",
       desc: "The STM32F1 clock tree end to end, why 72 MHz needs two flash wait states, and how every peripheral clock is derived.",
       sections: [
@@ -82,7 +82,7 @@
         ["peripheral-clocks", "Peripheral clock enables", "rcc_apb2enr rcc_apb1enr rcc_ahbenr"],
         ["mco", "Measuring the clock (MCO on PA8)", "mco pa8 oscilloscope"],
       ] },
-    { id: "gpio", status: "planned", phase: 3, file: "gpio.html", num: "05", group: "From reset to main",
+    { id: "gpio", status: "ready", phase: 3, file: "gpio.html", num: "05", group: "From reset to main",
       title: "GPIO and Alternate Functions", short: "GPIO & AFIO", icon: "📍", accent: "#3fb68b",
       desc: "CRL/CRH modes, ODR vs BSRR, pull-ups, 5 V tolerance, AFIO remapping and how not to lock yourself out of SWD.",
       sections: [
@@ -94,7 +94,7 @@
         ["swj", "SWJ_CFG: keeping SWD alive", "swj_cfg jtag disable pa13 pa14 pa15 pb3 pb4 lockout"],
         ["debounce", "Buttons and debouncing", "button bounce debounce pull-up"],
       ] },
-    { id: "interrupts", status: "planned", phase: 3, file: "interrupts.html", num: "06", group: "From reset to main",
+    { id: "interrupts", status: "ready", phase: 3, file: "interrupts.html", num: "06", group: "From reset to main",
       title: "Interrupts, NVIC, EXTI and SysTick", short: "Interrupts & NVIC", icon: "⚡", accent: "#60a5fa",
       desc: "Exception model, NVIC priorities with 4 priority bits, EXTI line mapping, SysTick time base and safe sharing with main().",
       sections: [
@@ -106,7 +106,7 @@
         ["shared-data", "Sharing data with an ISR", "volatile atomic critical section primask race"],
         ["scheduler", "A non-blocking cooperative scheduler", "super loop cooperative scheduler tasks millis"],
       ] },
-    { id: "timers", status: "planned", phase: 3, file: "timers.html", num: "07", group: "From reset to main",
+    { id: "timers", status: "ready", phase: 3, file: "timers.html", num: "07", group: "From reset to main",
       title: "Timers, PWM and Input Capture", short: "Timers & PWM", icon: "〰️", accent: "#a78bfa",
       desc: "General-purpose timers, prescaler/ARR math, PWM output compare, input capture and the APB1 ×2 timer-clock rule.",
       sections: [
@@ -119,7 +119,7 @@
       ] },
   
     /* ───────────── Group: Peripherals ───────────── */
-    { id: "uart", status: "planned", phase: 4, file: "uart.html", num: "08", group: "Peripherals",
+    { id: "uart", status: "ready", phase: 4, file: "uart.html", num: "08", group: "Peripherals",
       title: "USART: Frames, Interrupts and a Command Shell", short: "UART", icon: "💬", accent: "#60a5fa",
       desc: "UART framing, BRR math, interrupt-driven RX/TX with a lock-free ring buffer, and the USART LIN mode.",
       sections: [
@@ -130,7 +130,7 @@
         ["shell", "A tiny command shell", "command line parser shell"],
         ["lin-mode", "LIN mode on the F1 USART", "lin break lbd lbdl linen"],
       ] },
-    { id: "adc-dma", status: "planned", phase: 4, file: "adc-dma.html", num: "09", group: "Peripherals",
+    { id: "adc-dma", status: "ready", phase: 4, file: "adc-dma.html", num: "09", group: "Peripherals",
       title: "ADC and DMA", short: "ADC & DMA", icon: "🎚️", accent: "#e8a36b",
       desc: "12-bit SAR ADC, calibration, sampling time, scan mode, then DMA circular transfers that free the CPU.",
       sections: [
@@ -141,7 +141,7 @@
         ["adc-dma", "Scan + DMA circular", "scan mode dma circular half transfer"],
         ["noise", "Noise, averaging and Vrefint", "oversampling average vrefint temperature sensor"],
       ] },
-    { id: "i2c", status: "planned", phase: 4, file: "i2c.html", num: "10", group: "Peripherals",
+    { id: "i2c", status: "ready", phase: 4, file: "i2c.html", num: "10", group: "Peripherals",
       title: "I2C and an SSD1306 OLED", short: "I2C", icon: "🖥️", accent: "#3fb68b",
       desc: "I2C protocol on the wire, the F1 I2C peripheral and its errata, then drawing on an SSD1306 OLED.",
       sections: [
@@ -151,7 +151,7 @@
         ["errata", "Errata you must know", "busy flag analog filter errata workaround"],
         ["ssd1306", "Driving the SSD1306", "ssd1306 oled framebuffer page addressing"],
       ] },
-    { id: "spi", status: "planned", phase: 4, file: "spi.html", num: "11", group: "Peripherals",
+    { id: "spi", status: "ready", phase: 4, file: "spi.html", num: "11", group: "Peripherals",
       title: "SPI and a W25Qxx Flash", short: "SPI", icon: "🔁", accent: "#a78bfa",
       desc: "SPI modes (CPOL/CPHA), chip select discipline, and reading/writing a W25Qxx NOR flash.",
       sections: [
@@ -161,7 +161,7 @@
         ["w25q", "Talking to a W25Qxx", "jedec id 0x9f read 0x03 page program erase status busy"],
         ["dma-spi", "SPI with DMA", "spi dma"],
       ] },
-    { id: "can", status: "planned", phase: 4, file: "can.html", num: "12", group: "Peripherals",
+    { id: "can", status: "ready", phase: 4, file: "can.html", num: "12", group: "Peripherals",
       title: "CAN with bxCAN (and CAN FD, LIN in Theory)", short: "CAN & LIN", icon: "🚗", accent: "#fbbf24",
       desc: "CAN physical layer, frame format, arbitration, bit timing and filters, two Blue Pills over SN65HVD230, plus CAN FD and LIN concepts.",
       sections: [
@@ -176,7 +176,7 @@
         ["can-fd", "CAN FD in theory", "can fd brs edl 64 byte not supported bxcan"],
         ["lin", "LIN in theory", "lin master slave schedule table break sync pid checksum"],
       ] },
-    { id: "power-wdg", status: "planned", phase: 4, file: "power-wdg.html", num: "13", group: "Peripherals",
+    { id: "power-wdg", status: "ready", phase: 4, file: "power-wdg.html", num: "13", group: "Peripherals",
       title: "Watchdogs, Reset Sources and Low Power", short: "Watchdog & Power", icon: "🔋", accent: "#3fb68b",
       desc: "IWDG vs WWDG, reading reset causes, Sleep/Stop/Standby modes and waking up correctly.",
       sections: [
@@ -190,7 +190,7 @@
       ] },
   
     /* ───────────── Group: Embedded engineering ───────────── */
-    { id: "rtos", status: "planned", phase: 5, file: "rtos.html", num: "14", group: "Embedded engineering",
+    { id: "rtos", status: "ready", phase: 5, file: "rtos.html", num: "14", group: "Embedded engineering",
       title: "Bare Metal vs RTOS: FreeRTOS on Cortex-M3", short: "FreeRTOS", icon: "🧵", accent: "#60a5fa",
       desc: "When a super-loop stops scaling, how a context switch really works (PendSV), and tasks, queues, mutexes and priorities in FreeRTOS.",
       sections: [
@@ -202,7 +202,7 @@
         ["isr-rules", "ISR rules: FromISR APIs", "fromisr portyield_from_isr priority"],
         ["stack", "Stack sizing and overflow detection", "stack high water mark configcheck_for_stack_overflow"],
       ] },
-    { id: "faults-debug", status: "planned", phase: 5, file: "faults-debug.html", num: "15", group: "Embedded engineering",
+    { id: "faults-debug", status: "ready", phase: 5, file: "faults-debug.html", num: "15", group: "Embedded engineering",
       title: "Fault Handling and Debugging", short: "Faults & Debugging", icon: "🐞", accent: "#f87171",
       desc: "HardFault anatomy, decoding CFSR/HFSR/MMFAR/BFAR, a fault handler that logs and survives, and a debugging toolbox.",
       sections: [
@@ -213,7 +213,7 @@
         ["gdb", "GDB and Cortex-Debug techniques", "gdb watchpoint backtrace x/ registers"],
         ["semihosting-swo", "printf: UART, semihosting, SWO", "semihosting swo itm st-link clone limitation"],
       ] },
-    { id: "bootloader", status: "planned", phase: 5, file: "bootloader.html", num: "16", group: "Embedded engineering",
+    { id: "bootloader", status: "ready", phase: 5, file: "bootloader.html", num: "16", group: "Embedded engineering",
       title: "Bootloaders and Flash Programming", short: "Bootloaders", icon: "🧰", accent: "#e8a36b",
       desc: "ST's system bootloader, writing your own UART bootloader, splitting flash, VTOR relocation and safe jump to application.",
       sections: [
@@ -225,7 +225,7 @@
         ["protocol", "A tiny update protocol", "crc32 packet ack nack"],
         ["protection", "Read-out and write protection", "rdp wrp option bytes"],
       ] },
-    { id: "quality", status: "planned", phase: 5, file: "quality.html", num: "17", group: "Embedded engineering",
+    { id: "quality", status: "ready", phase: 5, file: "quality.html", num: "17", group: "Embedded engineering",
       title: "Testing, Static Analysis and MISRA C", short: "Quality & MISRA", icon: "✅", accent: "#3fb68b",
       desc: "Unit tests on the host with Unity, hardware abstraction for testability, cppcheck with the MISRA addon, and what MISRA rules are for.",
       sections: [
@@ -238,7 +238,7 @@
       ] },
   
     /* ───────────── Group: AUTOSAR Classic ───────────── */
-    { id: "autosar-arch", status: "planned", phase: 6, file: "autosar-arch.html", num: "18", group: "AUTOSAR Classic",
+    { id: "autosar-arch", status: "ready", phase: 6, file: "autosar-arch.html", num: "18", group: "AUTOSAR Classic",
       title: "AUTOSAR Classic: Layered Architecture", short: "AUTOSAR Architecture", icon: "🏛️", accent: "#a78bfa",
       desc: "Why AUTOSAR exists, ASW / RTE / BSW / MCAL, the methodology and ARXML, and what is generated vs hand-written in a real project.",
       sections: [
@@ -249,7 +249,7 @@
         ["release", "Releases and documents", "r25-11 sws srs tr document naming"],
         ["on-bluepill", "How we do AUTOSAR on a Blue Pill", "hand-written mcal honest limitations"],
       ] },
-    { id: "autosar-swc", status: "planned", phase: 6, file: "autosar-swc.html", num: "19", group: "AUTOSAR Classic",
+    { id: "autosar-swc", status: "ready", phase: 6, file: "autosar-swc.html", num: "19", group: "AUTOSAR Classic",
       title: "Software Components, Ports and the RTE", short: "SWCs & RTE", icon: "🧩", accent: "#a78bfa",
       desc: "Atomic SWCs, sender-receiver and client-server interfaces, runnables and events, and the RTE API a SWC actually calls.",
       sections: [
@@ -260,7 +260,7 @@
         ["rte-code", "What generated RTE code looks like", "rte_swc.h rte.c contract header"],
         ["mini-gen", "A tiny RTE generator", "rte generator arxml python"],
       ] },
-    { id: "autosar-mcal", status: "planned", phase: 6, file: "autosar-mcal.html", num: "20", group: "AUTOSAR Classic",
+    { id: "autosar-mcal", status: "ready", phase: 6, file: "autosar-mcal.html", num: "20", group: "AUTOSAR Classic",
       title: "Writing MCAL Drivers the AUTOSAR Way", short: "MCAL Conventions", icon: "🔧", accent: "#a78bfa",
       desc: "Std_Types, compiler abstraction, MemMap, config structures, DET error reporting and naming rules, applied to Port, Dio, Pwm, Adc, Gpt, Wdg and Can on the F1.",
       sections: [
@@ -274,7 +274,7 @@
         ["pwm-adc-gpt", "Pwm, Adc and Gpt on the F1", "pwm_setdutycycle adc_startgroupconversion gpt"],
         ["can-wdg", "Can and Wdg on the F1", "can_write can_mainfunction_read wdg_setmode"],
       ] },
-    { id: "autosar-os-com", status: "planned", phase: 6, file: "autosar-os-com.html", num: "21", group: "AUTOSAR Classic",
+    { id: "autosar-os-com", status: "ready", phase: 6, file: "autosar-os-com.html", num: "21", group: "AUTOSAR Classic",
       title: "OS, Scheduling and the COM Stack", short: "OS & COM Stack", icon: "📡", accent: "#a78bfa",
       desc: "OSEK/AUTOSAR OS concepts, mapping runnables to tasks, and a signal's journey through Com, PduR, CanIf and Can.",
       sections: [
@@ -285,7 +285,7 @@
         ["can-matrix", "The CAN matrix", "dbc can matrix signal packing endianness"],
         ["ecum", "EcuM and BswM", "ecum startup shutdown bswm mode"],
       ] },
-    { id: "autosar-diag-nvm", status: "planned", phase: 6, file: "autosar-diag-nvm.html", num: "22", group: "AUTOSAR Classic",
+    { id: "autosar-diag-nvm", status: "ready", phase: 6, file: "autosar-diag-nvm.html", num: "22", group: "AUTOSAR Classic",
       title: "Diagnostics (DCM/DEM, UDS) and NvM", short: "Diagnostics & NvM", icon: "🩺", accent: "#a78bfa",
       desc: "UDS services, DTCs and event debouncing in DEM, the DCM request path, and storing data with NvM over Fee on the F1 flash.",
       sections: [
@@ -295,7 +295,7 @@
         ["iso-tp", "Transport: ISO-TP on CAN", "iso 15765 single frame first frame flow control"],
         ["nvm", "NvM, MemIf, Fee, Fls", "nvm block fee flash emulation wear"],
       ] },
-    { id: "autosar-review", status: "planned", phase: 6, file: "autosar-review.html", num: "23", group: "AUTOSAR Classic",
+    { id: "autosar-review", status: "ready", phase: 6, file: "autosar-review.html", num: "23", group: "AUTOSAR Classic",
       title: "Code That Passes an OEM / Tier-1 Review", short: "Review-Ready Code", icon: "📝", accent: "#f87171",
       desc: "The checklist reviewers actually use: naming, types, MemMap, error handling, MISRA deviations, traceability and the bad-vs-good gallery.",
       sections: [
@@ -306,7 +306,7 @@
       ] },
   
     /* ───────────── Group: Capstone ───────────── */
-    { id: "capstone-baremetal", status: "planned", phase: 7, file: "capstone-baremetal.html", num: "24", group: "Capstone",
+    { id: "capstone-baremetal", status: "ready", phase: 7, file: "capstone-baremetal.html", num: "24", group: "Capstone",
       title: "Capstone 1: Turn-Signal ECU, Bare Metal", short: "Capstone: Bare Metal", icon: "🚦", accent: "#fbbf24",
       desc: "Requirements, state machine and a bare-metal implementation of a turn-signal / hazard ECU talking CAN to a cluster node.",
       sections: [
@@ -316,7 +316,7 @@
         ["implementation", "Implementation walkthrough", "super loop scheduler"],
         ["acceptance", "Acceptance tests", "acceptance test robot renode"],
       ] },
-    { id: "capstone-rtos", status: "planned", phase: 7, file: "capstone-rtos.html", num: "25", group: "Capstone",
+    { id: "capstone-rtos", status: "ready", phase: 7, file: "capstone-rtos.html", num: "25", group: "Capstone",
       title: "Capstone 2: The Same ECU on FreeRTOS", short: "Capstone: FreeRTOS", icon: "🚦", accent: "#60a5fa",
       desc: "Splitting the ECU into tasks and queues, timing analysis and what changed vs bare metal.",
       sections: [
@@ -325,7 +325,7 @@
         ["timing", "Timing and watchdog supervision", "deadline watchdog supervision"],
         ["diff", "What changed", "comparison"],
       ] },
-    { id: "capstone-autosar", status: "planned", phase: 7, file: "capstone-autosar.html", num: "26", group: "Capstone",
+    { id: "capstone-autosar", status: "ready", phase: 7, file: "capstone-autosar.html", num: "26", group: "Capstone",
       title: "Capstone 3: Refactoring into AUTOSAR Layers", short: "Capstone: AUTOSAR", icon: "🚦", accent: "#a78bfa",
       desc: "Turning the ECU into an application SWC with runnables over a hand-written RTE, BSW-lite and MCAL on the STM32F103.",
       sections: [
@@ -338,7 +338,7 @@
       ] },
   
     /* ───────────── Group: Reference ───────────── */
-    { id: "board", status: "planned", phase: 2, file: "board.html", num: "A", group: "Reference",
+    { id: "board", status: "ready", phase: 2, file: "board.html", num: "A", group: "Reference",
       title: "Blue Pill Board Reference", short: "Board Reference", icon: "🗺️", accent: "#94a3b8",
       desc: "Interactive pinout, alternate functions, 5 V tolerance, on-board parts and known hardware quirks.",
       sections: [
@@ -347,7 +347,7 @@
         ["quirks", "Known quirks", "clone cks32 gd32 r10 usb 64k 128k"],
         ["modules", "Common modules", "sn65hvd230 ssd1306 w25q usb uart"],
       ] },
-    { id: "troubleshooting", status: "planned", phase: 2, file: "troubleshooting.html", num: "B", group: "Reference",
+    { id: "troubleshooting", status: "ready", phase: 2, file: "troubleshooting.html", num: "B", group: "Reference",
       title: "Troubleshooting", short: "Troubleshooting", icon: "🧯", accent: "#94a3b8",
       desc: "Symptom-first fixes: no ST-Link, wrong IDCODE, cannot halt, inverted LED, garbage UART, flash size mismatch and more.",
       sections: [
@@ -361,7 +361,7 @@
         ["usb", "USB not enumerating", "r10 1.5k pull-up d+"],
         ["can-silent", "CAN sends nothing", "no ack termination transceiver silent loopback"],
       ] },
-    { id: "automotive-mcus", status: "planned", phase: 8, file: "automotive-mcus.html", num: "C", group: "Reference",
+    { id: "automotive-mcus", status: "ready", phase: 8, file: "automotive-mcus.html", num: "C", group: "Reference",
       title: "From Blue Pill to Automotive-Grade MCUs", short: "Automotive MCUs", icon: "🏭", accent: "#94a3b8",
       desc: "How each lesson maps to NXP S32K1xx, Infineon AURIX TC3xx and Renesas RH850: qualification, safety, vendor MCAL and tooling.",
       sections: [
@@ -369,7 +369,7 @@
         ["mapping", "Lesson mapping table", "s32k aurix rh850 mapping"],
         ["vendor-mcal", "Vendor MCAL and tools", "rtd mcal tresos davinci"],
       ] },
-    { id: "ll-drivers", status: "planned", phase: 8, file: "ll-drivers.html", num: "D", group: "Reference",
+    { id: "ll-drivers", status: "ready", phase: 8, file: "ll-drivers.html", num: "D", group: "Reference",
       title: "Appendix: ST's LL Drivers", short: "LL Drivers", icon: "📚", accent: "#94a3b8",
       desc: "What ST's Low-Layer drivers are, how they map onto the registers you already know, and when a team picks registers, LL or HAL.",
       sections: [
@@ -395,12 +395,147 @@
     pm0056: { t: "STM32F10xxx Cortex-M3 programming manual", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", kind: "st" },
     ddi0403: { t: "ARMv7-M Architecture Reference Manual", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", kind: "arm" },
     ddi0337: { t: "Cortex-M3 Technical Reference Manual", url: "https://developer.arm.com/documentation/ddi0337/latest/", doc: "ARM DDI 0337", kind: "arm" },
+    uneceR48: { t: "UN Regulation No. 48 — installation of lighting and light-signalling devices (UNECE)", url: "https://unece.org/transport/vehicle-regulations-wp29/standards/addenda-1958-agreement-regulations-41-60", doc: "UN R48", kind: "spec" },
     autosarRelease: { t: "AUTOSAR Classic Platform R25-11 — Release Overview", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_TR_ReleaseOverview.pdf", doc: "AUTOSAR_CP_TR_ReleaseOverview", rev: "R25-11", kind: "autosar" },
     cmsisDeviceF1: { t: "cmsis-device-f1 — STM32F1 CMSIS device headers", url: "https://github.com/STMicroelectronics/cmsis-device-f1", kind: "tool" },
     renodeDocs: { t: "Renode documentation", url: "https://renode.readthedocs.io/en/latest/", kind: "tool" },
     openocdManual: { t: "OpenOCD User's Guide", url: "https://openocd.org/doc/html/index.html", kind: "tool" },
+    ds5319Pins: { t: "STM32F103x8/xB datasheet — pin definitions and I/O levels", url: ST + "datasheet/stm32f103c8.pdf", doc: "DS5319", sec: "3, Table 5", kind: "st" },
+    ds5319Elec: { t: "STM32F103x8/xB datasheet — electrical characteristics", url: ST + "datasheet/stm32f103c8.pdf", doc: "DS5319", sec: "5", kind: "st" },
+    rm0008Boot: { t: "RM0008 — memory map and boot configuration", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "3.3–3.4", kind: "st" },
+    rm0008Rcc: { t: "RM0008 — reset and clock control (RCC)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "7", kind: "st" },
+    rm0008Gpio: { t: "RM0008 — GPIO and AFIO", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "9", kind: "st" },
+    rm0008Usart: { t: "RM0008 — USART", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "27", kind: "st" },
+    rm0008Sig: { t: "RM0008 — device electronic signature (flash size, unique ID)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "30", kind: "st" },
+    rm0008Debug: { t: "RM0008 — debug support (SWJ-DP, DBGMCU)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "31", kind: "st" },
+    pm0075: { t: "STM32F10xxx Flash memory programming manual", url: ST + "programming_manual/pm0075-stm32f10xxx-flash-memory-microcontrollers-stmicroelectronics.pdf", doc: "PM0075", kind: "st" },
+    es096: { t: "STM32F101x8/B, F102x8/B, F103x8/B errata sheet", url: "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c8.html#documentation", doc: "ES096", kind: "st" },
+    an2606: { t: "AN2606 — STM32 microcontroller system memory boot mode", url: ST + "application_note/an2606-stm32-microcontroller-system-memory-boot-mode-stmicroelectronics.pdf", doc: "AN2606", kind: "st" },
+    an3155: { t: "AN3155 — USART protocol used in the STM32 bootloader", url: ST + "application_note/an3155-usart-protocol-used-in-the-stm32-bootloader-stmicroelectronics.pdf", doc: "AN3155", kind: "st" },
+    um1075: { t: "UM1075 — ST-LINK/V2 in-circuit debugger/programmer user manual", url: ST + "user_manual/um1075-stlinkv2-incircuit-debuggerprogrammer-for-stm8-and-stm32-stmicroelectronics.pdf", doc: "UM1075", kind: "st" },
+    um2237: { t: "UM2237 — STM32CubeProgrammer software description", url: ST + "user_manual/um2237-stm32cubeprogrammer-software-description-stmicroelectronics.pdf", doc: "UM2237", kind: "st" },
+    ddi0403Reset: { t: "ARMv7-M ARM — reset behaviour and the vector table", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", sec: "B1.5", kind: "arm" },
+    cmakeToolchains: { t: "cmake-toolchains(7) — cross compiling", url: "https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html", kind: "tool" },
+    cmakePresets: { t: "cmake-presets(7)", url: "https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html", kind: "tool" },
+    gccArm: { t: "GCC manual — ARM options", url: "https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html", kind: "tool" },
+    ldManual: { t: "GNU ld manual — linker scripts", url: "https://sourceware.org/binutils/docs/ld/Scripts.html", kind: "tool" },
+    cortexDebug: { t: "Cortex-Debug for VS Code — wiki", url: "https://github.com/Marus/cortex-debug/wiki", kind: "tool" },
+    armGnu: { t: "Arm GNU Toolchain downloads", url: "https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads", kind: "tool" },
+    rm0008Exti: { t: "RM0008 — interrupts and events (NVIC vector table, EXTI)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "10", kind: "st" },
+    rm0008Tim: { t: "RM0008 — general-purpose timers TIM2 to TIM5", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "15", kind: "st" },
+    pm0056Nvic: { t: "PM0056 — NVIC, SCB and SysTick", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", sec: "4.3–4.5", kind: "st" },
+    ddi0403Exc: { t: "ARMv7-M ARM — exception model", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", sec: "B1.5", kind: "arm" },
+    ddi0337Lat: { t: "Cortex-M3 TRM — exception latency and tail-chaining", url: "https://developer.arm.com/documentation/ddi0337/latest/", doc: "ARM DDI 0337", sec: "5", kind: "arm" },
+    cmsisCore: { t: "CMSIS-Core (Cortex-M) documentation", url: "https://arm-software.github.io/CMSIS_6/latest/Core/index.html", kind: "tool" },
+    rm0008Pwr: { t: "RM0008 — power control (low-power modes)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "5", kind: "st" },
+    rm0008Adc: { t: "RM0008 — analog-to-digital converter (ADC)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "11", kind: "st" },
+    rm0008Dma: { t: "RM0008 — direct memory access controller (DMA)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "13", kind: "st" },
+    rm0008Iwdg: { t: "RM0008 — independent watchdog (IWDG)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "19", kind: "st" },
+    rm0008Wwdg: { t: "RM0008 — window watchdog (WWDG)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "20", kind: "st" },
+    rm0008Can: { t: "RM0008 — controller area network (bxCAN)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "24", kind: "st" },
+    rm0008Spi: { t: "RM0008 — serial peripheral interface (SPI)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "25", kind: "st" },
+    rm0008I2c: { t: "RM0008 — inter-integrated circuit interface (I2C)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "26", kind: "st" },
+    um10204: { t: "UM10204 — I2C-bus specification and user manual (NXP)", url: "https://www.nxp.com/docs/en/user-guide/UM10204.pdf", doc: "UM10204", kind: "spec" },
+    iso11898: { t: "ISO 11898-1 — CAN data link layer and physical signalling (summary)", url: "https://www.iso.org/standard/63648.html", doc: "ISO 11898-1:2015", kind: "iso" },
+    iso11898p2: { t: "ISO 11898-2 — CAN high-speed physical medium attachment (summary)", url: "https://www.iso.org/standard/67244.html", doc: "ISO 11898-2:2016", kind: "iso" },
+    iso17987: { t: "ISO 17987 — Local Interconnect Network (LIN) (summary)", url: "https://www.iso.org/standard/61222.html", doc: "ISO 17987-1:2016", kind: "iso" },
+    tiSn65: { t: "SN65HVD230 3.3 V CAN transceiver datasheet (TI)", url: "https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf", doc: "SLOS346", kind: "datasheet" },
+    winbondW25q: { t: "Winbond W25Q serial NOR flash (product family and datasheets)", url: "https://www.winbond.com/hq/product/code-storage-flash-memory/serial-nor-flash/", kind: "datasheet" },
+    ssd1306: { t: "SSD1306 OLED controller datasheet (Solomon Systech, copy hosted by Adafruit)", url: "https://cdn-shop.adafruit.com/datasheets/SSD1306.pdf", kind: "community" },
+    freertosCm3: { t: "FreeRTOS — running the RTOS on ARM Cortex-M (interrupt priorities)", url: "https://www.freertos.org/RTOS-Cortex-M3-M4.html", kind: "tool" },
+    freertosConfig: { t: "FreeRTOS — FreeRTOSConfig.h customisation", url: "https://www.freertos.org/a00110.html", kind: "tool" },
+    freertosStack: { t: "FreeRTOS — stack usage and stack overflow checking", url: "https://www.freertos.org/Stacks-and-stack-overflow-checking.html", kind: "tool" },
+    freertosMutex: { t: "FreeRTOS — mutexes and priority inheritance", url: "https://www.freertos.org/Real-time-embedded-RTOS-mutexes.html", kind: "tool" },
+    freertosKernel: { t: "FreeRTOS-Kernel source (Cortex-M3 port: portable/GCC/ARM_CM3/port.c)", url: "https://github.com/FreeRTOS/FreeRTOS-Kernel", kind: "tool" },
+    pm0056Exc: { t: "PM0056 — Cortex-M3 processor: stacks, exception model, PendSV and SVCall", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", sec: "2.1.2, 2.3", kind: "st" },
+    ddi0403Stack: { t: "ARMv7-M ARM — exception entry stacking and EXC_RETURN", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", sec: "B1.5.6–B1.5.8", kind: "arm" },
+    pm0056Fault: { t: "PM0056 — fault handling, SHCSR, CFSR, HFSR, MMFAR, BFAR", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", sec: "2.4, 4.4.9–4.4.17", kind: "st" },
+    ddi0403Fault: { t: "ARMv7-M ARM — fault handling, escalation and lockup", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", sec: "B1.5.6, B1.5.15", kind: "arm" },
+    ddi0337Debug: { t: "Cortex-M3 TRM — ACTLR, FPB, DWT and ITM", url: "https://developer.arm.com/documentation/ddi0337/latest/", doc: "ARM DDI 0337", sec: "4.3, 8, 11", kind: "arm" },
+    gdbManual: { t: "Debugging with GDB — breakpoints, watchpoints, examining memory", url: "https://sourceware.org/gdb/current/onlinedocs/gdb.html/", kind: "tool" },
+    armSemihosting: { t: "Arm semihosting specification", url: "https://github.com/ARM-software/abi-aa/blob/main/semihosting/semihosting.rst", kind: "arm" },
+    pm0075Prog: { t: "PM0075 — flash program/erase controller: unlock, page erase, programming, option bytes", url: ST + "programming_manual/pm0075-stm32f10xxx-flash-memory-microcontrollers-stmicroelectronics.pdf", doc: "PM0075", kind: "st" },
+    pm0056Vtor: { t: "PM0056 — vector table offset register (VTOR)", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", sec: "4.4.4", kind: "st" },
+    ds5319Flash: { t: "STM32F103x8/xB datasheet — flash memory characteristics (erase/program time, endurance)", url: ST + "datasheet/stm32f103c8.pdf", doc: "DS5319", kind: "st" },
+    unity: { t: "Unity — unit testing for C (ThrowTheSwitch)", url: "https://www.throwtheswitch.org/unity", kind: "tool" },
+    cmock: { t: "CMock — mock generation for C (ThrowTheSwitch)", url: "https://www.throwtheswitch.org/cmock", kind: "tool" },
+    cppcheckManual: { t: "Cppcheck manual (including the MISRA addon)", url: "https://cppcheck.sourceforge.io/manual.pdf", kind: "tool" },
+    misraC: { t: "MISRA C:2012 guidelines and amendments (MISRA, purchase required)", url: "https://misra.org.uk/product/misra-c2012-third-edition-first-revision/", doc: "MISRA C:2012", kind: "spec" },
+    misraCompliance: { t: "MISRA Compliance:2020 — deviations and guideline re-categorisation (free download)", url: "https://misra.org.uk/app/uploads/2021/06/MISRA-Compliance-2020.pdf", doc: "MISRA Compliance:2020", kind: "spec" },
+    ctest: { t: "ctest(1) — CMake test driver", url: "https://cmake.org/cmake/help/latest/manual/ctest.1.html", kind: "tool" },
+    gccAnalyzer: { t: "GCC manual — static analyzer options (-fanalyzer)", url: "https://gcc.gnu.org/onlinedocs/gcc/Static-Analyzer-Options.html", kind: "tool" },
+    arLayered: { t: "Layered Software Architecture (explanatory)", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_EXP_LayeredSoftwareArchitecture.pdf", doc: "AUTOSAR_CP_EXP_LayeredSoftwareArchitecture", rev: "R25-11", kind: "autosar" },
+    arMethodology: { t: "Methodology (technical report)", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_TR_Methodology.pdf", doc: "AUTOSAR_CP_TR_Methodology", rev: "R25-11", kind: "autosar" },
+    arModuleList: { t: "List of Basic Software Modules", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_TR_BSWModuleList.pdf", doc: "AUTOSAR_CP_TR_BSWModuleList", rev: "R25-11", kind: "autosar" },
+    arSrsBswGeneral: { t: "General Requirements on Basic Software Modules", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SRS_BSWGeneral.pdf", doc: "AUTOSAR_CP_SRS_BSWGeneral", rev: "R25-11", kind: "autosar" },
+    arRte: { t: "Specification of RTE Software", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_RTE.pdf", doc: "AUTOSAR_CP_SWS_RTE", rev: "R25-11", kind: "autosar" },
+    arSwcTemplate: { t: "Software Component Template", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_TPS_SoftwareComponentTemplate.pdf", doc: "AUTOSAR_CP_TPS_SoftwareComponentTemplate", rev: "R25-11", kind: "autosar" },
+    arStdTypes: { t: "Specification of Standard Types", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_StandardTypes.pdf", doc: "AUTOSAR_CP_SWS_StandardTypes", rev: "R25-11", kind: "autosar" },
+    arPlatformTypes: { t: "Specification of Platform Types", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_PlatformTypes.pdf", doc: "AUTOSAR_CP_SWS_PlatformTypes", rev: "R25-11", kind: "autosar" },
+    arCompilerAbs: { t: "Specification of Compiler Abstraction", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_CompilerAbstraction.pdf", doc: "AUTOSAR_CP_SWS_CompilerAbstraction", rev: "R25-11", kind: "autosar" },
+    arMemMap: { t: "Specification of Memory Mapping", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_MemoryMapping.pdf", doc: "AUTOSAR_CP_SWS_MemoryMapping", rev: "R25-11", kind: "autosar" },
+    arDet: { t: "Specification of Default Error Tracer", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_DefaultErrorTracer.pdf", doc: "AUTOSAR_CP_SWS_DefaultErrorTracer", rev: "R25-11", kind: "autosar" },
+    arDio: { t: "Specification of DIO Driver", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_DIODriver.pdf", doc: "AUTOSAR_CP_SWS_DIODriver", rev: "R25-11", kind: "autosar" },
+    arPort: { t: "Specification of Port Driver", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_PortDriver.pdf", doc: "AUTOSAR_CP_SWS_PortDriver", rev: "R25-11", kind: "autosar" },
+    arPwm: { t: "Specification of PWM Driver", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_PWMDriver.pdf", doc: "AUTOSAR_CP_SWS_PWMDriver", rev: "R25-11", kind: "autosar" },
+    arAdc: { t: "Specification of ADC Driver", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_ADCDriver.pdf", doc: "AUTOSAR_CP_SWS_ADCDriver", rev: "R25-11", kind: "autosar" },
+    arCan: { t: "Specification of CAN Driver", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_CANDriver.pdf", doc: "AUTOSAR_CP_SWS_CANDriver", rev: "R25-11", kind: "autosar" },
+    arWdg: { t: "Specification of Watchdog Driver", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_WatchdogDriver.pdf", doc: "AUTOSAR_CP_SWS_WatchdogDriver", rev: "R25-11", kind: "autosar" },
+    arMcu: { t: "Specification of MCU Driver", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_MCUDriver.pdf", doc: "AUTOSAR_CP_SWS_MCUDriver", rev: "R25-11", kind: "autosar" },
+    arOs: { t: "Specification of Operating System", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_OS.pdf", doc: "AUTOSAR_CP_SWS_OS", rev: "R25-11", kind: "autosar" },
+    arCom: { t: "Specification of COM", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_COM.pdf", doc: "AUTOSAR_CP_SWS_COM", rev: "R25-11", kind: "autosar" },
+    arPduR: { t: "Specification of PDU Router", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_PDURouter.pdf", doc: "AUTOSAR_CP_SWS_PDURouter", rev: "R25-11", kind: "autosar" },
+    arCanIf: { t: "Specification of CAN Interface", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_CANInterface.pdf", doc: "AUTOSAR_CP_SWS_CANInterface", rev: "R25-11", kind: "autosar" },
+    arEcuM: { t: "Specification of ECU State Manager", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_ECUStateManager.pdf", doc: "AUTOSAR_CP_SWS_ECUStateManager", rev: "R25-11", kind: "autosar" },
+    arDem: { t: "Specification of Diagnostic Event Manager", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_DiagnosticEventManager.pdf", doc: "AUTOSAR_CP_SWS_DiagnosticEventManager", rev: "R25-11", kind: "autosar" },
+    arDcm: { t: "Specification of Diagnostic Communication Manager", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_DiagnosticCommunicationManager.pdf", doc: "AUTOSAR_CP_SWS_DiagnosticCommunicationManager", rev: "R25-11", kind: "autosar" },
+    arNvM: { t: "Specification of NVRAM Manager", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_NVRAMManager.pdf", doc: "AUTOSAR_CP_SWS_NVRAMManager", rev: "R25-11", kind: "autosar" },
+    arFee: { t: "Specification of Flash EEPROM Emulation", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_FlashEEPROMEmulation.pdf", doc: "AUTOSAR_CP_SWS_FlashEEPROMEmulation", rev: "R25-11", kind: "autosar" },
+    arWdgM: { t: "Specification of Watchdog Manager", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_WatchdogManager.pdf", doc: "AUTOSAR_CP_SWS_WatchdogManager", rev: "R25-11", kind: "autosar" },
+    arCanTp: { t: "Specification of CAN Transport Layer", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_SWS_CANTransportLayer.pdf", doc: "AUTOSAR_CP_SWS_CANTransportLayer", rev: "R25-11", kind: "autosar" },
+    iso14229: { t: "ISO 14229-1 — Unified diagnostic services (UDS), application layer (summary)", url: "https://www.iso.org/standard/72439.html", doc: "ISO 14229-1:2020", kind: "iso" },
+    iso15765: { t: "ISO 15765-2 — Diagnostic communication over CAN, transport protocol (summary)", url: "https://www.iso.org/standard/84211.html", doc: "ISO 15765-2:2024", kind: "iso" },
+    iso26262: { t: "ISO 26262 — Road vehicles, functional safety (overview)", url: "https://www.iso.org/standard/68383.html", doc: "ISO 26262-1:2018", kind: "iso" },
+    iso17356: { t: "ISO 17356-3 — OSEK/VDX operating system (summary)", url: "https://www.iso.org/standard/40079.html", doc: "ISO 17356-3:2005", kind: "iso" },
+    stm32CubeF1: { t: "STM32CubeF1 — HAL and LL drivers (ST)", url: "https://github.com/STMicroelectronics/STM32CubeF1", kind: "st" },
+    um1850: { t: "UM1850 — Description of STM32F1 HAL and low-layer drivers", url: ST + "user_manual/um1850-description-of-stm32f1-hal-and-lowlayer-drivers-stmicroelectronics.pdf", doc: "UM1850", kind: "st" },
+    nxpS32k: { t: "NXP S32K automotive microcontrollers (product family)", url: "https://www.nxp.com/products/processors-and-microcontrollers/s32-automotive-platform/s32k-auto-general-purpose-mcus:S32K-MCUS", kind: "datasheet" },
+    infineonAurix: { t: "Infineon AURIX TC3xx microcontrollers (product family)", url: "https://www.infineon.com/cms/en/product/microcontroller/32-bit-tricore-microcontroller/32-bit-tricore-aurix-tc3xx/", kind: "datasheet" },
+    renesasRh850: { t: "Renesas RH850 automotive microcontrollers (product family)", url: "https://www.renesas.com/en/products/microcontrollers-microprocessors/rh850-automotive-mcus", kind: "datasheet" },
+    aecQ100: { t: "AEC-Q100 — failure mechanism based stress test qualification for integrated circuits", url: "http://www.aecouncil.com/AECDocuments.html", doc: "AEC-Q100", kind: "spec" },
+    stm32Base: { t: "STM32-base — Blue Pill board page and schematic notes", url: "https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html", kind: "community" },
   };
   const REFS = {
+                                                                "automotive-mcus": ["aecQ100", "iso26262", "nxpS32k", "infineonAurix", "renesasRh850", "ds5319", "arLayered"],
+    "ll-drivers": ["um1850", "stm32CubeF1", "rm0008Rcc", "rm0008Gpio", "cmsisDeviceF1"],
+    "capstone-autosar": ["arLayered", "arRte", "arCom", "arWdgM", "arDem", "arEcuM", "arOs", "arModuleList"],
+    "capstone-rtos": ["freertosCm3", "freertosConfig", "freertosStack", "freertosKernel", "rm0008Iwdg", "pm0056Exc"],
+    "capstone-baremetal": ["uneceR48", "rm0008Tim", "rm0008Can", "rm0008Adc", "rm0008Iwdg", "iso11898", "renodeDocs"],
+    "autosar-review": ["arSrsBswGeneral", "arLayered", "misraC", "misraCompliance", "iso26262", "arMcu"],
+    "autosar-diag-nvm": ["iso14229", "iso15765", "arDem", "arDcm", "arCanTp", "arNvM", "arFee", "ds5319Flash"],
+    "autosar-os-com": ["arOs", "iso17356", "arRte", "arCom", "arPduR", "arCanIf", "arCan", "arEcuM", "iso11898"],
+    "autosar-mcal": ["arSrsBswGeneral", "arModuleList", "arStdTypes", "arPlatformTypes", "arCompilerAbs", "arMemMap", "arDet", "arPort", "arDio", "arPwm", "arAdc", "arCan", "arWdg", "rm0008Gpio"],
+    "autosar-swc": ["arRte", "arSwcTemplate", "arLayered", "arCom", "arDem"],
+    "autosar-arch": ["arLayered", "arMethodology", "arModuleList", "arSrsBswGeneral", "autosarRelease", "arEcuM"],
+    "quality": ["misraC", "misraCompliance", "cppcheckManual", "unity", "cmock", "ctest", "gccAnalyzer", "gccArm"],
+    "bootloader": ["an2606", "an3155", "pm0075Prog", "pm0056Vtor", "ddi0403Reset", "ds5319Flash", "rm0008Boot", "ldManual"],
+    "faults-debug": ["pm0056Fault", "ddi0403Fault", "ddi0403Stack", "ddi0337Debug", "rm0008Debug", "gdbManual", "armSemihosting", "um1075"],
+    "rtos": ["pm0056Exc", "ddi0403Stack", "pm0056Nvic", "freertosCm3", "freertosConfig", "freertosStack", "freertosMutex", "freertosKernel"],
+    "power-wdg": ["rm0008Pwr", "rm0008Iwdg", "rm0008Wwdg", "rm0008Rcc", "rm0008Debug", "ds5319Elec", "pm0056"],
+    "can": ["rm0008Can", "iso11898", "iso11898p2", "iso17987", "rm0008Gpio", "tiSn65"],
+    "spi": ["rm0008Spi", "rm0008Dma", "ds5319Elec", "winbondW25q"],
+    "i2c": ["rm0008I2c", "es096", "um10204", "ds5319Pins", "ssd1306"],
+    "adc-dma": ["rm0008Adc", "rm0008Dma", "ds5319Elec", "ds5319Pins", "rm0008Rcc"],
+    "uart": ["rm0008Usart", "rm0008Rcc", "pm0056Nvic", "iso17987", "ds5319Pins"],
+    "timers": ["rm0008Tim", "rm0008Rcc", "rm0008Gpio", "ds5319Pins", "pm0056"],
+    "interrupts": ["pm0056Nvic", "ddi0403Exc", "ddi0337Lat", "rm0008Exti", "rm0008Usart", "cmsisCore"],
+    "gpio": ["rm0008Gpio", "ds5319Pins", "ds5319Elec", "rm0008Exti", "es096", "stm32Base"],
+    "clocks": ["rm0008Rcc", "ds5319Elec", "pm0075", "ds5319", "rm0008Gpio"],
+    "boot": ["rm0008Boot", "pm0056", "ddi0403Reset", "ldManual", "gccArm", "an2606", "cmsisDeviceF1"],
+    "fundamentals": ["ds5319", "rm0008Boot", "rm0008Rcc", "pm0056", "ddi0403", "ddi0337", "cmsisDeviceF1", "gccArm", "ldManual"],
+    "troubleshooting": ["openocdManual", "rm0008Debug", "rm0008Gpio", "rm0008Sig", "ds5319Pins", "es096", "an2606", "um1075", "stm32Base"],
+    "board": ["ds5319Pins", "ds5319Elec", "rm0008Gpio", "rm0008Boot", "rm0008Sig", "es096", "stm32Base"],
+    "setup": ["ds5319", "ds5319Pins", "rm0008Boot", "rm0008Rcc", "rm0008Gpio", "rm0008Usart", "pm0075", "pm0056", "ddi0403Reset", "an3155", "um1075", "um2237", "openocdManual", "cmakeToolchains", "cmakePresets", "gccArm", "ldManual", "cortexDebug", "armGnu", "renodeDocs"],
     glossary: ["f103Docs", "ds5319", "rm0008", "pm0056", "ddi0403", "autosarRelease", "openocdManual", "renodeDocs"],
   };
 
@@ -886,7 +1021,7 @@
     let cur = -1, timer = null;
     const D = window.MCU && window.MCU.Diagram;
 
-    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.ariaLabel || T.ariaDefault)}"><defs>`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="group" aria-label="${esc(opts.ariaLabel || T.ariaDefault)}"><defs>`;
     SEQ_KINDS.forEach((k) => {
       svg += `<marker id="${host.id}-ah-${k}" class="k-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>`;
     });
@@ -958,11 +1093,11 @@
       count.textContent = `${cur + 1} / ${steps.length}`;
       prog.style.width = ((cur + 1) / steps.length) * 100 + "%";
       if (!s) {
-        main.innerHTML = `<h4>${esc(T.ready)}</h4><p class="muted">${opts.intro || T.intro}</p>`;
+        main.innerHTML = `<h3 class="w-title">${esc(T.ready)}</h3><p class="muted">${opts.intro || T.intro}</p>`;
         side.innerHTML = opts.introSide || `<p class="muted small">${esc(T.introSide)}</p>`;
       } else {
         main.innerHTML = `<div class="seq-tags"><span class="badge gray">${esc(T.step(cur + 1))}</span>${(s.tags || []).map((t) => `<span class="badge ${t[1] || ""}">${esc(t[0])}</span>`).join("")}</div>
-          <h4>${esc(s.title || s.label)}</h4><div>${s.detail || ""}</div>`;
+          <h3 class="w-title">${esc(s.title || s.label)}</h3><div>${s.detail || ""}</div>`;
         side.innerHTML = (s.code ? codeBlockHTML({ code: s.code, lang: s.codeLang || "c", file: s.codeFile || "", label: s.codeLang || "c" }) : "") +
           (s.analogy ? `<div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">${esc(S.callout.analogy)}</span>${s.analogy}</div></div>` : "");
         wireCopy(side);
@@ -1068,6 +1203,33 @@
       .observe(document.body, { childList: true, subtree: true });
   }
 
+  /* ------------------------------------------------- Tool versions
+     <span data-version="cmake"></span> → "4.4.4"; <span data-version="renode" data-version-field="name"></span>.
+     <div data-versions-table="arm-gnu-toolchain cmake …"></div> → a table. Data: data/versions.js,
+     generated from tools/versions.json, the only place a version is written (CLAUDE.md rule 4). */
+  function renderVersions(root = document) {
+    const els = $$("[data-version], [data-versions-table]", root);
+    if (!els.length) return;
+    const V = window.MCU_DATA && window.MCU_DATA.versions;
+    if (!V) throw new Error("This page uses data-version but does not load assets/js/data/versions.js");
+    const get = (k) => {
+      const t = V.tools[k] || V.third_party[k];
+      if (!t) throw new Error(`Unknown tool "${k}" in data-version (tools/versions.json)`);
+      return t;
+    };
+    els.forEach((el) => {
+      if (el.dataset.versionsTable !== undefined) {
+        const keys = el.dataset.versionsTable.split(/\s+/).filter(Boolean);
+        el.innerHTML = `<div class="table-wrap"><table class="t"><thead><tr><th>${esc(S.versions.tool)}</th><th>${esc(S.versions.version)}</th><th>${esc(S.versions.notes)}</th></tr></thead><tbody>${keys.map((k) => {
+          const t = get(k);
+          return `<tr><td><a href="${t.url}" target="_blank" rel="noopener">${esc(t.name)}</a></td><td><code>${esc(t.version)}</code></td><td class="small">${t.alt ? esc(S.versions.alt(t.alt)) : ""}${t.min ? esc(S.versions.min(t.min)) : ""}</td></tr>`;
+        }).join("")}</tbody></table></div><p class="small muted">${esc(S.versions.checked(V.checked))}</p>`;
+      } else {
+        el.textContent = get(el.dataset.version)[el.dataset.versionField || "version"] || "";
+      }
+    });
+  }
+
   /* --------------------------------------------------------- Boot */
   function boot() {
     initTooltips();
@@ -1082,6 +1244,7 @@
     initScrollspy();
     initTabs();
     renderStaticCode();
+    renderVersions();
     initLangSwitch();
     initSoftBreaks();
     if (location.hash) {
@@ -1096,7 +1259,7 @@
 
   window.MCU = Object.assign(window.MCU || {}, {
     CONFIG, SITE, R, REFS, STRINGS: S, $, $$, esc, norm, slug, store, isReady, byId,
-    initTabs, codeBlockHTML, embedded, renderCodeExplorer, renderStaticCode, wireCopy, SequenceDiagram,
+    initTabs, codeBlockHTML, embedded, renderVersions, renderCodeExplorer, renderStaticCode, wireCopy, SequenceDiagram,
     tokenize: CODE.tokenize, toLines: CODE.toLines, parseMarks: CODE.parseMarks,
   });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

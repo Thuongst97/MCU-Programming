@@ -1,0 +1,5 @@
+Example 11 node B: bxCAN 500 kbit/s on PB8/PB9
+self-test (silent loopback): OK
+rx id 0x00000100 dlc 2 data0 0
+tx 10 rx 10 TEC 0 REC 0 error active
+rx id 0x00000100 dlc 2 data0 1

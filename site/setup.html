@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Setting Up and Running a Program on STM32F103C8T6 Blue Pill — MCU Academy</title>
+  <meta name="description" content="Wire an ST-Link, install the toolchain on Windows/Linux/macOS, build two ways, blink PC13, switch to 72 MHz, print over UART, debug, and run it in Renode.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="setup">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 02</span><span>/</span><span>Setup &amp; First Program</span></nav>
+          <div class="eyebrow">Module 02 · Start here</div>
+          <h1>Setting Up and Running a Program on STM32F103C8T6 Blue Pill</h1>
+          <p class="lead">By the end of this module a Blue Pill on your desk blinks its LED, switches itself from 8 MHz to 72 MHz, prints <code>Hello from Blue Pill @ 72 MHz</code> on your PC, and stops at a breakpoint in your debugger. You will also run the very same binary in the Renode simulator, with no hardware at all.</p>
+          <div class="page-meta"><span>⏱ 90 min (first time)</span><span>🎯 Beginner</span><span>📂 examples/00-bluepill-blink-uart</span></div>
+        </header>
+
+        <section class="doc-section" id="bom" data-title="Bill of materials">
+          <div class="sec-head"><h2><span class="sec-num">2.1</span>Bill of materials</h2></div>
+          <p>Everything in the course runs on the parts below. Modules that need more (a potentiometer, an OLED, a CAN transceiver) list their extras at the top.</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Part</th><th>Why you need it</th><th>Watch out for</th></tr></thead>
+            <tbody>
+              <tr><td>STM32F103C8T6 "Blue Pill"</td><td>The target: a Cortex-M3 at up to 72 MHz with 64 KB flash and 20 KB SRAM (DS5319).</td><td>Many boards carry a clone chip (CKS32, CS32, GD32). They mostly work; <a href="troubleshooting.html#idcode">the debugger needs one extra setting</a>.</td></tr>
+              <tr><td>ST-Link V2 (or a clone)</td><td>USB debug probe. Talks SWD to the chip: flash, run, stop, read registers.</td><td>Clones work for SWD. Their pin order differs from box to box: read the label, not a photo.</td></tr>
+              <tr><td>USB-UART adapter, 3.3 V logic (CH340, CP2102, FT232)</td><td>Shows what the board prints. USART1 is on PA9 (TX) and PA10 (RX).</td><td>Pick a 3.3 V adapter or set its jumper to 3.3 V.</td></tr>
+              <tr><td>8 female-female jumper wires</td><td>4 for SWD, 3 for the UART, 1 spare.</td><td>Short wires (≤ 20 cm) make SWD reliable.</td></tr>
+              <tr><td>Two USB cables</td><td>One for the ST-Link, one for the USB-UART.</td><td>Some "charge-only" cables have no data lines.</td></tr>
+              <tr><td>Optional: breadboard, push button, LEDs, 330 Ω resistors</td><td>Used from module 05 on.</td><td>The Blue Pill is wider than half a breadboard on some boards.</td></tr>
+            </tbody>
+          </table></div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">64 KB, not 128 KB</span><p>The C8 part is specified with 64 KB of flash. Many chips answer 128 KB when a tool asks, and the upper half often works, but nothing guarantees it. This course never uses it: our linker script and OpenOCD configuration both say 64 KB. <a href="board.html#quirks">Board quirks</a> explains why.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="wiring" data-title="Wiring SWD and BOOT jumpers">
+          <div class="sec-head"><h2><span class="sec-num">2.2</span>Wiring SWD and BOOT jumpers</h2></div>
+          <p>SWD (Serial Wire Debug) needs only two signals plus ground: <b>SWDIO</b> (data, PA13) and <b>SWCLK</b> (clock, PA14). On most Blue Pills they come out on the 4-pin header at the end opposite the USB connector. The ST-Link can also power the board through its 3.3 V pin while you flash.</p>
+          <div id="po-wiring"></div>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>From</th><th>To</th><th>Signal</th></tr></thead>
+            <tbody>
+              <tr><td>ST-Link <code>SWDIO</code></td><td>Blue Pill SWD header <code>DIO</code> (PA13)</td><td>Debug data, bidirectional</td></tr>
+              <tr><td>ST-Link <code>SWCLK</code></td><td>Blue Pill SWD header <code>CLK</code> (PA14)</td><td>Debug clock, driven by the probe</td></tr>
+              <tr><td>ST-Link <code>GND</code></td><td>Blue Pill SWD header <code>GND</code></td><td>Common ground</td></tr>
+              <tr><td>ST-Link <code>3.3V</code></td><td>Blue Pill SWD header <code>3.3</code></td><td>Power for the board (only if no other supply)</td></tr>
+              <tr><td>USB-UART <code>RX</code></td><td><code>PA9</code></td><td>USART1 TX → your PC</td></tr>
+              <tr><td>USB-UART <code>TX</code></td><td><code>PA10</code></td><td>Your PC → USART1 RX</td></tr>
+              <tr><td>USB-UART <code>GND</code></td><td><code>G</code></td><td>Common ground (always connect it)</td></tr>
+            </tbody>
+          </table></div>
+          <p>Leave both <b>BOOT jumpers on 0</b>. At reset the chip samples the BOOT0 pin (and BOOT1 on PB2) to decide where to start: with BOOT0 = 0 it runs your program from main flash at <code>0x08000000</code> (RM0008 §3.4). BOOT0 = 1 starts ST's built-in serial bootloader instead; <a href="#flash">flashing</a> shows when that is useful.</p>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">One power source at a time</span><p>Power the board from the ST-Link's 3.3 V pin <i>or</i> from its own USB connector, not both. On most boards the regulator output is tied straight to the 3.3 V header pin, so two supplies end up fighting each other. If the USB cable is plugged in, leave the ST-Link 3.3 V wire off and keep GND connected.</p></div></div>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">TX goes to RX</span><p>A UART line has one talker and one listener, so the board's TX (PA9) goes to the adapter's RX, and the adapter's TX goes to PA10. PA9 and PA10 are 5 V tolerant (DS5319 Table 5), but a 3.3 V adapter stays safe even if you later move a wire to a pin that is not.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="install" data-title="Install the environment">
+          <div class="sec-head"><h2><span class="sec-num">2.3</span>Install the environment</h2></div>
+          <p>You need five things: a <b>cross-compiler</b> that produces Arm Cortex-M code (<code>arm-none-eabi-gcc</code>), <b>CMake</b> and <b>Ninja</b> to drive it, <b>OpenOCD</b> to talk to the ST-Link, and <b>VS Code</b> with the Cortex-Debug extension as a debugger front end. <b>Renode</b> is optional but lets you run every example without a board. The table shows the versions CI uses; newer ones usually work.</p>
+          <div data-versions-table="arm-gnu-toolchain cmake ninja openocd renode cortex-debug stm32cubeide stm32cubeprogrammer"></div>
+          <div data-tabs data-remember="mcu-os" data-detect="os">
+            <div class="tab-list" role="tablist"><button data-tab="windows">Windows</button><button data-tab="linux">Linux</button><button data-tab="macos">macOS</button></div>
+            <div class="tab-panel" data-panel="windows">
+              <ol>
+                <li><b>CMake and Ninja</b> from a terminal (PowerShell):
+                  <script type="text/plain" data-code data-lang="console">$ winget install Kitware.CMake Ninja-build.Ninja Python.Python.3.12 Git.Git</script></li>
+                <li><b>Arm GNU Toolchain</b>: download the <code>arm-none-eabi</code> Windows installer from Arm's download page and tick <i>Add path to environment variable</i> on the last screen. The xPack build (<code>xpack-arm-none-eabi-gcc</code>) is an equivalent zip if you prefer no installer.</li>
+                <li><b>OpenOCD</b>: unzip the xPack OpenOCD release for Windows and add its <code>bin</code> folder to <code>PATH</code>.</li>
+                <li><b>ST-Link USB driver</b>: install ST's <code>STSW-LINK009</code> driver package, then plug the ST-Link in. Device Manager should list "STMicroelectronics STLink dongle".</li>
+                <li><b>VS Code</b> and its extensions: <i>Cortex-Debug</i> (marus25), <i>CMake Tools</i> and <i>C/C++</i>. Opening this repository suggests them automatically (<code>.vscode/extensions.json</code>).</li>
+                <li><b>Renode</b> (optional): the Windows installer from the Renode GitHub releases page.</li>
+                <li><b>Serial terminal</b>: PuTTY, or the <i>Serial Monitor</i> extension in VS Code.</li>
+              </ol>
+            </div>
+            <div class="tab-panel" data-panel="linux">
+              <p>On Ubuntu or Debian, the distribution packages cover everything except the Arm compiler and Renode. The repository's installer downloads exactly the versions CI uses into a folder you choose and prints their <code>bin</code> directories:</p>
+              <script type="text/plain" data-code data-lang="console">$ sudo apt install cmake ninja-build openocd stlink-tools picocom git python3 python3-pip
+$ python3 tools/install-tools.py --dest ~/mcu-tools gcc renode
+$ export PATH="$(python3 tools/install-tools.py --dest ~/mcu-tools gcc renode | paste -sd:):$PATH"   # add this line to ~/.bashrc</script>
+              <p>The <code>openocd</code> package installs udev rules that let a logged-in user open the ST-Link. Unplug and replug the probe after installing. If OpenOCD reports <code>LIBUSB_ERROR_ACCESS</code>, see <a href="troubleshooting.html#no-stlink">Troubleshooting</a>.</p>
+              <p>Then install VS Code with the <i>Cortex-Debug</i>, <i>CMake Tools</i> and <i>C/C++</i> extensions.</p>
+            </div>
+            <div class="tab-panel" data-panel="macos">
+              <script type="text/plain" data-code data-lang="console">$ brew install cmake ninja open-ocd stlink picocom python
+$ brew install --cask gcc-arm-embedded visual-studio-code</script>
+              <p>Renode (optional): download the macOS package from the Renode GitHub releases page. No USB driver is needed for the ST-Link on macOS.</p>
+              <p>In VS Code install <i>Cortex-Debug</i>, <i>CMake Tools</i> and <i>C/C++</i>.</p>
+            </div>
+          </div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>A <b>cross</b>-compiler is like a translator who lives in your office but writes letters in a language spoken in another country: it runs on your x86 or Apple laptop and writes Thumb-2 machine code for the Cortex-M3. The ST-Link is the courier that carries the letter to the chip and can knock on its door at any time to ask what it is doing.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="verify" data-title="Verify every tool">
+          <div class="sec-head"><h2><span class="sec-num">2.4</span>Verify every tool</h2></div>
+          <p>Check each tool on its own before building anything. When something fails later, you will know it is not the installation.</p>
+          <script type="text/plain" data-code data-lang="console" data-file="terminal">$ arm-none-eabi-gcc --version      # first line names the Arm GNU toolchain
+$ cmake --version
+$ ninja --version
+$ openocd --version
+$ renode --version                 # optional
+$ openocd -f examples/common/openocd/bluepill.cfg -c "init; reset halt; exit"   # board wired, ST-Link plugged in</script>
+          <p>The last command is the real test: it opens the ST-Link, connects over SWD, reads the chip's debug ID and stops the CPU. On a working setup the output contains these lines (numbers vary):</p>
+          <script type="text/plain" data-code data-lang="console" data-file="openocd output">Info : STLINK V2J… (API v2) VID:PID 0483:3748
+Info : Target voltage: 3.2…
+Info : [stm32f1x.cpu] Cortex-M3 r1p1 processor detected
+Info : [stm32f1x.cpu] target has 6 breakpoints, 4 watchpoints
+[stm32f1x.cpu] halted due to debug-request, current mode: Thread</script>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">"UNEXPECTED idcode: 0x2ba01477"</span><p>Your board has a clone MCU. Nothing is broken: use <code>examples/common/openocd/bluepill-clone.cfg</code> instead, which tells OpenOCD to expect that ID. Never edit OpenOCD's installed scripts. Details in <a href="troubleshooting.html#idcode">Troubleshooting</a>.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="paths" data-title="Two build paths compared">
+          <div class="sec-head"><h2><span class="sec-num">2.5</span>Two build paths compared</h2></div>
+          <p>There are two common ways to get a first program onto an STM32. You will see both once, then the rest of the course uses path B.</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th><span class="sr-only">Aspect</span></th><th>Path A: STM32CubeIDE + HAL</th><th>Path B: CMake + registers (this course)</th></tr></thead>
+            <tbody>
+              <tr><td>Setup</td><td>One installer; a graphical pin/clock configurator writes the init code.</td><td>A few command-line tools; you write every line.</td></tr>
+              <tr><td>What you learn</td><td>ST's HAL API.</td><td>What the hardware actually does, register by register.</td></tr>
+              <tr><td>Code size (example 00)</td><td>about 6 KB flash</td><td>under 2 KB flash</td></tr>
+              <tr><td>Portability of the knowledge</td><td>STM32 only.</td><td>Any MCU: the same ideas appear on S32K, AURIX and RH850, which is where automotive AUTOSAR MCAL drivers live.</td></tr>
+              <tr><td>Used in industry?</td><td>Prototypes, many products.</td><td>Production automotive code (through an MCAL), safety-critical code, bootloaders.</td></tr>
+            </tbody>
+          </table></div>
+          <p>Here is the same job, "run at 72 MHz from the 8 MHz crystal", written both ways. Switch the tabs: the HAL fills in a structure and calls one function; the register version does each step in order.</p>
+          <div class="lang-switch">
+            <script type="text/plain" data-code data-label="Registers" data-src="examples/00-bluepill-blink-uart/bare/src/main.c" data-region="clock" data-lang="c" data-file="bare/src/main.c" data-start="58" data-end="81" data-sha="c4395b86a08f">
+static int clock_72mhz(void)
+{
+    RCC->CR |= RCC_CR_HSEON;                                         /* start the 8 MHz crystal */  // «6»
+    if (!wait_set(&RCC->CR, RCC_CR_HSERDY, RCC_CR_HSERDY))
+    {
+        return 1;                                                    /* no crystal: stay on HSI */
+    }
+    FLASH->ACR = FLASH_ACR_PRFTBE | (2U << FLASH_ACR_LATENCY_Pos);   /* 2 wait states BEFORE speeding up */ // «7»
+    RCC->CFGR |= RCC_CFGR_PPRE1_DIV2                                 /* APB1 <= 36 MHz */            // «8»
+               | RCC_CFGR_PLLSRC                                     /* PLL input: HSE */
+               | RCC_CFGR_PLLMULL9;                                  /* 8 MHz x 9 = 72 MHz */        // «9»
+    RCC->CR |= RCC_CR_PLLON;
+    if (!wait_set(&RCC->CR, RCC_CR_PLLRDY, RCC_CR_PLLRDY))
+    {
+        return 2;
+    }
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;        /* switch SYSCLK to the PLL */  // «10»
+    if (!wait_set(&RCC->CFGR, RCC_CFGR_SWS, RCC_CFGR_SWS_PLL))       /* hardware confirms in SWS */  // «11»
+    {
+        return 3;
+    }
+    SystemCoreClock = 72000000U;
+    return 0;
+}
+</script>
+            <script type="text/plain" data-code data-label="HAL" data-src="examples/00-bluepill-blink-uart/hal/Core/Src/main.c" data-region="clock" data-lang="c" data-file="hal/Core/Src/main.c" data-start="45" data-end="69" data-sha="895c4adb7f45">
+static void SystemClock_Config(void)
+{
+    RCC_OscInitTypeDef osc = {0};
+    RCC_ClkInitTypeDef clk = {0};
+
+    osc.OscillatorType = RCC_OSCILLATORTYPE_HSE;                                   // «5»
+    osc.HSEState = RCC_HSE_ON;
+    osc.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+    osc.PLL.PLLState = RCC_PLL_ON;
+    osc.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+    osc.PLL.PLLMUL = RCC_PLL_MUL9;
+    if (HAL_RCC_OscConfig(&osc) != HAL_OK)                                         // «6»
+    {
+        for (;;) { }
+    }
+    clk.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+    clk.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+    clk.AHBCLKDivider = RCC_SYSCLK_DIV1;
+    clk.APB1CLKDivider = RCC_HCLK_DIV2;                                            // «7»
+    clk.APB2CLKDivider = RCC_HCLK_DIV1;
+    if (HAL_RCC_ClockConfig(&clk, FLASH_LATENCY_2) != HAL_OK)   /* HAL's own constant for 2 WS */ // «8»
+    {
+        for (;;) { }
+    }
+}
+</script>
+          </div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">Why registers?</span><p>The HAL is fine for products, but it hides the hardware you need to understand when something goes wrong, and an automotive ECU does not use it: its drivers come from an AUTOSAR MCAL. HAL appears only on this page. Appendix D shows ST's thinner LL drivers for comparison.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="path-cube" data-title="Path A: STM32CubeIDE + HAL">
+          <div class="sec-head"><h2><span class="sec-num">2.6</span>Path A: STM32CubeIDE + HAL</h2></div>
+          <p>Install STM32CubeIDE (ST account required), then:</p>
+          <ol>
+            <li><b>File → New → STM32 Project</b>, pick <code>STM32F103C8Tx</code>.</li>
+            <li>In the <b>Pinout &amp; Configuration</b> tab: <b>System Core → SYS → Debug: Serial Wire</b>. Do this first.</li>
+            <li><b>System Core → RCC → High Speed Clock: Crystal/Ceramic Resonator</b>.</li>
+            <li>Click PC13 and choose <code>GPIO_Output</code>. Under <b>Connectivity → USART1</b> choose <i>Asynchronous</i>, 115200 baud.</li>
+            <li><b>Clock Configuration</b> tab: input 8 MHz, PLL source HSE, multiplier ×9, APB1 prescaler /2. The tool turns any limit you break red.</li>
+            <li>Save: CubeMX generates <code>main.c</code>, <code>stm32f1xx_hal_msp.c</code> and the startup file. Build with the hammer, run with the green arrow.</li>
+          </ol>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Don't skip "Debug: Serial Wire"</span><p>If SYS → Debug stays at <i>No Debug</i>, the generated init code releases PA13/PA14 from the debug port. The first flash works, and after that the ST-Link can no longer connect to a running program. Recovery: <a href="troubleshooting.html#cannot-halt">connect under reset or boot with BOOT0 = 1</a>.</p></div></div>
+          <p>The repository holds the same program written the HAL way, laid out as CubeMX generates it (<code>examples/00-bluepill-blink-uart/hal/</code>), so it also builds with CMake. Click the numbered lines:</p>
+          <script type="text/plain" id="src-00-hal-main" data-src="examples/00-bluepill-blink-uart/hal/Core/Src/main.c" data-region="main" data-lang="c" data-file="hal/Core/Src/main.c" data-start="18" data-end="41" data-sha="895c4adb7f45">
+int main(void)
+{
+    HAL_Init();                 /* SysTick at 1 kHz on HSI, NVIC priority grouping */      // «1»
+    SystemClock_Config();       /* HSE x 9 = 72 MHz, same settings as the bare version */  // «2»
+    MX_GPIO_Init();
+    MX_USART1_UART_Init();
+
+    say("Hello from Blue Pill @ ");
+    say_u32(HAL_RCC_GetSysClockFreq() / 1000000U);
+    say(" MHz (HAL)\r\n");
+
+    uint32_t seconds = 0U;
+    for (;;)
+    {
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);   /* LED on (active-low) */ // «3»
+        HAL_Delay(500U);
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);     /* LED off */
+        HAL_Delay(500U);                                         /* busy-waits on uwTick */ // «4»
+        ++seconds;
+        say("uptime ");
+        say_u32(seconds);
+        say(" s\r\n");
+    }
+}
+</script>
+          <div id="ex-hal"></div>
+        </section>
+
+        <section class="doc-section" id="path-bare" data-title="Path B: bare-metal CMake from scratch">
+          <div class="sec-head"><h2><span class="sec-num">2.7</span>Path B: bare-metal CMake from scratch</h2></div>
+          <p>A bare-metal program is four small files. Nothing is hidden: every byte that ends up in flash comes from code you can read.</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>File</th><th>Job</th></tr></thead>
+            <tbody>
+              <tr><td><code>src/startup.c</code></td><td>The vector table (where the CPU finds its first stack pointer and every interrupt handler) and <code>Reset_Handler</code>, which prepares memory and calls <code>main()</code>.</td></tr>
+              <tr><td><code>src/system.c</code></td><td><code>SystemInit()</code> and the <code>SystemCoreClock</code> variable the CMSIS headers expect.</td></tr>
+              <tr><td><code>ld/stm32f103c8_64k.ld</code></td><td>The linker script: where flash and RAM are, and which section goes where.</td></tr>
+              <tr><td><code>src/main.c</code></td><td>Your program.</td></tr>
+            </tbody>
+          </table></div>
+          <h3>Reset_Handler: from power-on to main()</h3>
+          <script type="text/plain" id="src-00-reset" data-src="examples/00-bluepill-blink-uart/bare/src/startup.c" data-region="reset" data-lang="c" data-file="bare/src/startup.c" data-start="31" data-end="51" data-sha="b8e0317f0830">
+void Reset_Handler(void)
+{
+    /* 1. Copy initial values of .data from flash to RAM. */
+    const uint32_t *src = _sidata;                         // «1»
+    for (uint32_t *dst = _sdata; dst < _edata; ++dst, ++src)
+    {
+        *dst = *src;
+    }
+    /* 2. Zero .bss. */
+    for (uint32_t *dst = _sbss; dst < _ebss; ++dst)        // «2»
+    {
+        *dst = 0U;
+    }
+    /* 3. Minimal system setup (vector table location, SystemCoreClock). */
+    SystemInit();                                          // «3»
+    /* 4. Run the application. main() is not expected to return. */
+    (void)main();                                          // «4»
+    for (;;)
+    {
+    }
+}
+</script>
+          <div id="ex-reset"></div>
+          <h3>The vector table</h3>
+          <script type="text/plain" id="src-00-vectors" data-src="examples/00-bluepill-blink-uart/bare/src/startup.c" data-region="vectors" data-lang="c" data-file="bare/src/startup.c" data-start="126" data-end="140" data-sha="b8e0317f0830">
+__attribute__((section(".isr_vector"), used))                 // «6»
+const vector_t g_vector_table[16 + 43] = {
+    (vector_t)(uintptr_t)_estack,   /* 0: initial main stack pointer (MSP) */   // «7»
+    Reset_Handler,                  /* 1: reset */                               // «8»
+    NMI_Handler,                    /* 2 */
+    HardFault_Handler,              /* 3 */
+    MemManage_Handler,              /* 4 */
+    BusFault_Handler,               /* 5 */
+    UsageFault_Handler,             /* 6 */
+    0, 0, 0, 0,                     /* 7-10: reserved */
+    SVC_Handler,                    /* 11 */
+    DebugMon_Handler,               /* 12 */
+    0,                              /* 13: reserved */
+    PendSV_Handler,                 /* 14 */
+    SysTick_Handler,                /* 15 */
+</script>
+          <div id="ex-vectors"></div>
+          <h3>The linker script</h3>
+          <script type="text/plain" id="src-00-ld" data-src="examples/00-bluepill-blink-uart/bare/ld/stm32f103c8_64k.ld" data-lang="ld" data-file="ld/stm32f103c8_64k.ld" data-start="1" data-end="91" data-sha="283e758fac69" data-skip="6,21,51,77">
+/* SPDX-License-Identifier: MIT
+ * Linker script for the STM32F103C8T6 "Blue Pill": 64 KB flash, 20 KB SRAM (DS5319).
+ * Never 128 KB: the second 64 KB on many C8 dies is untested and undocumented.
+ * Shared by every example from 01 on; example 00 carries an annotated copy of this file.
+ */
+ENTRY(Reset_Handler)                       /* «1» */
+
+MEMORY                                     /* «2» */
+{
+  FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 64K
+  RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 20K
+}
+
+/* Top of RAM. AAPCS wants an 8-byte aligned stack; ORIGIN + LENGTH is 0x20005000. */
+_estack = ORIGIN(RAM) + LENGTH(RAM);       /* «3» */
+
+/* The link fails if the static data plus these reserves do not fit into RAM. */
+_Min_Heap_Size  = 0x000;                   /* no malloc in this course */
+_Min_Stack_Size = 0x400;                   /* 1 KB main stack: checked, not enforced at run time */
+
+SECTIONS
+{
+  /* The vector table must be first: the core reads SP and PC from 0x08000000 at reset. */
+  .isr_vector :                            /* «4» */
+  {
+    . = ALIGN(4);
+    KEEP(*(.isr_vector))
+    . = ALIGN(4);
+  } >FLASH
+
+  .text :
+  {
+    . = ALIGN(4);
+    *(.text)
+    *(.text*)
+    *(.rodata)
+    *(.rodata*)
+    KEEP(*(.init))
+    KEEP(*(.fini))
+    . = ALIGN(4);
+    _etext = .;
+  } >FLASH
+
+  .ARM.exidx :
+  {
+    *(.ARM.exidx* .gnu.linkonce.armexidx.*)
+  } >FLASH
+
+  /* Initialised variables live in RAM (VMA) but their start values are stored in flash (LMA). */
+  _sidata = LOADADDR(.data);               /* «5» */
+  .data :
+  {
+    . = ALIGN(4);
+    _sdata = .;
+    *(.data)
+    *(.data*)
+    . = ALIGN(4);
+    _edata = .;
+  } >RAM AT> FLASH                         /* «6» */
+
+  /* Zero-initialised variables: no image in flash, the startup code clears them. */
+  .bss (NOLOAD) :
+  {
+    . = ALIGN(4);
+    _sbss = .;
+    __bss_start__ = _sbss;
+    *(.bss)
+    *(.bss*)
+    *(COMMON)
+    . = ALIGN(4);
+    _ebss = .;
+    __bss_end__ = _ebss;
+  } >RAM
+
+  /* Reserve heap + stack so the link fails early when RAM runs out. */
+  ._user_heap_stack (NOLOAD) :             /* «7» */
+  {
+    . = ALIGN(8);
+    PROVIDE(end = .);
+    PROVIDE(_end = .);
+    . = . + _Min_Heap_Size;
+    . = . + _Min_Stack_Size;
+    . = ALIGN(8);
+  } >RAM
+
+  .ARM.attributes 0 : { *(.ARM.attributes) }
+}
+</script>
+          <div id="ex-ld"></div>
+          <p>Build it and look at the result. The memory map below is drawn from the ELF that CI built from these exact files: step through it to watch what <code>Reset_Handler</code> does.</p>
+          <script type="text/plain" data-code data-lang="console" data-file="terminal">$ cmake --preset bluepill-debug
+$ cmake --build --preset bluepill-debug --target 00-bluepill-blink-uart</script>
+          <div id="mm-00"></div>
+          <p>The HAL build of the same program, for comparison. The extra flash is HAL code that handles every configuration the HAL supports, plus timeouts and state tracking:</p>
+          <div id="mm-00-hal"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Don't copy ST's linker script for the C8</span><p>ST's generic <code>STM32F103XB_FLASH.ld</code> is written for the 128 KB XB part. Our script declares 64 KB and puts the initial stack pointer at the very top of the 20 KB RAM (<code>0x20005000</code>). <a href="boot.html#linker-script">Module 03</a> takes the linker script apart line by line.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="cmake-under-hood" data-title="What CMake generates under the hood">
+          <div class="sec-head"><h2><span class="sec-num">2.8</span>What CMake generates under the hood</h2></div>
+          <p>CMake does not compile anything. It reads <code>CMakeLists.txt</code> and writes a build description for Ninja, which then runs the compiler. Three things make that work for a microcontroller.</p>
+          <h3>1. A toolchain file says "cross-compile for Arm"</h3>
+          <script type="text/plain" id="src-cmake-toolchain" data-src="examples/common/cmake/arm-none-eabi.cmake" data-region="toolchain" data-lang="cmake" data-file="examples/common/cmake/arm-none-eabi.cmake" data-start="5" data-end="25" data-sha="bb752d22c569">
+set(CMAKE_SYSTEM_NAME Generic)                     # «1»
+set(CMAKE_SYSTEM_PROCESSOR arm)
+# CMake test-compiles a program to check the compiler; a static library avoids needing our linker script.
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)   # «2»
+
+set(ARM_TOOLCHAIN_DIR "$ENV{ARM_TOOLCHAIN_DIR}" CACHE PATH "Directory containing arm-none-eabi-gcc (empty: search PATH)")
+set(_hint "")
+if(ARM_TOOLCHAIN_DIR)
+  set(_hint HINTS "${ARM_TOOLCHAIN_DIR}" NO_DEFAULT_PATH)
+endif()
+find_program(ARM_GCC arm-none-eabi-gcc ${_hint} REQUIRED)   # «3»
+get_filename_component(_bin "${ARM_GCC}" DIRECTORY)
+
+set(CMAKE_C_COMPILER   "${_bin}/arm-none-eabi-gcc${CMAKE_EXECUTABLE_SUFFIX}")   # «4»
+set(CMAKE_ASM_COMPILER "${_bin}/arm-none-eabi-gcc${CMAKE_EXECUTABLE_SUFFIX}")
+set(CMAKE_OBJCOPY      "${_bin}/arm-none-eabi-objcopy${CMAKE_EXECUTABLE_SUFFIX}" CACHE FILEPATH "")
+set(CMAKE_SIZE         "${_bin}/arm-none-eabi-size${CMAKE_EXECUTABLE_SUFFIX}" CACHE FILEPATH "")
+
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+</script>
+          <div id="ex-toolchain"></div>
+          <h3>2. Flags for the Cortex-M3</h3>
+          <script type="text/plain" id="src-cmake-flags" data-src="examples/common/cmake/bluepill.cmake" data-region="flags" data-lang="cmake" data-file="examples/common/cmake/bluepill.cmake" data-start="21" data-end="24" data-sha="fbfe8878b0fa">
+set(MCU_CPU_FLAGS -mcpu=cortex-m3 -mthumb)                                       # «5»
+set(MCU_C_FLAGS
+  ${MCU_CPU_FLAGS} -std=c11 -ffunction-sections -fdata-sections -fno-common -ffreestanding
+  -Wall -Wextra -Werror -Wshadow -Wundef -Wstrict-prototypes -Wmissing-prototypes -Wconversion -g3)   # «6»
+</script>
+          <div id="ex-flags"></div>
+          <h3>3. Linking, image files and a flash target</h3>
+          <script type="text/plain" id="src-cmake-link" data-src="examples/common/cmake/bluepill.cmake" data-region="link" data-lang="cmake" data-file="examples/common/cmake/bluepill.cmake" data-start="75" data-end="88" data-sha="fbfe8878b0fa">
+target_link_options(${name} PRIVATE ${MCU_CPU_FLAGS} -L "${MCU_COMMON}/ld"
+  -T "${BP_LINKER_SCRIPT}" --specs=nano.specs --specs=nosys.specs                # «7»
+  -Wl,--gc-sections -Wl,-Map=$<TARGET_FILE_DIR:${name}>/${name}.map -Wl,--print-memory-usage)   # «8»
+add_custom_command(TARGET ${name} POST_BUILD
+  COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${name}> $<TARGET_FILE_DIR:${name}>/${name}.hex   # «9»
+  COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${name}> $<TARGET_FILE_DIR:${name}>/${name}.bin
+  COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${name}>
+  VERBATIM)
+if(OPENOCD)
+  add_custom_target(flash-${name}                                                  # «10»
+    COMMAND ${OPENOCD} -f "${MCU_COMMON}/openocd/bluepill.cfg"
+            -c "program $<TARGET_FILE:${name}> verify reset exit"
+    DEPENDS ${name} USES_TERMINAL VERBATIM)
+endif()
+</script>
+          <div id="ex-link"></div>
+          <h3>Presets: one command on every OS</h3>
+          <script type="text/plain" data-code data-src="CMakePresets.json" data-lang="json" data-file="CMakePresets.json" data-start="1" data-end="25" data-sha="e0abccdd9439">
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "bluepill-base", "hidden": true, "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/examples/common/cmake/arm-none-eabi.cmake",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    { "name": "bluepill-debug", "inherits": "bluepill-base", "displayName": "Blue Pill (Debug, -Og)", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "bluepill-release", "inherits": "bluepill-base", "displayName": "Blue Pill (Release, -Os)", "cacheVariables": { "CMAKE_BUILD_TYPE": "MinSizeRel" } },
+    {
+      "name": "host-tests", "displayName": "Host unit tests (Unity)", "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/host-tests", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "bluepill-debug", "configurePreset": "bluepill-debug" },
+    { "name": "bluepill-release", "configurePreset": "bluepill-release" },
+    { "name": "host-tests", "configurePreset": "host-tests" }
+  ],
+  "testPresets": [
+    { "name": "host-tests", "configurePreset": "host-tests", "output": { "outputOnFailure": true } }
+  ]
+}
+</script>
+          <p>After <code>cmake --preset bluepill-debug</code>, look inside <code>build/bluepill-debug/</code>:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>File</th><th>What it is</th></tr></thead>
+            <tbody>
+              <tr><td><code>build.ninja</code></td><td>Every compile and link command with its full flags. Search it for <code>-mcpu=cortex-m3</code> to see a real command line.</td></tr>
+              <tr><td><code>compile_commands.json</code></td><td>The same commands as JSON. VS Code's C/C++ extension and clang-tidy read it, so "go to definition" finds <code>RCC-&gt;CFGR</code> in the CMSIS header.</td></tr>
+              <tr><td><code>CMakeCache.txt</code></td><td>Settings remembered between runs (compiler path, build type).</td></tr>
+              <tr><td><code>examples/…/*.elf, .hex, .bin, .map</code></td><td>The program with debug info (ELF), two flashable images, and the linker's map of where every symbol landed.</td></tr>
+            </tbody>
+          </table></div>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">See the exact commands</span><p><code>cmake --build --preset bluepill-debug -- -v</code> makes Ninja print every command it runs. Copy one and run it by hand to experiment with a flag.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="blink" data-title="Blink PC13 (active-low)">
+          <div class="sec-head"><h2><span class="sec-num">2.9</span>Blink PC13 (active-low)</h2></div>
+          <p>Blinking an LED takes three steps on any STM32F1: turn on the clock of the GPIO port, configure the pin as an output, and write to it. The on-board LED sits between 3.3 V and PC13, so current flows, and the LED lights, when PC13 is driven <b>low</b>.</p>
+          <script type="text/plain" id="src-00-led" data-src="examples/00-bluepill-blink-uart/bare/src/main.c" data-region="led" data-lang="c" data-file="bare/src/main.c" data-start="13" data-end="28" data-sha="c4395b86a08f">
+static void led_init(void)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;                                     // «1»
+    GPIOC->CRH = (GPIOC->CRH & ~(GPIO_CRH_MODE13 | GPIO_CRH_CNF13))       // «2»
+                 | GPIO_CRH_MODE13_1;   /* output, 2 MHz max, push-pull */  // «3»
+}
+
+static void led_on(void)
+{
+    GPIOC->BSRR = GPIO_BSRR_BR13;   /* drive LOW: the LED is wired to 3.3 V, so it lights */ // «4»
+}
+
+static void led_off(void)
+{
+    GPIOC->BSRR = GPIO_BSRR_BS13;   /* drive HIGH: no current, LED off */
+}
+</script>
+          <div id="ex-led"></div>
+          <p>The pin configuration lives in <code>GPIOC_CRH</code>: four bits per pin (MODE and CNF) for pins 8 to 15. Below is the value after <code>led_init()</code>. Change <code>MODE13</code> or <code>CNF13</code> and watch the C expression change; then try another port.</p>
+          <div id="reg-crh"></div>
+          <script type="text/plain" id="src-00-delay" data-src="examples/00-bluepill-blink-uart/bare/src/main.c" data-region="crude-delay" data-lang="c" data-file="bare/src/main.c" data-start="34" data-end="39" data-sha="c4395b86a08f">
+static void crude_delay(uint32_t loops)
+{
+    for (volatile uint32_t i = 0U; i < loops; ++i)   /* volatile: the compiler must not drop the loop */ // «5»
+    {
+    }
+}
+</script>
+          <div id="ex-delay"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">PC13 is a weak pin</span><p>PC13, PC14 and PC15 can sink only about 3 mA, must run at 2 MHz or less, and must not source current (DS5319, Table 5 notes). That is enough for the on-board LED and nothing more. Never hang a relay or a bright LED on them; that is why <code>led_init()</code> picks the 2 MHz output mode.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="clock-72" data-title="From HSI 8 MHz to PLL 72 MHz">
+          <div class="sec-head"><h2><span class="sec-num">2.10</span>From HSI 8 MHz to PLL 72 MHz</h2></div>
+          <p>After reset the chip runs from <b>HSI</b>, an internal 8 MHz RC oscillator: available instantly, but only accurate to about 1 % at room temperature and worse across the temperature range (DS5319). The Blue Pill also carries an 8 MHz crystal (<b>HSE</b>). The <b>PLL</b> multiplies it by 9 to reach the 72 MHz maximum. The order of the steps matters:</p>
+          <script type="text/plain" id="src-00-clock" data-src="examples/00-bluepill-blink-uart/bare/src/main.c" data-region="clock" data-lang="c" data-file="bare/src/main.c" data-start="58" data-end="81" data-sha="c4395b86a08f">
+static int clock_72mhz(void)
+{
+    RCC->CR |= RCC_CR_HSEON;                                         /* start the 8 MHz crystal */  // «6»
+    if (!wait_set(&RCC->CR, RCC_CR_HSERDY, RCC_CR_HSERDY))
+    {
+        return 1;                                                    /* no crystal: stay on HSI */
+    }
+    FLASH->ACR = FLASH_ACR_PRFTBE | (2U << FLASH_ACR_LATENCY_Pos);   /* 2 wait states BEFORE speeding up */ // «7»
+    RCC->CFGR |= RCC_CFGR_PPRE1_DIV2                                 /* APB1 <= 36 MHz */            // «8»
+               | RCC_CFGR_PLLSRC                                     /* PLL input: HSE */
+               | RCC_CFGR_PLLMULL9;                                  /* 8 MHz x 9 = 72 MHz */        // «9»
+    RCC->CR |= RCC_CR_PLLON;
+    if (!wait_set(&RCC->CR, RCC_CR_PLLRDY, RCC_CR_PLLRDY))
+    {
+        return 2;
+    }
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;        /* switch SYSCLK to the PLL */  // «10»
+    if (!wait_set(&RCC->CFGR, RCC_CFGR_SWS, RCC_CFGR_SWS_PLL))       /* hardware confirms in SWS */  // «11»
+    {
+        return 3;
+    }
+    SystemCoreClock = 72000000U;
+    return 0;
+}
+</script>
+          <div id="ex-clock"></div>
+          <p>This is <code>RCC_CFGR</code> after a successful switch. <code>SWS</code> (read-only) now reports the PLL, which is how the code knows the switch really happened:</p>
+          <div id="reg-cfgr"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct"><code>FLASH_ACR_LATENCY_2</code> is not "two wait states"</span><p>In the CMSIS header, <code>FLASH_ACR_LATENCY_2</code> is the mask of bit 2 of the field, value <code>0x4</code>. Writing it asks for four wait states, which the F1 does not define. Two wait states is the value 2 in the field: <code>(2U &lt;&lt; FLASH_ACR_LATENCY_Pos)</code>. Too few wait states at 72 MHz makes the CPU read flash before the data is ready, and the program crashes in ways that look random.</p></div></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>Switching clocks is like changing the conveyor speed in a factory. You first tell the slow station (flash) to take two extra beats per item, then start the fast motor (PLL) and wait until it runs smoothly, and only then move the belt onto it. Doing it in any other order drops parts on the floor.</p></div></div>
+          <p>On hardware the difference is visible: the same <code>crude_delay(200000)</code> loop blinks nine times faster after the switch, because the loop now runs at 72 million instead of 8 million cycles per second.</p>
+        </section>
+
+        <section class="doc-section" id="uart-hello" data-title="&quot;Hello from Blue Pill&quot; over USART1">
+          <div class="sec-head"><h2><span class="sec-num">2.11</span>"Hello from Blue Pill" over USART1</h2></div>
+          <p>USART1 sits on the APB2 bus, which runs at the full 72 MHz here. Its transmit pin is PA9, so PA9 must be handed to the peripheral (an <i>alternate function</i> output) instead of being a plain GPIO.</p>
+          <script type="text/plain" id="src-00-uart" data-src="examples/00-bluepill-blink-uart/bare/src/main.c" data-region="uart" data-lang="c" data-file="bare/src/main.c" data-start="86" data-end="114" data-sha="c4395b86a08f">
+static void uart_init(uint32_t pclk2, uint32_t baud)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_USART1EN;                   // «12»
+    GPIOA->CRH = (GPIOA->CRH & ~(GPIO_CRH_CNF9 | GPIO_CRH_MODE9 | GPIO_CRH_CNF10 | GPIO_CRH_MODE10))
+                 | GPIO_CRH_CNF9_1 | GPIO_CRH_MODE9    /* PA9: alternate-function push-pull, 50 MHz */ // «13»
+                 | GPIO_CRH_CNF10_0;                   /* PA10: floating input */
+    USART1->BRR = (pclk2 + (baud / 2U)) / baud;        /* 72 MHz / 115200 = 625 = 0x271 */          // «14»
+    USART1->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE;                                      // «15»
+}
+
+static void uart_putc(char c)
+{
+    for (uint32_t n = 0U; ((USART1->SR & USART_SR_TXE) == 0U) && (n < WAIT_LOOPS); ++n)  // «16»
+    {
+    }
+    USART1->DR = (uint8_t)c;
+}
+
+static void uart_puts(const char *s)
+{
+    for (; *s != '\0'; ++s)
+    {
+        if (*s == '\n')
+        {
+            uart_putc('\r');   /* terminals expect CR LF */
+        }
+        uart_putc(*s);
+    }
+}
+</script>
+          <div id="ex-uart"></div>
+          <p>And <code>main()</code> ties it together: slow blinks, the switch, fast blinks, then SysTick for proper timing.</p>
+          <script type="text/plain" id="src-00-main" data-src="examples/00-bluepill-blink-uart/bare/src/main.c" data-region="main" data-lang="c" data-file="bare/src/main.c" data-start="142" data-end="195" data-sha="c4395b86a08f">
+int main(void)
+{
+    led_init();
+
+    /* 1. On HSI (8 MHz): five slow blinks with the crude delay. */
+    for (uint32_t k = 0U; k < 5U; ++k)                                       // «17»
+    {
+        led_on();
+        crude_delay(200000U);
+        led_off();
+        crude_delay(200000U);
+    }
+
+    /* 2. Switch to 72 MHz. The SAME crude delay now finishes nine times sooner. */
+    const int status = clock_72mhz();                                        // «18»
+    for (uint32_t k = 0U; k < 5U; ++k)
+    {
+        led_on();
+        crude_delay(200000U);
+        led_off();
+        crude_delay(200000U);
+    }
+
+    /* 3. Proper timing: SysTick at 1 kHz, independent of how fast the loop runs. */
+    (void)SysTick_Config(SystemCoreClock / 1000U);                           // «19»
+    uart_init(SystemCoreClock, 115200U);   /* APB2 = SYSCLK here (prescaler 1) */
+    uart_puts("Hello from Blue Pill @ ");                                    // «20»
+    uart_put_dec(SystemCoreClock / 1000000U);
+    uart_puts(" MHz\n");
+    uart_puts("clock status: ");
+    uart_put_dec((uint32_t)status);
+    uart_puts(" (0 = OK)\n");
+
+    uint32_t next = 1000U, seconds = 0U;
+    for (;;)
+    {
+        if (s_ms >= next)                                                    // «21»
+        {
+            next += 1000U;
+            ++seconds;
+            uart_puts("uptime ");
+            uart_put_dec(seconds);
+            uart_puts(" s\n");
+        }
+        if ((s_ms % 1000U) < 500U)   /* 1 Hz blink, 50 % duty */
+        {
+            led_on();
+        }
+        else
+        {
+            led_off();
+        }
+    }
+}
+</script>
+          <div id="ex-main"></div>
+          <p>Open a terminal at <b>115200 baud, 8 data bits, no parity, 1 stop bit</b> (8N1), press the Blue Pill's reset button, and you should see exactly this (from <code>expected-output.txt</code>):</p>
+          <div data-tabs data-remember="mcu-os" data-detect="os">
+            <div class="tab-list" role="tablist"><button data-tab="windows">Windows</button><button data-tab="linux">Linux</button><button data-tab="macos">macOS</button></div>
+            <div class="tab-panel" data-panel="windows"><p>Find the adapter's port in Device Manager under "Ports (COM &amp; LPT)", then in PuTTY choose <i>Serial</i>, that COM port and speed 115200.</p></div>
+            <div class="tab-panel" data-panel="linux"><script type="text/plain" data-code data-lang="console">$ picocom -b 115200 /dev/ttyUSB0      # Ctrl-A Ctrl-X quits; add yourself to the dialout group if access is denied</script></div>
+            <div class="tab-panel" data-panel="macos"><script type="text/plain" data-code data-lang="console">$ ls /dev/tty.usbserial* /dev/tty.wchusbserial*
+$ picocom -b 115200 /dev/tty.usbserial-XXXX</script></div>
+          </div>
+          <script type="text/plain" data-code data-src="examples/00-bluepill-blink-uart/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="5" data-sha="2b5949b6d2b8">
+Hello from Blue Pill @ 72 MHz
+clock status: 0 (0 = OK)
+uptime 1 s
+uptime 2 s
+uptime 3 s
+</script>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Garbage characters?</span><p>Wrong baud rate on one side. If you see garbage only <i>after</i> the clock switch, the code computed <code>BRR</code> for the wrong clock. <a href="troubleshooting.html#uart-garbage">Troubleshooting</a> lists the checks.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="flash" data-title="Flash with OpenOCD and CubeProgrammer">
+          <div class="sec-head"><h2><span class="sec-num">2.12</span>Flash with OpenOCD and CubeProgrammer</h2></div>
+          <p>Every example has a <code>flash-&lt;name&gt;</code> target, so one command builds and flashes:</p>
+          <script type="text/plain" data-code data-lang="console" data-file="terminal">$ cmake --build --preset bluepill-debug --target flash-00-bluepill-blink-uart</script>
+          <p>It runs OpenOCD with the course's configuration file:</p>
+          <script type="text/plain" id="src-ocd-cfg" data-src="examples/common/openocd/bluepill.cfg" data-region="cfg" data-lang="tcl" data-file="examples/common/openocd/bluepill.cfg" data-start="6" data-end="10" data-sha="d868bd73554a">
+source [find interface/stlink.cfg]       ;# ST-Link driver  # «1»
+transport select hla_swd                 ;# SWD, not JTAG  # «2»
+set FLASH_SIZE 0x10000                   ;# 64 KB, as specified for the C8 (DS5319)  # «3»
+source [find target/stm32f1x.cfg]        ;# STM32F1 flash driver, reads FLASH_SIZE  # «4»
+adapter speed 1000                       ;# kHz  # «5»
+</script>
+          <div id="ex-ocd"></div>
+          <p>What happens between your keyboard and the flash cells:</p>
+          <div id="seq-flash"></div>
+          <h3>Alternatives</h3>
+          <ul>
+            <li><b>STM32CubeProgrammer</b> (GUI and CLI from ST): <code>STM32_Programmer_CLI -c port=SWD -w build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf -v -rst</code>. It refuses some clone chips.</li>
+            <li><b>The system bootloader over USART1</b>, without any probe: set BOOT0 = 1, reset, and send the image through the same USB-UART adapter (ST's protocol is described in AN3155; <code>stm32flash</code> implements it). Set BOOT0 back to 0 afterwards. <a href="bootloader.html#system-bl">Module 16</a> covers it.</li>
+          </ul>
+        </section>
+
+        <section class="doc-section" id="debug" data-title="Debug: breakpoints, stepping, SVD">
+          <div class="sec-head"><h2><span class="sec-num">2.13</span>Debug: breakpoints, stepping, SVD</h2></div>
+          <p>The repository ships a ready VS Code configuration. Open the repository folder, press <kbd>F5</kbd>, and Cortex-Debug builds the example, starts OpenOCD, flashes the ELF and stops at the first line of <code>main()</code>.</p>
+          <script type="text/plain" data-code data-src=".vscode/launch.json" data-lines="1-15" data-lang="json" data-file=".vscode/launch.json" data-start="1" data-end="15" data-sha="077f61b8e6af">
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Blue Pill · example 00 (ST-Link + OpenOCD)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "openocd",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf",
+      "configFiles": ["${workspaceFolder}/examples/common/openocd/bluepill.cfg"],
+      "svdFile": "${workspaceFolder}/.cache/svd/STM32F103.svd",
+      "runToEntryPoint": "main",
+      "preLaunchTask": "build: bluepill-debug"
+    },
+</script>
+          <p>The <code>svdFile</code> entry gives the debugger a description of every peripheral register, so the <i>XPERIPHERALS</i> panel shows <code>RCC</code>, <code>GPIOC</code> and the others field by field. ST's SVD file is not stored in this repository (its licence is unclear); one command downloads it and checks its hash:</p>
+          <script type="text/plain" data-code data-lang="console" data-file="terminal">$ python3 tools/fetch-svd.py       # writes .cache/svd/STM32F103.svd</script>
+          <p>Things to try in your first session:</p>
+          <ol>
+            <li>Set a breakpoint on <code>RCC-&gt;CFGR = (RCC-&gt;CFGR &amp; ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;</code> in <code>clock_72mhz()</code>. Open <i>XPERIPHERALS → RCC → CFGR</i>, step over the line (<kbd>F10</kbd>) and watch <code>SWS</code> change to PLL.</li>
+            <li>Add <code>s_ms</code> to <i>Watch</i>, continue (<kbd>F5</kbd>) and pause: it holds the milliseconds since SysTick started.</li>
+            <li>In the <i>Debug Console</i>, type <code>-exec info registers</code> to see the core registers, or <code>-exec x/4wx 0x08000000</code> to see the first four words of the vector table: the initial stack pointer <code>0x20005000</code> comes first.</li>
+          </ol>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">Where printf goes</span><p>This course prints over a real UART. Semihosting (sending text through the debug probe) is very slow and stops the program when no debugger is attached, and SWO tracing needs the probe's SWO pin, which most ST-Link V2 clones lack. <a href="faults-debug.html#semihosting-swo">Module 15</a> compares the options.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="renode" data-title="Run without hardware in Renode">
+          <div class="sec-head"><h2><span class="sec-num">2.14</span>Run without hardware in Renode</h2></div>
+          <p>Renode is an open-source simulator from Antmicro. It runs the <b>same ELF</b> you would flash, on a model of the STM32F103, and shows the UART output in a window. The course's model (<code>examples/common/renode/bluepill.repl</code>) adds what Renode's stock STM32F103 platform lacks for our examples: a clock controller that reports the PLL as locked and switched, a flash interface, and the bit-band regions the HAL uses.</p>
+          <script type="text/plain" data-code data-lang="console" data-file="terminal">$ cmake --build --preset bluepill-debug --target renode-00-bluepill-blink-uart     # opens Renode with a UART window
+$ python3 tools/run-renode-tests.py examples/00-bluepill-blink-uart/bare/test/00.robot   # the automated test CI runs</script>
+          <p>The script that loads the board and the program:</p>
+          <script type="text/plain" data-code data-src="examples/common/renode/bluepill.resc" data-lang="resc" data-file="examples/common/renode/bluepill.resc" data-start="1" data-end="14" data-sha="7fd135c89345">
+# SPDX-License-Identifier: MIT
+# Load the Blue Pill platform and an ELF:   renode -e '$bin=@path/to/app.elf; include @examples/common/renode/bluepill.resc'
+$name?="bluepill"
+using sysbus
+mach create $name
+machine LoadPlatformDescription $ORIGIN/bluepill.repl
+showAnalyzer sysbus.usart1
+
+macro reset
+"""
+    sysbus LoadELF $bin
+    cpu VectorTableOffset 0x08000000
+"""
+runMacro $reset
+</script>
+          <p>And the automated test, written in Robot Framework. It waits for the greeting and checks that PC13 blinks at 1 Hz in virtual time:</p>
+          <script type="text/plain" data-code data-src="examples/00-bluepill-blink-uart/bare/test/00.robot" data-lines="15-29" data-lang="robot" data-file="test/00.robot" data-start="15" data-end="29" data-sha="4131ce211324">
+*** Test Cases ***
+Bare: Switches To 72 MHz And Greets
+    Create Blue Pill    ${ELF}
+    Wait For Line On Uart    Hello from Blue Pill @ 72 MHz
+    Wait For Line On Uart    clock status: 0 (0 = OK)
+
+Bare: Prints Uptime Every Second
+    Create Blue Pill    ${ELF}
+    Wait For Line On Uart    uptime 1 s
+    Wait For Line On Uart    uptime 2 s
+
+Bare: Blinks PC13 At 1 Hz
+    Create Blue Pill    ${ELF}
+    Wait For Line On Uart    uptime 1 s
+    Assert LED Is Blinking    testDuration=3    onDuration=0.5    offDuration=0.5    tolerance=0.05
+</script>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity</span>
+            <p>✅ The clock-switch <i>logic</i> (HSERDY, PLLRDY, SWS), the UART text, the LED state and SysTick timing in virtual time.</p>
+            <p>⚠️ The speed-up after switching to 72 MHz is <b>not</b> reproduced: Renode's CPU and SysTick do not follow the RCC settings. Without the course's RCC model, the stock platform never reports the PLL as selected, and the program reports <code>clock status: 3</code> after its timeout.</p>
+            <p>❌ Electrical behaviour (the LED's current, the crystal starting up) and timing accuracy are not simulated. This example has not been checked on a real board by the course yet.</p></div></div>
+          <p>Debugging works too: in the Renode monitor type <code>machine StartGdbServer 3333</code>, then pick <i>Renode · attach to GDB server on :3333</i> in VS Code.</p>
+        </section>
+
+        <section class="doc-section" id="done" data-title="You are done when…">
+          <div class="sec-head"><h2><span class="sec-num">2.15</span>You are done when…</h2></div>
+          <p>Tick these off. Your progress is saved in this browser.</p>
+          <div id="ck-setup"></div>
+          <p>Next: <a href="board.html">get to know the board's pins</a>, or jump into <a href="fundamentals.html">what a microcontroller is</a>.</p>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/data/versions.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/memmap/00-bluepill-blink-uart.js?v=__BUILD__"></script>
+  <script src="assets/js/data/memmap/00-bluepill-blink-uart-hal.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/memorymap.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/setup.js?v=__BUILD__"></script>
+</body>
+</html>

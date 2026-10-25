@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>I2C and an SSD1306 OLED — MCU Academy</title>
+  <meta name="description" content="I2C protocol on the wire, the F1 I2C peripheral and its errata, then drawing on an SSD1306 OLED.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="i2c">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 10</span><span>/</span><span>I2C</span></nav>
+          <div class="eyebrow">Module 10 · Peripherals</div>
+          <h1>I2C and an SSD1306 OLED</h1>
+          <p class="lead">I2C connects many chips over just two wires, with addresses and an acknowledge after every byte. It is everywhere on circuit boards: displays, sensors, EEPROMs. The STM32F1's I2C peripheral is famously particular, so this module spends time on its event sequence and its errata, then drives an SSD1306 OLED.</p>
+          <div class="page-meta"><span>⏱ 45 min read</span><span>🎯 Intermediate</span><span>📂 examples/06-i2c-oled-ssd1306</span></div>
+        </header>
+
+        <section class="doc-section" id="protocol" data-title="I2C on the wire">
+          <div class="sec-head"><h2><span class="sec-num">10.1</span>I2C on the wire</h2></div>
+          <p>Two lines, <b>SCL</b> (clock, driven by the master) and <b>SDA</b> (data, both directions). Both are <b>open-drain</b>: devices can only pull a line low; a pull-up resistor (typically 4.7 kΩ) brings it back high. Any device can therefore hold a line low without short-circuiting another.</p>
+          <ul>
+            <li><b>START</b>: SDA falls while SCL is high. <b>STOP</b>: SDA rises while SCL is high. During data, SDA only changes while SCL is low.</li>
+            <li>The first byte is the 7-bit <b>address</b> plus a read/write bit. The addressed device answers with an <b>ACK</b>: it pulls SDA low during the ninth clock.</li>
+            <li>Then data bytes follow, each acknowledged by the receiver. A <b>NACK</b> (SDA left high) means "no such device" after the address, or "stop sending" from a master reading.</li>
+            <li>Standard mode runs at up to 100 kHz, fast mode up to 400 kHz (I2C specification UM10204).</li>
+          </ul>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>A classroom where the teacher (master) calls a pupil by number and every pupil must raise a hand to say "heard you" after each sentence. Nobody raises a hand? Either the pupil is absent or the number was wrong, and the teacher knows immediately.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="waveform" data-title="Interactive I2C transaction">
+          <div class="sec-head"><h2><span class="sec-num">10.2</span>Interactive I2C transaction</h2></div>
+          <p>Change the address and the data and watch the transaction. Shaded bands mark the fields; ACK and NACK are the receiver's answer.</p>
+          <div id="wv-i2c"></div>
+          <div class="wv-controls">
+            <label for="i2c-addr">Address (hex) <input id="i2c-addr" type="text" value="3C"></label>
+            <label for="i2c-rw">Direction <select id="i2c-rw"><option value="0">write</option><option value="1">read</option></select></label>
+            <label for="i2c-data">Data bytes (hex) <input id="i2c-data" type="text" value="00 AF"></label>
+            <label for="i2c-nack"><input id="i2c-nack" type="checkbox"> nobody answers</label>
+          </div>
+        </section>
+
+        <section class="doc-section" id="f1-i2c" data-title="The F1 I2C peripheral">
+          <div class="sec-head"><h2><span class="sec-num">10.3</span>The F1 I2C peripheral</h2></div>
+          <p>The F1's I2C peripheral is driven by <b>events</b>: you write a control bit, wait for a status flag, and the flag is cleared by a specific sequence of reads and writes (RM0008 §26.3.3). Step through a master write:</p>
+          <div id="sm-i2c"></div>
+          <div id="reg-i2csr1"></div>
+          <script type="text/plain" id="src-06-write" data-src="examples/06-i2c-oled-ssd1306/src/i2c.c" data-region="write" data-lang="c" data-file="examples/06-i2c-oled-ssd1306/src/i2c.c" data-start="81" data-end="116" data-sha="85568cfe6a7c">
+i2c_status_t i2c_write(uint8_t addr7, uint8_t prefix, const uint8_t *data, uint32_t len)
+{
+    uint32_t n = 0U;
+    while ((I2C1->SR2 & I2C_SR2_BUSY) != 0U)                 /* wait for a free bus */
+    {
+        if (++n > I2C_WAIT)
+        {
+            return I2C_ERR_BUSY;
+        }
+    }
+    I2C1->CR1 |= I2C_CR1_START;                                                                      // «8»
+    i2c_status_t st = wait_sr1(I2C_SR1_SB);                  /* EV5: start condition sent */
+    if (st != I2C_OK)
+    {
+        return st;
+    }
+    I2C1->DR = (uint8_t)(addr7 << 1);                        /* address + write bit (0) */           // «9»
+    st = wait_sr1(I2C_SR1_ADDR);                             /* EV6: the slave acknowledged */
+    if (st != I2C_OK)
+    {
+        return st;
+    }
+    (void)I2C1->SR2;                                         /* reading SR1 then SR2 clears ADDR */  // «10»
+    for (uint32_t i = 0U; i <= len; ++i)
+    {
+        st = wait_sr1(I2C_SR1_TXE);                          /* EV8: data register empty */
+        if (st != I2C_OK)
+        {
+            return st;
+        }
+        I2C1->DR = (i == 0U) ? prefix : data[i - 1U];
+    }
+    st = wait_sr1(I2C_SR1_BTF);                              /* EV8_2: last byte fully sent */       // «11»
+    I2C1->CR1 |= I2C_CR1_STOP;
+    return st;
+}
+</script>
+          <div id="ex-write"></div>
+          <p>Timing is set from the peripheral clock (36 MHz on APB1):</p>
+          <script type="text/plain" id="src-06-init" data-src="examples/06-i2c-oled-ssd1306/src/i2c.c" data-region="init" data-lang="c" data-file="examples/06-i2c-oled-ssd1306/src/i2c.c" data-start="59" data-end="72" data-sha="85568cfe6a7c">
+void i2c_init(void)
+{
+    RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+    RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
+    bus_recover();
+    GPIOB->CRL = (GPIOB->CRL & ~(GPIO_CRL_MODE6 | GPIO_CRL_CNF6 | GPIO_CRL_MODE7 | GPIO_CRL_CNF7))
+                 | GPIO_CRL_MODE6 | GPIO_CRL_CNF6          /* AF open-drain, 50 MHz: I2C is open-drain */ // «4»
+                 | GPIO_CRL_MODE7 | GPIO_CRL_CNF7;
+    const uint32_t mhz = clock_pclk1() / 1000000U;          /* 36 */
+    I2C1->CR2 = mhz;                                         /* FREQ: the peripheral's input clock */ // «5»
+    I2C1->CCR = I2C_CCR_FS | (clock_pclk1() / (3U * 400000U)); /* fast mode, Tlow:Thigh = 2:1 */      // «6»
+    I2C1->TRISE = ((mhz * 300U) / 1000U) + 1U;               /* 300 ns max rise time in fast mode */  // «7»
+    I2C1->CR1 = I2C_CR1_PE;
+}
+</script>
+          <div id="ex-init"></div>
+        </section>
+
+        <section class="doc-section" id="errata" data-title="Errata you must know">
+          <div class="sec-head"><h2><span class="sec-num">10.4</span>Errata you must know</h2></div>
+          <p>ST's errata sheet ES096 lists several limitations of the F1 I2C peripheral. The ones that bite most often:</p>
+          <ul>
+            <li><b>A stuck BUSY flag.</b> If a slave is left holding SDA low (for example, the MCU reset in the middle of a read), or the analog filter latches a glitch, the peripheral believes the bus is busy forever. Software must clock the bus free and reset the peripheral.</li>
+            <li><b>Strict timing between events</b> in master receive mode with interrupts: the sequences for reading 1, 2 or N bytes differ (RM0008 §26.3.3), and an interrupt arriving at the wrong moment can make the peripheral read one byte too many. Polling with interrupts masked for the critical steps, or DMA, avoids it.</li>
+          </ul>
+          <script type="text/plain" id="src-06-recover" data-src="examples/06-i2c-oled-ssd1306/src/i2c.c" data-region="recover" data-lang="c" data-file="examples/06-i2c-oled-ssd1306/src/i2c.c" data-start="33" data-end="55" data-sha="85568cfe6a7c">
+/* If a slave was reset in the middle of a transfer it may still hold SDA low, and the F1's I2C
+ * then sees the bus as busy forever (see the I2C section of errata sheet ES096). Clock SCL by hand
+ * until the slave lets go of SDA, then reset the peripheral before configuring it. */
+static void bus_recover(void)
+{
+    GPIOB->BSRR = GPIO_BSRR_BS6 | GPIO_BSRR_BS7;
+    GPIOB->CRL = (GPIOB->CRL & ~(GPIO_CRL_MODE6 | GPIO_CRL_CNF6 | GPIO_CRL_MODE7 | GPIO_CRL_CNF7))
+                 | GPIO_CRL_MODE6_1 | GPIO_CRL_CNF6_0      /* GPIO open-drain, 2 MHz */          // «1»
+                 | GPIO_CRL_MODE7_1 | GPIO_CRL_CNF7_0;
+    for (uint32_t i = 0U; (i < 9U) && ((GPIOB->IDR & GPIO_IDR_IDR7) == 0U); ++i)               // «2»
+    {
+        GPIOB->BSRR = GPIO_BSRR_BR6;
+        for (volatile uint32_t d = 0U; d < 200U; ++d)
+        {
+        }
+        GPIOB->BSRR = GPIO_BSRR_BS6;
+        for (volatile uint32_t d = 0U; d < 200U; ++d)
+        {
+        }
+    }
+    I2C1->CR1 = I2C_CR1_SWRST;                              /* reset the I2C state machine */      // «3»
+    I2C1->CR1 = 0U;
+}
+</script>
+          <div id="ex-recover"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Every wait needs a timeout</span><p>The most common I2C bug is a <code>while (!(I2C1-&gt;SR1 &amp; I2C_SR1_SB));</code> that hangs forever when the display is unplugged. Example 06 returns <code>I2C_ERR_NACK</code> or <code>I2C_ERR_TIMEOUT</code> instead, and the program keeps running.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="ssd1306" data-title="Driving the SSD1306">
+          <div class="sec-head"><h2><span class="sec-num">10.5</span>Driving the SSD1306</h2></div>
+          <p>The SSD1306 controls a 128 × 64 pixel OLED. Its memory is organised in 8 horizontal <b>pages</b> of 8 pixel rows; each byte is a vertical strip of 8 pixels, bit 0 at the top. Every I2C transaction starts with a <b>control byte</b>: <code>0x00</code> for commands, <code>0x40</code> for display data.</p>
+          <div id="po-oled"></div>
+          <script type="text/plain" id="src-06-ssdinit" data-src="examples/06-i2c-oled-ssd1306/src/ssd1306.c" data-region="init" data-lang="c" data-file="examples/06-i2c-oled-ssd1306/src/ssd1306.c" data-start="12" data-end="29" data-sha="93f920f06a69">
+static const uint8_t s_init[] = {
+    0xAE,         /* display off while configuring */                                         // «1»
+    0xD5, 0x80,   /* display clock divider / oscillator frequency */
+    0xA8, 0x3F,   /* multiplex ratio: 64 rows */
+    0xD3, 0x00,   /* no vertical display offset */
+    0x40,         /* start line 0 */
+    0x8D, 0x14,   /* charge pump on: the module has no separate panel supply */                // «2»
+    0x20, 0x00,   /* horizontal addressing: one flush writes all 8 pages in order */            // «3»
+    0xA1,         /* column 127 is SEG0: mirror horizontally so text reads left to right */
+    0xC8,         /* scan COM63 to COM0: mirror vertically */
+    0xDA, 0x12,   /* COM pin configuration for 128x64 */
+    0x81, 0xCF,   /* contrast */
+    0xD9, 0xF1,   /* pre-charge period */
+    0xDB, 0x40,   /* VCOMH deselect level */
+    0xA4,         /* display follows RAM content */
+    0xA6,         /* normal (not inverted) */
+    0xAF,         /* display on */                                                             // «4»
+};
+</script>
+          <div id="ex-ssdinit"></div>
+          <script type="text/plain" id="src-06-flush" data-src="examples/06-i2c-oled-ssd1306/src/ssd1306.c" data-region="flush" data-lang="c" data-file="examples/06-i2c-oled-ssd1306/src/ssd1306.c" data-start="38" data-end="47" data-sha="93f920f06a69">
+i2c_status_t ssd1306_flush(const gfx_t *g)
+{
+    static const uint8_t window[] = {0x21, 0x00, 0x7F, 0x22, 0x00, 0x07};   /* columns 0-127, pages 0-7 */ // «5»
+    const i2c_status_t st = i2c_write(SSD1306_ADDR, CTRL_CMD, window, sizeof window);
+    if (st != I2C_OK)
+    {
+        return st;
+    }
+    return i2c_write(SSD1306_ADDR, CTRL_DATA, g->buf, GFX_BYTES);           /* 1024 bytes */        // «6»
+}
+</script>
+          <div id="ex-flush"></div>
+          <p>Drawing happens in a 1 KB framebuffer in RAM, in exactly the controller's layout, so a flush is one long transfer. The drawing code has no hardware access and is unit-tested on your PC:</p>
+          <script type="text/plain" id="src-06-pixel" data-src="examples/06-i2c-oled-ssd1306/src/gfx.c" data-region="pixel" data-lang="c" data-file="examples/06-i2c-oled-ssd1306/src/gfx.c" data-start="13" data-end="22" data-sha="7f3286708bd2">
+void gfx_pixel(gfx_t *g, uint32_t x, uint32_t y, bool on)
+{
+    if ((x >= GFX_W) || (y >= GFX_H))
+    {
+        return;                                            /* clip, never write outside the buffer */
+    }
+    const uint32_t i = (y / 8U) * GFX_W + x;               /* page = y / 8, then the column */  // «1»
+    const uint8_t bit = (uint8_t)(1U << (y % 8U));         /* bit 0 = top pixel of the page */  // «2»
+    g->buf[i] = on ? (uint8_t)(g->buf[i] | bit) : (uint8_t)(g->buf[i] & (uint8_t)~bit);
+}
+</script>
+          <div id="ex-pixel"></div>
+          <p>At 400 kHz a full 1024-byte frame takes about 23 ms on the wire (9 clocks per byte), so example 06 redraws about 15 times per second. Updating only the pages that changed is the usual optimisation.</p>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 06)</span><p>✅ The I2C protocol path runs in Renode against a generic slave that acknowledges everything: probe, init and frames succeed; with no slave, the NACK path is tested. ❌ Renode has no SSD1306 model, so <b>no pixels</b> are simulated; no bus timing or pull-up rise times. Not tested on a Blue Pill yet.</p></div></div>
+          <div id="ck-i2c"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/i2c.js?v=__BUILD__"></script>
+</body>
+</html>

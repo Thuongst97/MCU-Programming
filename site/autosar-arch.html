@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AUTOSAR Classic: Layered Architecture — MCU Academy</title>
+  <meta name="description" content="Why AUTOSAR exists, ASW / RTE / BSW / MCAL, the methodology and ARXML, and what is generated vs hand-written in a real project.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="autosar-arch">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 18</span><span>/</span><span>AUTOSAR Architecture</span></nav>
+          <div class="eyebrow">Module 18 · AUTOSAR Classic</div>
+          <h1>AUTOSAR Classic: Layered Architecture</h1>
+          <p class="lead">Everything so far ran on one chip with code you wrote top to bottom. A car has around a hundred control units from dozens of suppliers, and their software must fit together, move between chips and survive fifteen years of maintenance. AUTOSAR Classic is the industry's answer: a layered architecture, standard module interfaces and a tool-driven method. This module maps it out before the next ones open each layer.</p>
+          <div class="page-meta"><span>⏱ 40 min read</span><span>🎯 Intermediate</span><span>📂 autosar/, capstone/turnlight/stage3-autosar</span></div>
+        </header>
+
+        <section class="doc-section" id="why" data-title="Why AUTOSAR exists">
+          <div class="sec-head"><h2><span class="sec-num">18.1</span>Why AUTOSAR exists</h2></div>
+          <div class="callout warn"><div class="ci">🔎</div><div><span class="ct">Verification status</span><p>Every API, type and rule on this page names its AUTOSAR R25-11 document. The requirement IDs and exact values are still being checked against the R25-11 PDFs; until then they come from the R4.x-era specifications, and no requirement ID is quoted, because the course never makes one up. Progress is tracked in <a href="https://github.com/Thuongst97/MCU-Programming/blob/main/docs/autosar-self-review.md">the self-review log</a>.</p></div></div>
+          <p>Before AUTOSAR, every supplier wrote its own drivers, scheduler and communication code for every chip, and every OEM specified interfaces differently. Moving a function to another ECU or another microcontroller meant rewriting it. AUTOSAR (AUTomotive Open System ARchitecture), founded in 2003 by OEMs and suppliers, standardises the parts that do not differentiate a product so that the parts that do can be reused:</p>
+          <ul>
+            <li><b>Standard basic software (BSW)</b>: drivers, communication, diagnostics, memory and mode management with specified APIs, bought from a BSW vendor.</li>
+            <li><b>Application software components (SWCs)</b> that talk only through a generated layer, the RTE, so they do not know which ECU or chip they run on.</li>
+            <li><b>A methodology</b> with exchange formats (ARXML) so OEM, supplier and tool vendor work on the same description.</li>
+          </ul>
+          <p><b>Classic</b> Platform targets deeply embedded ECUs like ours: static configuration, an OSEK-based OS, C code, microcontrollers. <b>Adaptive</b> Platform targets high-performance computers with POSIX, C++ and dynamic deployment. This course covers Classic.</p>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>AUTOSAR is the standard shipping container. Any crane (an ECU vendor's basic software) can lift any box (an application component), because the corners and dimensions are fixed. What is inside the box is still the supplier's business.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="layers" data-title="Layered architecture explorer">
+          <div class="sec-head"><h2><span class="sec-num">18.2</span>Layered architecture explorer</h2></div>
+          <p>The architecture is a stack of layers. Explore it: hover or focus a box to see what it connects to. The boxes are the modules this course implements in <code>autosar/</code> for the TurnLight capstone.</p>
+          <div id="lg-autosar" class="lg-host"></div>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Layer</th><th>Job</th><th>Depends on</th></tr></thead>
+            <tbody>
+              <tr><td>Application (SWCs)</td><td>the vehicle function: turn signals, lamp monitoring</td><td>only the RTE</td></tr>
+              <tr><td>RTE</td><td>connects ports of SWCs to each other and to BSW services; runs runnables in OS tasks</td><td>generated per ECU</td></tr>
+              <tr><td>Services</td><td>communication (Com, PduR), diagnostics (Dem, Dcm), memory (NvM), modes (EcuM, BswM), watchdog management (WdgM), the OS</td><td>abstraction layers below</td></tr>
+              <tr><td>ECU abstraction</td><td>the ECU's view of its I/O and buses: CanIf, IoHwAb, WdgIf</td><td>MCAL</td></tr>
+              <tr><td>MCAL</td><td>microcontroller drivers with standard APIs: Mcu, Port, Dio, Pwm, Adc, Gpt, Wdg, Can, Fls</td><td>the hardware registers</td></tr>
+              <tr><td>Complex drivers</td><td>anything the standard does not cover, from application to hardware in one module</td><td>whatever it needs</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="doc-section" id="methodology" data-title="Methodology and ARXML">
+          <div class="sec-head"><h2><span class="sec-num">18.3</span>Methodology and ARXML</h2></div>
+          <p>A real project does not write the RTE, the configuration tables or the OS task bodies by hand. It describes the system in <b>ARXML</b> (AUTOSAR XML), and tools generate code from that description. Step through the flow:</p>
+          <div id="sm-method"></div>
+          <p>The ECU configuration is the largest artefact: every module parameter (which pins, which CAN IDs, which signals, which DTCs) is a value in it. Generators turn it into the <code>*_Cfg.h</code>, <code>*_PBcfg.c</code>, <code>*_MemMap.h</code>, <code>Os_Cfg.c</code> and <code>Rte*.c</code> files you will see in the capstone.</p>
+        </section>
+
+        <section class="doc-section" id="generated" data-title="Generated vs hand-written">
+          <div class="sec-head"><h2><span class="sec-num">18.4</span>Generated vs hand-written</h2></div>
+          <p>In a production ECU, most files are not written by the ECU's software team. The course labels every file in <code>autosar/</code> and the capstone with what it would be in production:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Kind</th><th>Who writes it</th><th>Course files</th></tr></thead>
+            <tbody>
+              <tr><td><b>VENDOR-SUPPLIED</b></td><td>a BSW or MCAL vendor, delivered as source or library, configured not edited</td><td><code>autosar/mcal/*</code>, <code>autosar/services/*</code>, <code>autosar/ecual/canif</code></td></tr>
+              <tr><td><b>GENERATED</b></td><td>tools, from the ARXML configuration</td><td><code>stage3-autosar/cfg/*</code>, <code>stage3-autosar/rte/*</code> (hand-written here to look generated)</td></tr>
+              <tr><td><b>HAND-WRITTEN</b></td><td>the ECU team</td><td>SWCs (<code>asw/</code>), IoHwAb, callouts and hooks (<code>integration/</code>)</td></tr>
+            </tbody>
+          </table></div>
+          <p>Every file starts with a banner that says so. This is the start of the TurnLight SWC; compare it with the RTE header it includes, in module 19:</p>
+          <script type="text/plain" data-code data-src="capstone/turnlight/stage3-autosar/asw/TurnLight/TurnLight.c" data-lines="1-13" data-lang="c" data-file="asw/TurnLight/TurnLight.c" data-start="1" data-end="13" data-sha="a6d13e30ed98">
+/* SPDX-License-Identifier: MIT
+ * MCU Academy — AUTOSAR-style teaching code. NOT an AUTOSAR-conformant implementation.
+ * Spec reference : AUTOSAR CP R25-11, AUTOSAR_CP_SWS_RTE (RTE API), AUTOSAR_CP_TPS_SoftwareComponentTemplate
+ * In production  : HAND-WRITTEN (application software component)
+ *
+ * SWC TurnLight: the turn-signal function. It sees only its RTE contract (Rte_TurnLight.h):
+ * stalk and hazard inputs and lamp outputs through ports to the I/O hardware abstraction, lamp
+ * failures from LampMonitor, the status message through Com, ClusterAck supervision through the
+ * age of the received data, and the Dem event for a lost cluster. The behaviour is the same
+ * state machine as stages 1 and 2 (../../logic), used here as an application library.
+ */
+#include "Rte_TurnLight.h"
+#include "turnlight_sm.h"
+</script>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Never edit generated files</span><p>A change made by hand to a generated file disappears at the next generation, usually days later, without anyone noticing. In this repository the same rule holds: files written by <code>tools/gen-autosar-cfg.py</code> or <code>tools/embed-code.py</code> are regenerated, and CI fails when they drift.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="release" data-title="Releases and documents">
+          <div class="sec-head"><h2><span class="sec-num">18.5</span>Releases and documents</h2></div>
+          <p>AUTOSAR publishes the Classic Platform yearly (R19-11, R20-11, … <b>R25-11</b>, the release this course cites). Before R19-11 releases were numbered 4.0 to 4.4, and many ECUs in production still run 4.3.1 or 4.4.0. Since R22-11 every document is named <code>AUTOSAR_CP_&lt;type&gt;_&lt;Name&gt;</code>:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Type</th><th>Content</th><th>Example</th></tr></thead>
+            <tbody>
+              <tr><td>SWS</td><td>Software Specification of one module: API, behaviour, configuration</td><td><code>AUTOSAR_CP_SWS_DIODriver</code></td></tr>
+              <tr><td>SRS</td><td>Requirements on a group of modules</td><td><code>AUTOSAR_CP_SRS_BSWGeneral</code></td></tr>
+              <tr><td>EXP</td><td>Explanatory documents</td><td><code>AUTOSAR_CP_EXP_LayeredSoftwareArchitecture</code></td></tr>
+              <tr><td>TPS</td><td>Template specifications (the ARXML meta-model)</td><td><code>AUTOSAR_CP_TPS_SoftwareComponentTemplate</code></td></tr>
+              <tr><td>TR</td><td>Technical reports, such as the module list</td><td><code>AUTOSAR_CP_TR_BSWModuleList</code></td></tr>
+            </tbody>
+          </table></div>
+          <p>Each requirement in an SWS has an ID in square brackets. Reviews and safety cases trace code to these IDs, which is why the course plans to cite them for every rule it teaches.</p>
+          <div class="callout prod" data-doc="AUTOSAR R4.3.1 / R4.4.0"><div class="ci">🏭</div><div><span class="ct">In production (R4.x)</span><p>ECUs on R4.x use the older document names without the <code>CP_</code> part (for example <code>AUTOSAR_SWS_DIODriver</code>) and slightly different APIs in several modules. The AUTOSAR pages point out the differences you are likely to meet.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="on-bluepill" data-title="How we do AUTOSAR on a Blue Pill">
+          <div class="sec-head"><h2><span class="sec-num">18.6</span>How we do AUTOSAR on a Blue Pill</h2></div>
+          <p>Real AUTOSAR stacks need licences, configuration tools and a certified OS, and they target automotive microcontrollers. The course builds a small, honest imitation on the Blue Pill so you can read and step through every line:</p>
+          <ul>
+            <li><code>autosar/</code>: MCAL drivers (Mcu, Port, Dio, Pwm, Adc, Wdg, Can) over the STM32F1 registers you know, and "-lite" versions of CanIf, PduR, Com, Dem, WdgM, EcuM, IoHwAb and Det. Each header lists what was left out.</li>
+            <li><code>autosar/os_shim</code>: an OSEK/AUTOSAR-OS-like API over FreeRTOS. <b>It is not a real AUTOSAR OS</b>, and module 21 lists the differences.</li>
+            <li><code>capstone/turnlight/stage3-autosar</code>: two SWCs, a hand-written RTE that mirrors generated code, and the configuration files.</li>
+          </ul>
+          <p>Start-up shows the layering at work: EcuM, a service, initialises the drivers below it in a fixed order, then hands over to the OS:</p>
+          <script type="text/plain" id="src-ar-ecum" data-src="autosar/services/ecum/EcuM.c" data-region="init" data-lang="c" data-file="autosar/services/ecum/EcuM.c" data-start="14" data-end="33" data-sha="5f898148ef50">
+FUNC(void, ECUM_CODE) EcuM_Init(void)
+{
+    EcuM_AL_DriverInitZero();                       /* Det: before anything can report an error */   // «1»
+    Mcu_Init(&Mcu_Config);                                                                               // «2»
+    if (Mcu_InitClock(0U) == E_OK)                  /* clock setting 0: HSE 8 MHz x 9 = 72 MHz */
+    {
+        for (uint32 n = 0U; (n < 200000UL) && (Mcu_GetPllStatus() != MCU_PLL_LOCKED); ++n)
+        {
+            /* bounded wait for the PLL */
+        }
+        (void)Mcu_DistributePllClock();             /* on failure the ECU keeps running on HSI */
+    }
+    EcuM_AL_DriverInitOne();                        /* Port, Dio, ... : everything the OS needs */  // «3»
+    StartOS(OSDEFAULTAPPMODE);                      /* does not return */                           // «4»
+}
+
+FUNC(void, ECUM_CODE) EcuM_StartupTwo(void)
+{
+    EcuM_AL_DriverInitTwo();                        /* drivers needing the OS tick, the stack, the RTE */ // «5»
+}
+</script>
+          <div id="ex-ecum"></div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">Teaching code, not conformant code</span><p>The code follows AUTOSAR naming, types, configuration, memory mapping and error reporting, and <code>tools/check-autosar.py</code> checks those conventions in CI. It is not tested for conformance, not complete, and not meant for a vehicle.</p></div></div>
+          <div id="ck-arch"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/autosar-arch.js?v=__BUILD__"></script>
+</body>
+</html>

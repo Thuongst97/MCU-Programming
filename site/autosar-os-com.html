@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OS, Scheduling and the COM Stack — MCU Academy</title>
+  <meta name="description" content="OSEK/AUTOSAR OS concepts, mapping runnables to tasks, and a signal&#x27;s journey through Com, PduR, CanIf and Can.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="autosar-os-com">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 21</span><span>/</span><span>OS &amp; COM Stack</span></nav>
+          <div class="eyebrow">Module 21 · AUTOSAR Classic</div>
+          <h1>OS, Scheduling and the COM Stack</h1>
+          <p class="lead">Runnables need something to run them, and signals need a way onto the bus. This module covers the AUTOSAR OS (and the course's honest stand-in for it), how runnables and BSW main functions are mapped to tasks, and the communication stack: one signal's journey from an SWC through Com, PduR, CanIf and the Can driver to a frame on the wire.</p>
+          <div class="page-meta"><span>⏱ 55 min read</span><span>🎯 Advanced</span><span>📂 autosar/os_shim, autosar/services/com, stage3-autosar/rte</span></div>
+        </header>
+
+        <section class="doc-section" id="os-concepts" data-title="AUTOSAR OS concepts">
+          <div class="sec-head"><h2><span class="sec-num">21.1</span>AUTOSAR OS concepts</h2></div>
+          <div class="callout warn"><div class="ci">🔎</div><div><span class="ct">Verification status</span><p>Every API, type and rule on this page names its AUTOSAR R25-11 document. The requirement IDs and exact values are still being checked against the R25-11 PDFs; until then they come from the R4.x-era specifications, and no requirement ID is quoted, because the course never makes one up. Progress is tracked in <a href="https://github.com/Thuongst97/MCU-Programming/blob/main/docs/autosar-self-review.md">the self-review log</a>.</p></div></div>
+          <p>The AUTOSAR OS (AUTOSAR_CP_SWS_OS) is based on OSEK/VDX OS (ISO 17356-3): everything is configured statically, nothing is created at run time. Its objects:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Object</th><th>What it is</th><th>API</th></tr></thead>
+            <tbody>
+              <tr><td><b>Basic task</b></td><td>runs to completion when activated; cannot wait</td><td><code>ActivateTask</code>, <code>TerminateTask</code>, <code>ChainTask</code></td></tr>
+              <tr><td><b>Extended task</b></td><td>may wait for events</td><td><code>WaitEvent</code>, <code>SetEvent</code>, <code>ClearEvent</code>, <code>GetEvent</code></td></tr>
+              <tr><td><b>Counter + alarm</b></td><td>a tick source and a timed action on it: activate a task, set an event, call a callback</td><td><code>SetRelAlarm</code>, <code>SetAbsAlarm</code>, <code>CancelAlarm</code></td></tr>
+              <tr><td><b>Resource</b></td><td>mutual exclusion with the priority ceiling protocol</td><td><code>GetResource</code>, <code>ReleaseResource</code></td></tr>
+              <tr><td><b>Schedule table</b></td><td>a pre-planned sequence of expiry points (AUTOSAR addition)</td><td><code>StartScheduleTableRel</code>, …</td></tr>
+              <tr><td><b>OS-Application</b></td><td>a protection domain with its own memory and timing limits</td><td>(scalability classes 3 and 4)</td></tr>
+            </tbody>
+          </table></div>
+          <p>OSEK task states differ from FreeRTOS's (module 14): a basic task is <i>suspended</i> until activated and returns there when it terminates. Drive it:</p>
+          <div id="sm-osek"></div>
+          <p>The course has no AUTOSAR OS, so <code>autosar/os_shim</code> implements the API above over FreeRTOS. <b>It is not a real AUTOSAR OS</b>; these are the differences:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Topic</th><th>AUTOSAR OS</th><th>Course OS shim</th></tr></thead>
+            <tbody>
+              <tr><td>Conformance classes</td><td>BCC1, BCC2, ECC1, ECC2</td><td>none; behaves like BCC1/ECC1</td></tr>
+              <tr><td>Activations</td><td>configurable limit, queued</td><td>limit 1 (<code>E_OS_LIMIT</code> on a second activation)</td></tr>
+              <tr><td>Resources</td><td>priority ceiling protocol</td><td>FreeRTOS mutex with priority inheritance</td></tr>
+              <tr><td>Non-preemptive tasks, <code>Schedule()</code></td><td>supported</td><td>not supported</td></tr>
+              <tr><td><code>TerminateTask()</code></td><td>never returns</td><td>returns; it must be the last statement of the task</td></tr>
+              <tr><td>Protection (memory, timing, service), OS-Applications, IOC, multicore</td><td>scalability classes 2–4</td><td>none</td></tr>
+              <tr><td>Hooks</td><td>startup, shutdown, error, pre/post task, protection</td><td>shutdown and error hooks only</td></tr>
+            </tbody>
+          </table></div>
+          <script type="text/plain" id="src-os-task" data-src="autosar/os_shim/Os.c" data-region="task" data-lang="c" data-file="autosar/os_shim/Os.c" data-start="61" data-end="105" data-sha="dfe7c698e368">
+static void Os_TaskEntry(void *arg)
+{
+    // cppcheck-suppress misra-c2012-11.6 ; DEV-003
+    const TaskType t = (TaskType)(uintptr_t)arg;
+    P2CONST(Os_TaskConfigType, AUTOMATIC, OS_CONST) c = &Os_TaskConfig[t];
+    for (;;)
+    {
+        if (c->extended == FALSE)
+        {
+            (void)ulTaskNotifyTake(pdTRUE, portMAX_DELAY);   /* suspended until ActivateTask() */   // «1»
+        }
+        c->entry();                                          /* the TASK() body, ends with TerminateTask() */   // «2»
+        if (Os_Task[t].rechain == TRUE)
+        {
+            Os_Task[t].rechain = FALSE;
+            (void)xTaskNotifyGive(Os_Task[t].handle);        /* ChainTask(self): run again */
+        }
+        else
+        {
+            Os_Task[t].activated = FALSE;
+        }
+        if (c->extended == TRUE)
+        {
+            vTaskSuspend(NULL);                              /* an extended task that returns is done */
+        }
+    }
+}
+
+StatusType ActivateTask(TaskType TaskID)
+{
+    if (TaskID >= OS_NUM_TASKS)
+    {
+        return Os_Error(E_OS_ID);
+    }
+    taskENTER_CRITICAL();
+    const boolean busy = Os_Task[TaskID].activated;
+    Os_Task[TaskID].activated = TRUE;
+    taskEXIT_CRITICAL();
+    if (busy == TRUE)
+    {
+        return Os_Error(E_OS_LIMIT);                         /* still running or already pending */   // «3»
+    }
+    (void)xTaskNotifyGive(Os_Task[TaskID].handle);
+    return E_OK;
+}
+</script>
+          <div id="ex-os-task"></div>
+          <script type="text/plain" id="src-os-alarm" data-src="autosar/os_shim/Os.c" data-region="alarm" data-lang="c" data-file="autosar/os_shim/Os.c" data-start="135" data-end="177" data-sha="dfe7c698e368">
+static void Os_AlarmExpired(TimerHandle_t timer)
+{
+    const AlarmType a = (AlarmType)(uintptr_t)pvTimerGetTimerID(timer);
+    P2CONST(Os_AlarmConfigType, AUTOMATIC, OS_CONST) c = &Os_AlarmConfig[a];
+    if ((Os_AlarmFirst[a] == TRUE) && (Os_AlarmCycle[a] != 0U))
+    {
+        Os_AlarmFirst[a] = FALSE;
+        (void)xTimerChangePeriod(timer, (TickType_t)Os_AlarmCycle[a], 0);   /* from now on: the cycle */   // «4»
+    }
+    switch (c->action)
+    {
+    case OS_ALARM_ACTIVATETASK:
+        (void)ActivateTask(c->task);                         /* E_OS_LIMIT = the task overran its period */   // «5»
+        break;
+    case OS_ALARM_SETEVENT:
+        (void)SetEvent(c->task, c->event);
+        break;
+    default:
+        c->callback();
+        break;
+    }
+}
+
+StatusType SetRelAlarm(AlarmType AlarmID, TickType increment, TickType cycle)
+{
+    if (AlarmID >= OS_NUM_ALARMS)
+    {
+        return Os_Error(E_OS_ID);
+    }
+    if ((increment == 0U) || (increment > OS_MAXALLOWEDVALUE) || (cycle > OS_MAXALLOWEDVALUE))
+    {
+        return Os_Error(E_OS_VALUE);
+    }
+    if (xTimerIsTimerActive(Os_Timer[AlarmID]) != pdFALSE)
+    {
+        return Os_Error(E_OS_STATE);
+    }
+    Os_AlarmCycle[AlarmID] = cycle;
+    Os_AlarmFirst[AlarmID] = TRUE;
+    vTimerSetReloadMode(Os_Timer[AlarmID], (cycle != 0U) ? pdTRUE : pdFALSE);
+    (void)xTimerChangePeriod(Os_Timer[AlarmID], (TickType_t)increment, portMAX_DELAY);   /* also starts it */
+    return E_OK;
+}
+</script>
+          <div id="ex-os-alarm"></div>
+        </section>
+
+        <section class="doc-section" id="mapping" data-title="Mapping runnables to tasks">
+          <div class="sec-head"><h2><span class="sec-num">21.2</span>Mapping runnables to tasks</h2></div>
+          <p>The RTE generator places every runnable and every BSW main function into a task, in a fixed order. The capstone's mapping, as configured in <code>Os_Cfg.c</code> and generated into <code>Rte.c</code>:</p>
+          <script type="text/plain" id="src-os-cfg" data-src="capstone/turnlight/stage3-autosar/cfg/Os_Cfg.c" data-region="tasks" data-lang="c" data-file="capstone/turnlight/stage3-autosar/cfg/Os_Cfg.c" data-start="15" data-end="26" data-sha="586c140768f0">
+CONST(Os_TaskConfigType, OS_CONST) Os_TaskConfig[OS_NUM_TASKS] = {
+    {"Init", OsTask_Init, 6U, FALSE, TRUE},          /* highest: finishes start-up before anything runs */
+    {"Task5ms", OsTask_Task5ms, 5U, FALSE, FALSE},
+    {"Task10ms", OsTask_Task10ms, 4U, FALSE, FALSE},
+    {"Task50ms", OsTask_Task50ms, 3U, FALSE, FALSE},
+};
+
+CONST(Os_AlarmConfigType, OS_CONST) Os_AlarmConfig[OS_NUM_ALARMS] = {
+    {OS_ALARM_ACTIVATETASK, OsTask_5ms_ID, 0U, NULL_PTR},
+    {OS_ALARM_ACTIVATETASK, OsTask_10ms_ID, 0U, NULL_PTR},
+    {OS_ALARM_ACTIVATETASK, OsTask_50ms_ID, 0U, NULL_PTR},
+};
+</script>
+          <div id="ex-os-cfg"></div>
+          <script type="text/plain" id="src-rte-tasks" data-src="capstone/turnlight/stage3-autosar/rte/Rte.c" data-region="tasks" data-lang="c" data-file="capstone/turnlight/stage3-autosar/rte/Rte.c" data-start="222" data-end="252" data-sha="4044a3b95628">
+TASK(Task5ms)
+{
+    IoHwAb_MainFunction_Fast();                                           /* lamp ramps */
+    (void)WdgM_CheckpointReached(WdgMConf_WdgMSupervisedEntity_Lamps, 0U);
+    (void)TerminateTask();
+}
+
+TASK(Task10ms)
+{
+    Can_MainFunction_Read();                                              /* bus -> Com, in task context */   // «9»
+    Com_MainFunctionRx();
+    IoHwAb_MainFunction();                                                /* debounce, lamp current */
+    RE_TurnLight_10ms();                                                  /* the application */   // «8»
+    RE_LampMonitor_10ms();
+    Com_MainFunctionTx();                                                 /* Com -> bus */
+    Can_MainFunction_Write();
+    Dem_MainFunction();
+    (void)WdgM_CheckpointReached(WdgMConf_WdgMSupervisedEntity_Com, 0U);
+    (void)TerminateTask();
+}
+
+TASK(Task50ms)
+{
+    WdgM_MainFunction();                                                  /* triggers the watchdog only if all is well */   // «10»
+    if (++Rte_HeartbeatDiv >= 10U)
+    {
+        Rte_HeartbeatDiv = 0U;
+        (void)Dio_FlipChannel(DioConf_DioChannel_Heartbeat);              /* 1 Hz heartbeat */
+    }
+    (void)TerminateTask();
+}
+</script>
+          <div id="ex-rte-tasks"></div>
+          <p>The first 50 ms of the ECU, task by task (each run is drawn far wider than it is: most take a few microseconds):</p>
+          <div id="wv-tasks"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Order inside a task is a design decision</span><p><code>Can_MainFunction_Read</code> runs before the runnables so they see this cycle's frames; <code>Com_MainFunctionTx</code> runs after them so their writes leave in the same cycle. Swap them and every reaction is one period late. A real project documents and reviews this order like any other requirement.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="com-stack" data-title="The COM stack">
+          <div class="sec-head"><h2><span class="sec-num">21.3</span>The COM stack</h2></div>
+          <p>Application data travels as <b>signals</b>. Com packs signals into <b>I-PDUs</b> (protocol data units); PduR routes each PDU to the right bus interface; CanIf maps it to a CAN ID and a hardware object; the Can driver puts it in a mailbox. Each layer has its own handle numbers, and the configuration tables connect them.</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Module</th><th>Knows</th><th>Does not know</th></tr></thead>
+            <tbody>
+              <tr><td>Com</td><td>signals, their bit positions, send modes, deadlines</td><td>which bus, which CAN ID</td></tr>
+              <tr><td>PduR</td><td>which lower layer serves a PDU (CanIf, LinIf, FrIf, a TP)</td><td>what is inside</td></tr>
+              <tr><td>CanIf</td><td>CAN ID, DLC and hardware object of each PDU</td><td>signals</td></tr>
+              <tr><td>Can</td><td>mailboxes and registers</td><td>PDU meaning</td></tr>
+            </tbody>
+          </table></div>
+          <script type="text/plain" id="src-com-pack" data-src="autosar/services/com/Com.c" data-region="pack" data-lang="c" data-file="autosar/services/com/Com.c" data-start="56" data-end="109" data-sha="a06f87edaaa1">
+FUNC(uint8, COM_CODE) Com_SendSignal(Com_SignalIdType SignalId, P2CONST(void, AUTOMATIC, COM_APPL_DATA) SignalDataPtr)
+{
+    if (Com_ConfigPtr == NULL_PTR)
+    {
+        COM_DET(COM_SENDSIGNAL_SID, COM_E_UNINIT);
+        return COM_SERVICE_NOT_AVAILABLE;
+    }
+    if ((SignalId >= Com_ConfigPtr->numSignals) || (SignalDataPtr == NULL_PTR))
+    {
+        COM_DET(COM_SENDSIGNAL_SID, (SignalDataPtr == NULL_PTR) ? COM_E_PARAM_POINTER : COM_E_PARAM);
+        return COM_SERVICE_NOT_AVAILABLE;
+    }
+    P2CONST(Com_SignalConfigType, AUTOMATIC, COM_APPL_CONST) s = &Com_ConfigPtr->signals[SignalId];
+    const uint32 mask = (1UL << s->bitSize) - 1U;   // «1»
+    // cppcheck-suppress misra-c2012-11.5 ; DEV-002
+    const uint32 value = (uint32)(*(const uint8 *)SignalDataPtr) & mask;     /* 1..8 bit unsigned */
+    P2VAR(uint8, AUTOMATIC, COM_VAR) d = Com_IPdu[s->ipdu].data;
+    SchM_Enter_Com_COM_EXCLUSIVE_AREA_0();                                     /* vs. the main function */
+    uint32 word = (uint32)d[0] | ((uint32)d[1] << 8U) | ((uint32)d[2] << 16U) | ((uint32)d[3] << 24U);   /* bytes 0..3 */
+    const uint32 old = (word >> s->bitPosition) & mask;
+    word = (word & ~(mask << s->bitPosition)) | (value << s->bitPosition);
+    d[0] = (uint8)word;
+    d[1] = (uint8)(word >> 8U);
+    d[2] = (uint8)(word >> 16U);
+    d[3] = (uint8)(word >> 24U);
+    if ((s->triggeredOnChange == TRUE) && (old != value))
+    {
+        Com_IPdu[s->ipdu].pending = TRUE;                                     /* mixed mode: send now */   // «2»
+    }
+    SchM_Exit_Com_COM_EXCLUSIVE_AREA_0();
+    return E_OK;
+}
+
+FUNC(uint8, COM_CODE) Com_ReceiveSignal(Com_SignalIdType SignalId, P2VAR(void, AUTOMATIC, COM_APPL_DATA) SignalDataPtr)
+{
+    if (Com_ConfigPtr == NULL_PTR)
+    {
+        COM_DET(COM_RECEIVESIGNAL_SID, COM_E_UNINIT);
+        return COM_SERVICE_NOT_AVAILABLE;
+    }
+    if ((SignalId >= Com_ConfigPtr->numSignals) || (SignalDataPtr == NULL_PTR))
+    {
+        COM_DET(COM_RECEIVESIGNAL_SID, (SignalDataPtr == NULL_PTR) ? COM_E_PARAM_POINTER : COM_E_PARAM);
+        return COM_SERVICE_NOT_AVAILABLE;
+    }
+    P2CONST(Com_SignalConfigType, AUTOMATIC, COM_APPL_CONST) s = &Com_ConfigPtr->signals[SignalId];
+    P2CONST(uint8, AUTOMATIC, COM_VAR) d = Com_IPdu[s->ipdu].data;
+    SchM_Enter_Com_COM_EXCLUSIVE_AREA_0();
+    const uint32 word = (uint32)d[0] | ((uint32)d[1] << 8) | ((uint32)d[2] << 16) | ((uint32)d[3] << 24);
+    SchM_Exit_Com_COM_EXCLUSIVE_AREA_0();
+    // cppcheck-suppress misra-c2012-11.5 ; DEV-002
+    *(uint8 *)SignalDataPtr = (uint8)((word >> s->bitPosition) & ((1UL << s->bitSize) - 1U));
+    return E_OK;
+}
+</script>
+          <div id="ex-com-pack"></div>
+          <script type="text/plain" id="src-com-main" data-src="autosar/services/com/Com.c" data-region="main" data-lang="c" data-file="autosar/services/com/Com.c" data-start="113" data-end="173" data-sha="a06f87edaaa1">
+FUNC(void, COM_CODE) Com_MainFunctionTx(void)
+{
+    if (Com_ConfigPtr == NULL_PTR)
+    {
+        return;
+    }
+    for (uint16 i = 0U; i < Com_ConfigPtr->numIPdus; ++i)
+    {
+        P2CONST(Com_IPduConfigType, AUTOMATIC, COM_APPL_CONST) c = &Com_ConfigPtr->ipdus[i];
+        if (c->direction != COM_TX)
+        {
+            continue;
+        }
+        Com_IPdu[i].timerMs += Com_ConfigPtr->mainFunctionPeriodMs;
+        if ((Com_IPdu[i].pending == TRUE) || (Com_IPdu[i].timerMs >= c->periodMs))       /* on change or cycle */   // «3»
+        {
+            uint8 copy[8];
+            SchM_Enter_Com_COM_EXCLUSIVE_AREA_0();
+            for (uint8 b = 0U; b < 8U; ++b)
+            {
+                copy[b] = Com_IPdu[i].data[b];
+            }
+            Com_IPdu[i].pending = FALSE;
+            SchM_Exit_Com_COM_EXCLUSIVE_AREA_0();
+            PduInfoType pdu = {copy, NULL_PTR, c->length};
+            if ((c->txCallout == NULL_PTR) || (c->txCallout((PduIdType)i, &pdu) == TRUE))   /* e.g. alive counter */   // «4»
+            {
+                (void)PduR_ComTransmit(c->lowerPduId, &pdu);                    /* refused: next cycle repeats */
+            }
+            Com_IPdu[i].timerMs = 0U;
+        }
+    }
+}
+
+FUNC(void, COM_CODE) Com_MainFunctionRx(void)
+{
+    if (Com_ConfigPtr == NULL_PTR)
+    {
+        return;
+    }
+    for (uint16 i = 0U; i < Com_ConfigPtr->numIPdus; ++i)
+    {
+        P2CONST(Com_IPduConfigType, AUTOMATIC, COM_APPL_CONST) c = &Com_ConfigPtr->ipdus[i];
+        if ((c->direction != COM_RX) || (c->timeoutMs == 0U) || (Com_IPdu[i].timedOut == TRUE))
+        {
+            continue;
+        }
+        SchM_Enter_Com_COM_EXCLUSIVE_AREA_0();
+        Com_IPdu[i].timerMs += Com_ConfigPtr->mainFunctionPeriodMs;
+        const boolean expired = (Com_IPdu[i].timerMs >= c->timeoutMs) ? TRUE : FALSE;
+        SchM_Exit_Com_COM_EXCLUSIVE_AREA_0();
+        if (expired == TRUE)                                                   /* deadline monitoring */   // «5»
+        {
+            Com_IPdu[i].timedOut = TRUE;
+            if (c->timeoutNotification != NULL_PTR)
+            {
+                c->timeoutNotification();                                      /* e.g. into the RTE */
+            }
+        }
+    }
+}
+</script>
+          <div id="ex-com-main"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The COM stack is the postal system: a letter (signal) goes into an envelope (I-PDU), the sorting centre (PduR) picks the route, the local post office (CanIf) writes the address (CAN ID), and the truck (Can driver) drives it onto the road (the bus).</p></div></div>
+        </section>
+
+        <section class="doc-section" id="signal-flow" data-title="End-to-end signal flow">
+          <div class="sec-head"><h2><span class="sec-num">21.4</span>End-to-end signal flow</h2></div>
+          <p>Follow <code>LampLeft</code> from the TurnLight SWC to the bus, and ClusterAck back, with the capstone's real function names:</p>
+          <div id="seq-signal"></div>
+          <script type="text/plain" id="src-pdur" data-src="autosar/services/pdur/PduR.c" data-region="route" data-lang="c" data-file="autosar/services/pdur/PduR.c" data-start="27" data-end="42" data-sha="f0825256f97d">
+FUNC(Std_ReturnType, PDUR_CODE) PduR_ComTransmit(PduIdType TxPduId, P2CONST(PduInfoType, AUTOMATIC, PDUR_APPL_DATA) PduInfoPtr)
+{
+    if ((PduR_ConfigPtr == NULL_PTR) || (TxPduId >= PduR_ConfigPtr->numTx))
+    {
+        return E_NOT_OK;
+    }
+    return CanIf_Transmit(PduR_ConfigPtr->comTxToCanIf[TxPduId], PduInfoPtr);   /* Com handle -> CanIf handle */
+}
+
+FUNC(void, PDUR_CODE) PduR_CanIfRxIndication(PduIdType RxPduId, P2CONST(PduInfoType, AUTOMATIC, PDUR_APPL_DATA) PduInfoPtr)
+{
+    if ((PduR_ConfigPtr != NULL_PTR) && (RxPduId < PduR_ConfigPtr->numRx))
+    {
+        Com_RxIndication(PduR_ConfigPtr->canIfRxToCom[RxPduId], PduInfoPtr);
+    }
+}
+</script>
+          <div id="ex-pdur"></div>
+          <script type="text/plain" id="src-canif-tx" data-src="autosar/ecual/canif/CanIf.c" data-region="transmit" data-lang="c" data-file="autosar/ecual/canif/CanIf.c" data-start="47" data-end="68" data-sha="601445fd9a34">
+FUNC(Std_ReturnType, CANIF_CODE) CanIf_Transmit(PduIdType TxPduId, P2CONST(PduInfoType, AUTOMATIC, CANIF_APPL_DATA) PduInfoPtr)
+{
+    if (CanIf_ConfigPtr == NULL_PTR)
+    {
+        CANIF_DET(CANIF_TRANSMIT_SID, CANIF_E_UNINIT);
+        return E_NOT_OK;
+    }
+    if (PduInfoPtr == NULL_PTR)
+    {
+        CANIF_DET(CANIF_TRANSMIT_SID, CANIF_E_PARAM_POINTER);
+        return E_NOT_OK;
+    }
+    if (TxPduId >= CanIf_ConfigPtr->numTxPdus)
+    {
+        CANIF_DET(CANIF_TRANSMIT_SID, CANIF_E_PARAM_LPDU);
+        return E_NOT_OK;
+    }
+    P2CONST(CanIf_TxPduConfigType, AUTOMATIC, CANIF_APPL_CONST) c = &CanIf_ConfigPtr->txPdus[TxPduId];
+    const Can_PduType pdu = {TxPduId, (uint8)((PduInfoPtr->SduLength > c->dlc) ? c->dlc : PduInfoPtr->SduLength),
+                             c->canId, PduInfoPtr->SduDataPtr};               /* PDU handle -> CAN ID */
+    return (Can_Write(c->hth, &pdu) == E_OK) ? E_OK : E_NOT_OK;               /* CAN_BUSY: refused here */
+}
+</script>
+          <div id="ex-canif-tx"></div>
+        </section>
+
+        <section class="doc-section" id="can-matrix" data-title="The CAN matrix">
+          <div class="sec-head"><h2><span class="sec-num">21.5</span>The CAN matrix</h2></div>
+          <p>The <b>CAN matrix</b> (often a DBC file) is the contract between ECUs: every frame's ID, length, cycle time, sender and receivers, and every signal's position, length, byte order, scaling and range. In AUTOSAR it is part of the system description; Com's tables are generated from it. The capstone's matrix (IDs are hypothetical, made up for the course):</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Frame</th><th>ID</th><th>DLC</th><th>Sender → receiver</th><th>Timing</th></tr></thead>
+            <tbody>
+              <tr><td><code>TurnLightStatus</code></td><td><code>0x3A0</code></td><td>4</td><td>ECU → cluster</td><td>100 ms cycle and on change</td></tr>
+              <tr><td><code>ClusterAck</code></td><td><code>0x3A1</code></td><td>1</td><td>cluster → ECU</td><td>100 ms; ECU deadline 500 ms</td></tr>
+            </tbody>
+          </table></div>
+          <p>Set signal values and watch the payload change. Signals are little-endian (Intel byte order) from the bit position given:</p>
+          <div id="can-matrix" class="calc-host glass"></div>
+        </section>
+
+        <section class="doc-section" id="ecum" data-title="EcuM and BswM">
+          <div class="sec-head"><h2><span class="sec-num">21.6</span>EcuM and BswM</h2></div>
+          <p>The <b>ECU State Manager</b> (AUTOSAR_CP_SWS_ECUStateManager) starts and stops the ECU: it runs the driver initialisation lists, starts the OS, and in a full stack hands over to the <b>BSW Mode Manager</b> (BswM), which switches modes according to rules (communication allowed, sleep requested, …). The capstone uses EcuM-lite: fixed start-up, no shutdown or sleep.</p>
+          <script type="text/plain" id="src-integ-init" data-src="capstone/turnlight/stage3-autosar/integration/main.c" data-region="initlists" data-lang="c" data-file="capstone/turnlight/stage3-autosar/integration/main.c" data-start="42" data-end="84" data-sha="3bfbe1f6131d">
+void EcuM_AL_DriverInitZero(void)
+{
+    Det_Init(NULL_PTR);
+    Dem_PreInit();
+}
+
+void EcuM_AL_DriverInitOne(void)
+{
+    Port_Init(&Port_Config);                             /* pins first: everything else uses them */
+    uart_log_init(115200U);                              /* debug channel (not AUTOSAR) */
+    uint8 cause = 0U;
+    static const uint8 map[] = {0U, 3U, 2U, 1U, 6U};     /* Mcu_ResetType -> message coding */
+    const Mcu_ResetType r = Mcu_GetResetReason();
+    cause = map[((uint32)r < 5U) ? (uint32)r : 4U];
+    uart_puts("\nTurnLight stage 3 (AUTOSAR-style), reset cause: ");
+    uart_puts(tl_reset_name(cause));
+    uart_puts("\n");
+}
+
+void EcuM_AL_DriverInitTwo(void)
+{
+    Pwm_Init(&Pwm_Config);
+    Adc_Init(&Adc_Config);
+    Can_Init(&Can_Config);
+    CanIf_Init(&CanIf_Config);
+    PduR_Init(&PduR_Config);
+    Com_Init(&Com_Config);
+    Dem_Init(&Dem_Config);
+    IoHwAb_Init(&IoHwAb_Config);
+    Wdg_Init(&Wdg_Config);
+    WdgM_Init(&WdgM_Config);
+    (void)CanIf_SetControllerMode(CanConf_CanController_0, CAN_CS_STARTED);   /* production: CanSM via BswM */   // «2»
+    (void)Rte_Start();
+}
+
+TASK(Init)
+{
+    EcuM_StartupTwo();
+    (void)SetRelAlarm(OsAlarm_5ms_ID, 5U, 5U);           /* production: autostart alarms in the OS config */   // «1»
+    (void)SetRelAlarm(OsAlarm_10ms_ID, 10U, 10U);
+    (void)SetRelAlarm(OsAlarm_50ms_ID, 50U, 50U);
+    (void)TerminateTask();
+}
+</script>
+          <div id="ex-integ-init"></div>
+          <div class="callout prod" data-doc="AUTOSAR_SWS_ECUStateManager R4.4.0"><div class="ci">🏭</div><div><span class="ct">In production (R4.x)</span><p>R4.x projects choose between "fixed" and "flexible" EcuM. With flexible EcuM, most of the start-up after the OS is driven by BswM rules and action lists rather than a fixed callout; communication is started by ComM and CanSM, not by a direct <code>CanIf_SetControllerMode</code> call as here.</p></div></div>
+          <div id="ck-os-com"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/autosar-os-com.js?v=__BUILD__"></script>
+</body>
+</html>

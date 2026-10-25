@@ -160,6 +160,7 @@
        bands: [{ key, tag:"L1", title:["Application", "SWCs"], sub:["hand-written"], boundary?:true, tone?, marker?:"RTE" }],
        nodes: [{ id, band, row?, rows?, at?:[x0,x1] (fractions of the lane), span?, title, sub?, tag?:"SWC", tip?, hl?, soft?, tone? }],
        edges: [{ from, to, kind:"call"|"rte"|"pdu"|"hw"|"opt", label?, side?:"right"|"left", marker?:"RTE" }],
+       toneLabels?: { hw: "Core", … }   legend names when the diagram is not an AUTOSAR stack
      }
      A band with boundary:true is drawn as a glowing line (e.g. the RTE between SWCs and BSW);
      edges that cross it get a small marker chip. */
@@ -227,7 +228,7 @@
 
     // edge endpoints (attachment points spread along each side)
     const ends = [];
-    const edges = spec.edges.filter((e) => nodes[e.from] && nodes[e.to]).map((e, i) => {
+    const edges = (spec.edges || []).filter((e) => nodes[e.from] && nodes[e.to]).map((e, i) => {
       const a = nodes[e.from], b = nodes[e.to];
       const aB = a._y + a._h, bB = b._y + b._h;
       let sa, sb;
@@ -359,10 +360,12 @@
     });
 
     const kinds = [...new Set(edges.map((E) => E.kind || "call"))];
+    // spec.toneLabels renames the colour legend for non-AUTOSAR diagrams (e.g. a bus matrix); content text, so it comes from the page
+    const toneNames = { ...S.layered.tones, ...(spec.toneLabels || {}) };
     const tones = Object.keys(S.layered.tones).filter((t) => Object.values(nodes).some((n) => n._tone === t));
     host.classList.add("lg-host");
-    host.innerHTML = `<svg class="lg-svg" viewBox="0 0 1000 ${H}" role="img" aria-label="${esc(spec.label || S.layered.ariaDefault)}">${s}</svg>
-      <div class="lg-legend lg-tones">${tones.map((t) => `<span class="tn-${t}"><b></b>${esc(S.layered.tones[t])}</span>`).join("")}</div>
+    host.innerHTML = `<svg class="lg-svg" viewBox="0 0 1000 ${H}" role="group" aria-label="${esc(spec.label || S.layered.ariaDefault)}">${s}</svg>
+      <div class="lg-legend lg-tones">${tones.map((t) => `<span class="tn-${t}"><b></b>${esc(toneNames[t])}</span>`).join("")}</div>
       <div class="lg-legend">${kinds.map((k) => `<span class="${k}"><i></i>${esc(S.layered.kinds[k] || k)}</span>`).join("")}${boundaries.length ? `<span class="bnd"><i></i>${esc(S.layered.boundary)}</span>` : ""}<span class="hint">${esc(S.layered.hint)}</span></div>`;
 
     // ---- interaction: highlight direct connections, dim everything else

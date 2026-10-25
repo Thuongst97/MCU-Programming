@@ -1,0 +1,5 @@
+Example 03: TIM3 PWM on PA6, TIM2 capture on PA0
+clock status: 0
+duty 250/1000; capture: 1000 us period, 240 us high
+duty 1000/1000; capture: 1000 us period, 980 us high
+duty 250/1000; capture: 1000 us period, 260 us high

@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Capstone 1: Turn-Signal ECU, Bare Metal — MCU Academy</title>
+  <meta name="description" content="Requirements, state machine and a bare-metal implementation of a turn-signal / hazard ECU talking CAN to a cluster node.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="capstone-baremetal">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 24</span><span>/</span><span>Capstone: Bare Metal</span></nav>
+          <div class="eyebrow">Module 24 · Capstone</div>
+          <h1>Capstone 1: Turn-Signal ECU, Bare Metal</h1>
+          <p class="lead">Time to build something that behaves like a product: a turn-signal and hazard ECU that flashes two lamps, detects a blown bulb, talks to an instrument cluster over CAN and recovers from a software hang. Stage 1 builds it bare metal from drivers you already wrote. Stages 2 and 3 rebuild the same ECU on FreeRTOS and in AUTOSAR layers, and the same acceptance tests must pass every time.</p>
+          <div class="page-meta"><span>⏱ 60 min read</span><span>🎯 Advanced</span><span>📂 capstone/turnlight (logic, hw, stage1-baremetal, cluster)</span><span>🔧 2 Blue Pills, 3 buttons, 2 LEDs, pot, 2 × SN65HVD230, SSD1306</span></div>
+        </header>
+
+        <section class="doc-section" id="requirements" data-title="Requirements">
+          <div class="sec-head"><h2><span class="sec-num">24.1</span>Requirements</h2></div>
+          <p>Ten requirements, written for the course in the style an OEM would send to a supplier (<code>capstone/turnlight/docs/requirements.md</code>). Each has an ID, and every test and the code that implements it refer to that ID:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>ID</th><th>Requirement (short)</th><th>Verified</th></tr></thead>
+            <tbody>
+              <tr><td>TL-REQ-001</td><td>Stalk buttons PB12/PB13, active-low, debounced 20 ms, request that side</td><td>host, Renode</td></tr>
+              <tr><td>TL-REQ-002</td><td>1.5 Hz ± 2 %, 50 % ± 10 % duty</td><td>host, hardware</td></tr>
+              <tr><td>TL-REQ-003</td><td>Hazard button PB14 toggles hazard, overrides turn, both in phase</td><td>host, Renode</td></tr>
+              <tr><td>TL-REQ-004</td><td>Tap &lt; 500 ms gives exactly 3 flashes</td><td>host, Renode</td></tr>
+              <tr><td>TL-REQ-005</td><td>Lamp current too low while on: double rate, DEM event</td><td>host, Renode</td></tr>
+              <tr><td>TL-REQ-006</td><td><code>TurnLightStatus</code> 0x3A0 every 100 ms and on change (hypothetical ID)</td><td>host, Renode</td></tr>
+              <tr><td>TL-REQ-007</td><td><code>ClusterAck</code> missing &gt; 500 ms: DEM event, lamps keep working</td><td>host, Renode</td></tr>
+              <tr><td>TL-REQ-008</td><td>PWM lamps on TIM3, 20 ms soft ramp</td><td>hardware</td></tr>
+              <tr><td>TL-REQ-009</td><td>IWDG 100 ms, fed only when all activities checked in</td><td>hardware</td></tr>
+              <tr><td>TL-REQ-010</td><td>Reset cause logged and sent</td><td>Renode, hardware</td></tr>
+            </tbody>
+          </table></div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">Hypothetical data</span><p>CAN IDs, signal layouts and DTC numbers in the capstone are made up for the course. The flash-rate range follows the direction-indicator rules of UN ECE Regulation No. 48 (90 ± 30 flashes per minute); the project target is tighter.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="architecture" data-title="Architecture">
+          <div class="sec-head"><h2><span class="sec-num">24.2</span>Architecture</h2></div>
+          <p>Two boards on one CAN bus. The ECU node reads the stalk and hazard buttons, drives two lamps with PWM, measures lamp current, and reports its state; the cluster node shows telltales on the OLED and acknowledges every status frame.</p>
+          <div id="po-tl"></div>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Folder</th><th>Contents</th><th>Used by</th></tr></thead>
+            <tbody>
+              <tr><td><code>logic/</code></td><td>state machine, lamp monitor, message packing, ClusterAck supervision; pure C with host tests</td><td>all three stages</td></tr>
+              <tr><td><code>hw/</code></td><td>buttons, PWM ramp, ADC, IWDG, reset cause: every register access of the ECU node</td><td>stages 1 and 2</td></tr>
+              <tr><td><code>stage1-baremetal/</code></td><td>the integration: a cooperative scheduler and six jobs</td><td>stage 1</td></tr>
+              <tr><td><code>cluster/</code></td><td>the second board: CAN, OLED, ClusterAck</td><td>all stages</td></tr>
+            </tbody>
+          </table></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The logic folder is the recipe; the stages are three kitchens. A home kitchen (bare metal), a restaurant with a brigade of cooks (FreeRTOS tasks) and a franchise kitchen with standard stations and forms (AUTOSAR) all cook the same dish. If the dish tastes different, the kitchen is wrong, not the recipe.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="state-machine" data-title="Turn-signal state machine">
+          <div class="sec-head"><h2><span class="sec-num">24.3</span>Turn-signal state machine</h2></div>
+          <p>The heart of the ECU is one state machine (<code>logic/turnlight_sm.c</code>). Try it: this simulator runs the same rules in your browser, 10 ms per step, and draws the last four seconds of both lamps.</p>
+          <div id="tl-sim" class="tlsim-host glass"></div>
+          <div id="sm-tl"></div>
+          <script type="text/plain" id="src-tl-stalk" data-src="capstone/turnlight/logic/turnlight_sm.c" data-region="stalk" data-lang="c" data-file="capstone/turnlight/logic/turnlight_sm.c" data-start="44" data-end="61" data-sha="35089b2163a5">
+static void stalk_logic(turnlight_t *t, const tl_inputs_t *in)
+{
+    for (uint32_t i = 0U; i < (uint32_t)TL_SIDES; ++i)
+    {
+        const tl_side_t s = (tl_side_t)i;
+        const bool pressed = in->stalk[s] && !t->prev_stalk[s];
+        const bool released = !in->stalk[s] && t->prev_stalk[s];
+        if (pressed && !((t->mode == TL_MODE_TURN) && (t->side == other(s))))
+        {
+            start_turn(t, s);                               /* a new request wins over comfort */  // «1»
+        }
+        if (released && (t->mode == TL_MODE_TURN) && (t->side == s))
+        {
+            t->mode = (t->held_ms < TL_COMFORT_TAP_MS) ? TL_MODE_COMFORT : TL_MODE_IDLE;            // «2»
+        }
+        t->prev_stalk[s] = in->stalk[s];
+    }
+}
+</script>
+          <div id="ex-tl-stalk"></div>
+          <script type="text/plain" id="src-tl-step" data-src="capstone/turnlight/logic/turnlight_sm.c" data-region="step" data-lang="c" data-file="capstone/turnlight/logic/turnlight_sm.c" data-start="65" data-end="119" data-sha="35089b2163a5">
+bool tl_step(turnlight_t *t, const tl_inputs_t *in, uint32_t dt_ms, tl_outputs_t *out)
+{
+    tl_outputs_t before;
+    before = *out;
+
+    if (in->hazard_pressed)
+    {
+        t->hazard = !t->hazard;                             /* the hazard switch toggles */        // «3»
+        t->hazard_phase_ms = 0U;
+        if (t->hazard && (t->mode == TL_MODE_COMFORT))
+        {
+            t->mode = TL_MODE_IDLE;                         /* hazard cancels a comfort blink */
+        }
+    }
+    stalk_logic(t, in);
+
+    if (t->mode != TL_MODE_IDLE)
+    {
+        const uint32_t period = period_of(in->lamp_failed[t->side]);
+        t->held_ms += (t->mode == TL_MODE_TURN) ? dt_ms : 0U;
+        t->phase_ms += dt_ms;
+        if (t->phase_ms >= period)
+        {
+            t->phase_ms -= period;
+            t->cycles++;                                    /* one complete on + off */             // «4»
+            if ((t->mode == TL_MODE_COMFORT) && (t->cycles >= TL_COMFORT_CYCLES))
+            {
+                t->mode = TL_MODE_IDLE;
+            }
+        }
+    }
+    if (t->hazard)
+    {
+        t->hazard_phase_ms = (t->hazard_phase_ms + dt_ms) % (TL_PERIOD_MS * TL_FAST_PERIOD_MS);
+    }
+
+    for (uint32_t i = 0U; i < (uint32_t)TL_SIDES; ++i)
+    {
+        const tl_side_t s = (tl_side_t)i;
+        const bool turning = (t->mode != TL_MODE_IDLE) && (t->side == s);
+        out->indicating[s] = turning || t->hazard;
+        if (t->hazard)                                      /* hazard overrides: both sides in phase */ // «5»
+        {
+            out->lamp[s] = lamp_on(t->hazard_phase_ms, in->lamp_failed[s]);
+        }
+        else
+        {
+            out->lamp[s] = turning && lamp_on(t->phase_ms, in->lamp_failed[s]);
+        }
+    }
+    out->hazard = t->hazard;
+    return (before.lamp[TL_LEFT] != out->lamp[TL_LEFT]) || (before.lamp[TL_RIGHT] != out->lamp[TL_RIGHT]) ||
+           (before.indicating[TL_LEFT] != out->indicating[TL_LEFT]) ||
+           (before.indicating[TL_RIGHT] != out->indicating[TL_RIGHT]) || (before.hazard != out->hazard);
+}
+</script>
+          <div id="ex-tl-step"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Pure logic is what makes three stages possible</span><p>The state machine takes debounced inputs and elapsed time and returns lamp commands: no registers, no clock, no OS. That is why it has host tests for every requirement, and why stages 2 and 3 can reuse it unchanged. Put one register access inside it and all of that is gone.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="implementation" data-title="Implementation walkthrough">
+          <div class="sec-head"><h2><span class="sec-num">24.4</span>Implementation walkthrough</h2></div>
+          <p>Stage 1 runs six periodic jobs on the cooperative scheduler from <a href="interrupts.html">example 02</a>, sleeping in <code>WFI</code> between SysTick interrupts:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Job</th><th>Period</th><th>Does</th></tr></thead>
+            <tbody>
+              <tr><td>lamp</td><td>5 ms</td><td>PWM ramp towards the commanded state (TL-REQ-008)</td></tr>
+              <tr><td>input</td><td>10 ms</td><td>debounce three buttons (example 01's debouncer)</td></tr>
+              <tr><td>logic</td><td>10 ms</td><td>the state machine</td></tr>
+              <tr><td>monitor</td><td>10 ms</td><td>lamp current and lamp-out detection</td></tr>
+              <tr><td>can</td><td>10 ms</td><td>ClusterAck supervision, TurnLightStatus on change or every 100 ms</td></tr>
+              <tr><td>supervisor</td><td>50 ms</td><td>feed the IWDG only if every other job ran</td></tr>
+            </tbody>
+          </table></div>
+          <script type="text/plain" id="src-s1-input" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="input" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="44" data-end="60" data-sha="6868106ee151">
+static void job_input(void)            /* 10 ms: debounce the three buttons (TL-REQ-001) */
+{
+    const uint32_t now = millis();
+    for (uint32_t b = 0U; b < (uint32_t)TL_BTN_COUNT; ++b)
+    {
+        const debounce_event_t ev = debounce_update(&s_btn[b], tl_hw_button_pressed((tl_button_t)b), now);   // «1»
+        if (b == (uint32_t)TL_BTN_HAZARD)
+        {
+            s_in.hazard_pressed = s_in.hazard_pressed || (ev == DEBOUNCE_PRESSED);   /* latched edge */   // «2»
+        }
+        else
+        {
+            s_in.stalk[b] = s_btn[b].stable_pressed;
+        }
+    }
+    s_alive |= ALIVE_INPUT;
+}
+</script>
+          <div id="ex-s1-input"></div>
+          <script type="text/plain" id="src-s1-logic" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="logic" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="64" data-end="84" data-sha="6868106ee151">
+static void job_logic(void)            /* 10 ms: the state machine */
+{
+    const tl_outputs_t before = s_out;
+    if (tl_step(&s_tl, &s_in, 10U, &s_out))   // «3»
+    {
+        s_status_changed = true;       /* TL-REQ-006: send on change */
+        for (uint32_t i = 0U; i < (uint32_t)TL_SIDES; ++i)
+        {
+            if (before.lamp[i] != s_out.lamp[i])
+            {
+                log_lamp((tl_side_t)i, s_out.lamp[i]);
+            }
+        }
+        if (before.hazard != s_out.hazard)
+        {
+            uart_puts(s_out.hazard ? "tl: hazard on\n" : "tl: hazard off\n");
+        }
+    }
+    s_in.hazard_pressed = false;       /* the edge has been consumed */   // «4»
+    s_alive |= ALIVE_LOGIC;
+}
+</script>
+          <div id="ex-s1-logic"></div>
+          <script type="text/plain" id="src-s1-can" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="can" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="111" data-end="144" data-sha="6868106ee151">
+static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLightStatus TX */
+{
+    static uint32_t since_tx_ms;
+    bool ack = false;
+    can_frame_t rx;
+    while (can_receive(&rx))
+    {
+        ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.dlc >= 1U));
+    }
+    if (tl_comm_step(&s_comm, ack, 10U))                                  /* TL-REQ-007 */   // «5»
+    {
+        s_status_changed = true;
+        uart_puts(s_comm.lost ? "dem: TL_E_CLUSTER_LOST failed\n" : "dem: TL_E_CLUSTER_LOST passed\n");
+    }
+    since_tx_ms += 10U;
+    if (s_status_changed || (since_tx_ms >= TL_STATUS_CYCLE_MS))         /* TL-REQ-006 */   // «6»
+    {
+        s_status.lamp_left = s_out.lamp[TL_LEFT];
+        s_status.lamp_right = s_out.lamp[TL_RIGHT];
+        s_status.ind_left = s_out.indicating[TL_LEFT];
+        s_status.ind_right = s_out.indicating[TL_RIGHT];
+        s_status.hazard = s_out.hazard;
+        s_status.out_left = s_mon.failed[TL_LEFT];
+        s_status.out_right = s_mon.failed[TL_RIGHT];
+        s_status.cluster_lost = s_comm.lost;
+        s_status.alive++;
+        can_frame_t tx = {.id = TL_CAN_ID_STATUS, .dlc = TL_STATUS_DLC, .data = {0}};
+        tl_status_pack(&s_status, tx.data);   // «7»
+        (void)can_send(&tx);           /* a full mailbox drops this frame; the next cycle repeats it */
+        s_status_changed = false;
+        since_tx_ms = 0U;
+    }
+    s_alive |= ALIVE_CAN;
+}
+</script>
+          <div id="ex-s1-can"></div>
+          <script type="text/plain" id="src-s1-sup" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="supervisor" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="148" data-end="155" data-sha="6868106ee151">
+static void job_supervisor(void)       /* 50 ms: feed the watchdog only if every job ran (TL-REQ-009) */
+{
+    if (s_alive == ALIVE_ALL)   // «8»
+    {
+        tl_hw_wdg_feed();
+    }
+    s_alive = 0U;
+}
+</script>
+          <div id="ex-s1-sup"></div>
+          <script type="text/plain" id="src-hw-ramp" data-src="capstone/turnlight/hw/tl_hw.c" data-region="ramp" data-lang="c" data-file="capstone/turnlight/hw/tl_hw.c" data-start="83" data-end="102" data-sha="dca21b9eddab">
+void tl_hw_lamp_ramp(const bool on[TL_SIDES], uint32_t dt_ms)
+{
+    const uint32_t step = (TL_PWM_TOP * dt_ms) / TL_RAMP_MS;               /* full scale in 20 ms */   // «1»
+    for (uint32_t i = 0U; i < (uint32_t)TL_SIDES; ++i)
+    {
+        const uint32_t target = on[i] ? TL_PWM_TOP : 0U;
+        uint32_t d = s_duty[i];
+        if (d < target)
+        {
+            d = ((target - d) > step) ? (d + step) : target;
+        }
+        else
+        {
+            d = ((d - target) > step) ? (d - step) : target;
+        }
+        s_duty[i] = (uint16_t)d;
+    }
+    TIM3->CCR1 = s_duty[TL_LEFT];                                          /* taken at the next update */   // «2»
+    TIM3->CCR2 = s_duty[TL_RIGHT];
+}
+</script>
+          <div id="ex-hw-ramp"></div>
+        </section>
+
+        <section class="doc-section" id="acceptance" data-title="Acceptance tests">
+          <div class="sec-head"><h2><span class="sec-num">24.5</span>Acceptance tests</h2></div>
+          <p>One Robot Framework suite (<code>capstone/turnlight/test/turnlight.robot</code>) tests the ECU as a black box through its UART log and CAN frames. Every test is a template with one row per stage, so a stage that behaves differently fails CI:</p>
+          <script type="text/plain" data-code data-src="capstone/turnlight/test/turnlight.robot" data-region="comfort" data-lang="robot" data-file="test/turnlight.robot" data-start="70" data-end="79" data-sha="6061d3107111">
+A Tap Gives Exactly Three Flashes
+    [Arguments]    ${elf}
+    Reset Emulation
+    ${t}=    ECU    ${elf}
+    Hold    btnL    0.2
+    Wait For Line On Uart    lamp L 1    testerId=${t}
+    Wait For Line On Uart    lamp L 1    testerId=${t}
+    Wait For Line On Uart    lamp L 1    testerId=${t}
+    Wait For Line On Uart    lamp L 0    testerId=${t}
+    Should Not Be On Uart    lamp L 1    testerId=${t}    timeout=2
+</script>
+          <script type="text/plain" data-code data-src="capstone/turnlight/test/turnlight.robot" data-region="comfort-case" data-lang="robot" data-file="test/turnlight.robot" data-start="138" data-end="142" data-sha="6061d3107111">
+TL-REQ-004 Comfort Blink
+    [Template]    A Tap Gives Exactly Three Flashes
+    ${STAGE1}
+    ${STAGE2}
+    ${STAGE3}
+</script>
+          <p>What Renode cannot check is on the hardware checklist in <code>docs/acceptance.md</code>: flash rate with a logic analyser, the 20 ms ramp on a scope, real lamp current, and the watchdog reset.</p>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (capstone)</span><p>✅ State machine timing in virtual time, buttons, lamp-out via the ADC test input, CAN frames between two machines, the reset-cause line. ⚠️ No PWM waveform (lamp states are checked from the log), no analog current, no CAN bit timing or error frames, reset cause is always power-on. ❌ Not tested on Blue Pills yet.</p></div></div>
+          <div id="ck-cap1"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/capstone-baremetal.js?v=__BUILD__"></script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>From Blue Pill to Automotive-Grade MCUs — MCU Academy</title>
+  <meta name="description" content="How each lesson maps to NXP S32K1xx, Infineon AURIX TC3xx and Renesas RH850: qualification, safety, vendor MCAL and tooling.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="automotive-mcus">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Reference C</span><span>/</span><span>Automotive MCUs</span></nav>
+          <div class="eyebrow">Reference C · Reference</div>
+          <h1>From Blue Pill to Automotive-Grade MCUs</h1>
+          <p class="lead">The Blue Pill taught you the concepts with a cheap chip you can see every register of. Real ECUs use microcontrollers built and qualified for cars. This appendix explains what is different about them and maps each lesson of the course onto three families you are likely to meet: NXP S32K, Infineon AURIX and Renesas RH850.</p>
+          <div class="page-meta"><span>⏱ 20 min read</span><span>🎯 Intermediate</span><span>📂 (reading)</span></div>
+        </header>
+
+        <section class="doc-section" id="why-not-f103" data-title="Why the F103 isn&#x27;t automotive">
+          <div class="sec-head"><h2><span class="sec-num">C.1</span>Why the F103 isn&#x27;t automotive</h2></div>
+          <p>The STM32F103 is an industrial part. Nothing stops it from working in a car on a bench, but it lacks what a car maker requires:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Topic</th><th>Automotive MCU</th><th>STM32F103C8T6</th></tr></thead>
+            <tbody>
+              <tr><td>Qualification</td><td><b>AEC-Q100</b> stress tests, grade by ambient temperature (grade 1: −40 to 125 °C, grade 0: up to 150 °C)</td><td>industrial range, −40 to 85 °C for the "6" suffix (DS5319)</td></tr>
+              <tr><td>Functional safety</td><td>ISO 26262 safety manual, lockstep CPU cores, ECC on flash and RAM, built-in self tests, safety management unit</td><td>none of these</td></tr>
+              <tr><td>Communication</td><td>CAN FD, several CAN channels, LIN, often Ethernet and FlexRay</td><td>one classic CAN, shared with USB</td></tr>
+              <tr><td>Long-term supply</td><td>10–15 years, change notification process, PPAP</td><td>commercial availability; clone chips on many Blue Pills</td></tr>
+              <tr><td>Software</td><td>vendor AUTOSAR MCAL, safety OS options, configuration tools</td><td>CMSIS, HAL/LL</td></tr>
+            </tbody>
+          </table></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The Blue Pill is a learner car on an empty parking lot: every control is visible and nothing bad happens if you stall. An automotive MCU is the same car built for the motorway in winter: same pedals, plus airbags, ABS, a service history and a manufacturer who promises spare parts for fifteen years.</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Never in a real vehicle</span><p>Nothing from this course, hardware or software, belongs in a vehicle on a public road. The capstone imitates an ECU to teach how one is built; it is not qualified, not safety-analysed and not tested to automotive standards.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="mapping" data-title="Lesson mapping table">
+          <div class="sec-head"><h2><span class="sec-num">C.2</span>Lesson mapping table</h2></div>
+          <p>Choose a course module to see the matching peripheral or concept on each family. Names are from the vendors' reference manuals as commonly used; derivatives differ, so check the manual of your exact part.</p>
+          <div id="am-map" class="calc-host glass"></div>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Family</th><th>Cores</th><th>Typical role</th></tr></thead>
+            <tbody>
+              <tr><td>NXP S32K1</td><td>Arm Cortex-M0+ / M4F</td><td>body, gateway, general-purpose ECUs; closest to what you learned</td></tr>
+              <tr><td>NXP S32K3</td><td>Arm Cortex-M7, lockstep options</td><td>higher-performance body and safety ECUs</td></tr>
+              <tr><td>Infineon AURIX TC3xx</td><td>TriCore, up to six cores, lockstep checker cores</td><td>powertrain, chassis, ASIL D domains</td></tr>
+              <tr><td>Renesas RH850</td><td>Renesas G3/G4 cores, lockstep variants</td><td>body, chassis, powertrain across many ECUs</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="doc-section" id="vendor-mcal" data-title="Vendor MCAL and tools">
+          <div class="sec-head"><h2><span class="sec-num">C.3</span>Vendor MCAL and tools</h2></div>
+          <p>On these parts you rarely write registers for production. The silicon vendor delivers an <b>AUTOSAR MCAL</b> (NXP: Real-Time Drivers; Infineon: AURIX MCAL; Renesas: RH850 MCAL), configured with a tool such as EB tresos or the vendor's own configurator, plus low-level drivers for non-AUTOSAR projects. The modules you built in <code>autosar/mcal</code> (Port, Dio, Pwm, Adc, Can, Wdg, Mcu) are exactly the ones those packages contain, with many more options.</p>
+          <ul>
+            <li><b>Evaluation boards</b> (for example S32K144EVB, AURIX lite kits, RH850 starter kits) cost about as much as a good multimeter and come with debuggers on board.</li>
+            <li><b>Toolchains</b>: GCC works for Cortex-M parts; TriCore and RH850 usually use vendor or commercial compilers (some with free versions for evaluation).</li>
+            <li><b>What transfers directly</b>: clocks and PLLs, wait states, NVIC-style interrupt priorities, timers and PWM, ADC with DMA, CAN bit timing, watchdogs, startup code and linker scripts, MISRA, and everything AUTOSAR.</li>
+          </ul>
+          <div id="ck-am"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/automotive-mcus.js?v=__BUILD__"></script>
+</body>
+</html>

@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code That Passes an OEM / Tier-1 Review — MCU Academy</title>
+  <meta name="description" content="The checklist reviewers actually use: naming, types, MemMap, error handling, MISRA deviations, traceability and the bad-vs-good gallery.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="autosar-review">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 23</span><span>/</span><span>Review-Ready Code</span></nav>
+          <div class="eyebrow">Module 23 · AUTOSAR Classic</div>
+          <h1>Code That Passes an OEM / Tier-1 Review</h1>
+          <p class="lead">Code for a vehicle is read by more people than wrote it: the OEM's reviewers, the supplier's quality team, a safety assessor, and the engineer who maintains it in ten years. This module collects what they check, shows the common findings side by side with the fix, explains traceability from requirement to test, and places ISO 26262 on the map.</p>
+          <div class="page-meta"><span>⏱ 35 min read</span><span>🎯 Advanced</span><span>📂 autosar/, capstone/turnlight, tools/check-autosar.py</span></div>
+        </header>
+
+        <section class="doc-section" id="checklist" data-title="The review checklist">
+          <div class="sec-head"><h2><span class="sec-num">23.1</span>The review checklist</h2></div>
+          <div class="callout warn"><div class="ci">🔎</div><div><span class="ct">Verification status</span><p>Every API, type and rule on this page names its AUTOSAR R25-11 document. The requirement IDs and exact values are still being checked against the R25-11 PDFs; until then they come from the R4.x-era specifications, and no requirement ID is quoted, because the course never makes one up. Progress is tracked in <a href="https://github.com/Thuongst97/MCU-Programming/blob/main/docs/autosar-self-review.md">the self-review log</a>.</p></div></div>
+          <p>A review checklist turns "is this good code?" into questions with yes/no answers. This one combines the AUTOSAR conventions of modules 18–22 with the embedded rules of the whole course. Tick through it for the capstone's stage 3; it remembers your progress in this browser:</p>
+          <div id="ck-review-list"></div>
+          <p>Several items are checked by machine on every push: <code>tools/check-autosar.py</code> (naming, version macros, MemMap pairs, DET guards, SWC includes, banners), <code>tools/run-misra.py</code> (MISRA C:2012 via cppcheck, with recorded deviations), the compiler with <code>-Werror</code>, and the acceptance tests in Renode. The rest needs a person.</p>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>A review checklist is a pilot's pre-flight checklist: experienced pilots use it precisely because experience makes you skip steps. It does not make the flight safe by itself; it makes forgetting the obvious unlikely.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="gallery" data-title="Bad vs good gallery">
+          <div class="sec-head"><h2><span class="sec-num">23.2</span>Bad vs good gallery</h2></div>
+          <p>Two findings that come up in almost every first review, with the version from this repository that passes:</p>
+          <div class="cmp-host" id="cmp-swc"></div>
+          <div class="cmp-host" id="cmp-wait"></div>
+          <script type="text/plain" id="src-r-swc-bad" data-src="autosar/gallery/gallery.c" data-region="swc-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="62" data-end="66" data-sha="1d96068ded30">
+/* An "application" function that reads pins itself: tied to this ECU, untestable on a PC */
+boolean TurnLight_StalkLeftPressed(void)
+{
+    return ((GPIOB->IDR & GPIO_IDR_IDR12) == 0U) ? TRUE : FALSE;
+}
+</script>
+          <script type="text/plain" id="src-r-swc-good" data-src="capstone/turnlight/stage3-autosar/asw/TurnLight/TurnLight.c" data-region="runnable" data-lang="c" data-file="asw/TurnLight/TurnLight.c" data-start="38" data-end="80" data-sha="a6d13e30ed98">
+FUNC(void, TURNLIGHT_CODE) RE_TurnLight_10ms(void)
+{
+    boolean left = FALSE;
+    boolean right = FALSE;
+    boolean hazard = FALSE;
+    boolean failedL = FALSE;
+    boolean failedR = FALSE;
+    (void)Rte_Call_StalkLeft_Get(&left);                                      /* client-server to IoHwAb */   // «1»
+    (void)Rte_Call_StalkRight_Get(&right);
+    (void)Rte_Call_HazardSwitch_Get(&hazard);
+    (void)Rte_Read_LampFailed_Left(&failedL);                                 /* sender-receiver from LampMonitor */   // «2»
+    (void)Rte_Read_LampFailed_Right(&failedR);
+
+    tl_inputs_t in;
+    in.stalk[TL_LEFT] = (left == TRUE);
+    in.stalk[TL_RIGHT] = (right == TRUE);
+    in.hazard_pressed = (hazard == TRUE) && (TurnLight_PrevHazard == FALSE);   /* edge */
+    in.lamp_failed[TL_LEFT] = (failedL == TRUE);
+    in.lamp_failed[TL_RIGHT] = (failedR == TRUE);
+    TurnLight_PrevHazard = hazard;
+    (void)tl_step(&TurnLight_Sm, &in, 10U, &TurnLight_Out);   // «3»
+
+    const boolean lampL = TurnLight_Out.lamp[TL_LEFT] ? TRUE : FALSE;
+    const boolean lampR = TurnLight_Out.lamp[TL_RIGHT] ? TRUE : FALSE;
+    (void)Rte_Call_LampLeft_Set(lampL);                                       /* to IoHwAb -> Pwm */   // «4»
+    (void)Rte_Call_LampRight_Set(lampR);
+    (void)Rte_Write_LampState_Left(lampL);                                    /* to LampMonitor (and Com) */   // «5»
+    (void)Rte_Write_LampState_Right(lampR);
+    (void)Rte_Write_TurnStatus_IndLeft(TurnLight_Out.indicating[TL_LEFT] ? TRUE : FALSE);
+    (void)Rte_Write_TurnStatus_IndRight(TurnLight_Out.indicating[TL_RIGHT] ? TRUE : FALSE);
+    (void)Rte_Write_TurnStatus_Hazard(TurnLight_Out.hazard ? TRUE : FALSE);
+
+    uint8 alive = 0U;
+    const Std_ReturnType ack = Rte_Read_ClusterAck_Alive(&alive);              /* TL-REQ-007 */   // «6»
+    const boolean lost = ((ack & RTE_E_MAX_AGE_EXCEEDED) != 0U) ? TRUE : FALSE;
+    if (lost != TurnLight_ClusterLost)
+    {
+        TurnLight_ClusterLost = lost;
+        (void)Rte_Write_TurnStatus_ClusterLost(lost);
+        (void)Rte_Call_EvClusterLost_SetEventStatus((lost == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);   // «7»
+    }
+    (void)Rte_Call_Alive_CheckpointReached(0U);                               /* WdgM alive supervision */   // «8»
+}
+</script>
+          <script type="text/plain" id="src-r-wait-bad" data-src="autosar/gallery/gallery.c" data-region="wait-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="70" data-end="77" data-sha="1d96068ded30">
+/* Waits forever if the crystal is missing: the ECU hangs before the watchdog is even running */
+void Clock_Start(void)
+{
+    RCC->CR |= RCC_CR_HSEON;
+    while ((RCC->CR & RCC_CR_HSERDY) == 0U)
+    {
+    }
+}
+</script>
+          <script type="text/plain" id="src-r-wait-good" data-src="autosar/mcal/mcu/Mcu.c" data-region="wait" data-lang="c" data-file="autosar/mcal/mcu/Mcu.c" data-start="36" data-end="46" data-sha="ca5f4354da21">
+static FUNC(boolean, MCU_CODE) Mcu_WaitSet(volatile uint32 *reg, uint32 mask, uint32 value)
+{
+    for (uint32 n = 0U; n < MCU_WAIT_LOOPS; ++n)
+    {
+        if ((*reg & mask) == value)
+        {
+            return TRUE;
+        }
+    }
+    return FALSE;                                         /* every hardware wait has a timeout */
+}
+</script>
+          <p>More pairs, each with its rule: <a href="quality.html#bad-good">module 17</a> (MISRA findings) and <a href="autosar-mcal.html#det">module 20</a> (return codes, DET, Dio).</p>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">"It works" is not a review argument</span><p>Every "before" example in the course works on the bench. Reviews exist for the cases a bench test never hits: the crystal that fails in winter, the interrupt that lands between two instructions, the next engineer who moves the function to another ECU.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="traceability" data-title="Requirements traceability">
+          <div class="sec-head"><h2><span class="sec-num">23.3</span>Requirements traceability</h2></div>
+          <p><b>Traceability</b> links each requirement to the design and code that implement it and to the tests that verify it, in both directions. It answers two questions a reviewer always asks: "where is this requirement implemented and tested?" and "why does this code exist?". Pick a requirement of the capstone:</p>
+          <div id="trace" class="calc-host glass"></div>
+          <p>The code side of TL-REQ-005, in the LampMonitor SWC:</p>
+          <script type="text/plain" id="src-r-lm" data-src="capstone/turnlight/stage3-autosar/asw/LampMonitor/LampMonitor.c" data-region="runnable" data-lang="c" data-file="asw/LampMonitor/LampMonitor.c" data-start="28" data-end="51" data-sha="e64d076a09bc">
+FUNC(void, LAMPMONITOR_CODE) RE_LampMonitor_10ms(void)
+{
+    boolean onL = FALSE;
+    boolean onR = FALSE;
+    uint16 raw = 0U;
+    (void)Rte_Read_LampState_Left(&onL);   // «1»
+    (void)Rte_Read_LampState_Right(&onR);
+    (void)Rte_Call_LampCurrent_Get(&raw);   // «2»
+    const bool on[TL_SIDES] = {onL == TRUE, onR == TRUE};
+    lampmon_event_t ev[TL_SIDES];
+    lampmon_step(&LampMonitor_State, on, raw, 10U, ev);   // «3»
+    if (ev[TL_LEFT] != LAMPMON_NO_CHANGE)
+    {
+        const boolean f = LampMonitor_State.failed[TL_LEFT] ? TRUE : FALSE;
+        (void)Rte_Write_LampFailed_Left(f);                                    /* to TurnLight and Com */   // «4»
+        (void)Rte_Call_EvLampOutLeft_SetEventStatus((f == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);   // «5»
+    }
+    if (ev[TL_RIGHT] != LAMPMON_NO_CHANGE)
+    {
+        const boolean f = LampMonitor_State.failed[TL_RIGHT] ? TRUE : FALSE;
+        (void)Rte_Write_LampFailed_Right(f);
+        (void)Rte_Call_EvLampOutRight_SetEventStatus((f == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);
+    }
+}
+</script>
+          <div id="ex-r-lm"></div>
+          <p>In a real project the links live in a requirements tool, and code comments or test tags carry the IDs. The capstone does the same by hand: test cases are named after requirements (<code>TL-REQ-005 Lamp Out</code>), and code comments mention the ID they serve.</p>
+        </section>
+
+        <section class="doc-section" id="safety" data-title="A word on ISO 26262">
+          <div class="sec-head"><h2><span class="sec-num">23.4</span>A word on ISO 26262</h2></div>
+          <p><b>ISO 26262</b> is the functional safety standard for road vehicles. It does not tell you how to write a driver; it tells you how much rigour each function needs, based on how bad its failure could be:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Level</th><th>Meaning</th><th>Typical example (depends on the analysis)</th></tr></thead>
+            <tbody>
+              <tr><td>QM</td><td>quality management is enough</td><td>infotainment, comfort functions</td></tr>
+              <tr><td>ASIL A</td><td>lowest safety integrity level</td><td>some lighting functions</td></tr>
+              <tr><td>ASIL B</td><td></td><td>instrument cluster warnings, some body functions</td></tr>
+              <tr><td>ASIL C</td><td></td><td>some powertrain functions</td></tr>
+              <tr><td>ASIL D</td><td>highest</td><td>steering, braking</td></tr>
+            </tbody>
+          </table></div>
+          <p>The ASIL comes from a hazard analysis that rates severity, exposure and controllability of each failure. It then sets requirements across the whole lifecycle: methods for requirements, design, coding (MISRA C, defensive programming), verification (coverage targets), and the hardware itself.</p>
+          <ul>
+            <li><b>Freedom from interference</b>: software of a lower ASIL must not corrupt software of a higher one, in memory, timing or communication. AUTOSAR's OS-Applications with memory protection, timing protection and E2E-protected messages exist for this.</li>
+            <li><b>Hardware matters</b>: ASIL C/D microcontrollers have lockstep cores, ECC on RAM and flash, and self-tests. The STM32F103 has none of these, which is one reason it is not an automotive part (<a href="automotive-mcus.html">appendix C</a>).</li>
+          </ul>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">This course is QM</span><p>Nothing in this course is developed to ISO 26262, and the TurnLight capstone is not a safety-qualified turn-signal function. The point here is to know where the standard applies and what it asks for.</p></div></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/compare.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/autosar-review.js?v=__BUILD__"></script>
+</body>
+</html>

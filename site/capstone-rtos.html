@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Capstone 2: The Same ECU on FreeRTOS — MCU Academy</title>
+  <meta name="description" content="Splitting the ECU into tasks and queues, timing analysis and what changed vs bare metal.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="capstone-rtos">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 25</span><span>/</span><span>Capstone: FreeRTOS</span></nav>
+          <div class="eyebrow">Module 25 · Capstone</div>
+          <h1>Capstone 2: The Same ECU on FreeRTOS</h1>
+          <p class="lead">Stage 2 rebuilds the TurnLight ECU on FreeRTOS. The state machine, the lamp monitor, the message packing and the board layer are the same files as in stage 1; only the integration changes. The question this module answers is what you gain and what you pay for it.</p>
+          <div class="page-meta"><span>⏱ 40 min read</span><span>🎯 Advanced</span><span>📂 capstone/turnlight/stage2-freertos</span></div>
+        </header>
+
+        <section class="doc-section" id="task-design" data-title="Task design">
+          <div class="sec-head"><h2><span class="sec-num">25.1</span>Task design</h2></div>
+          <p>Tasks are chosen by deadline and by what they wait for, not by source file:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Task</th><th>Priority</th><th>Runs</th><th>Waits on</th></tr></thead>
+            <tbody>
+              <tr><td>lamp</td><td>4 (highest)</td><td>every 5 ms</td><td><code>vTaskDelayUntil</code>: the ramp must be smooth</td></tr>
+              <tr><td>input</td><td>3</td><td>every 10 ms</td><td><code>vTaskDelayUntil</code>; sends edges to a queue</td></tr>
+              <tr><td>logic</td><td>3</td><td>every 10 ms</td><td><code>vTaskDelayUntil</code>; lamp monitor + state machine</td></tr>
+              <tr><td>can</td><td>2</td><td>on change, else every 10 ms</td><td>an event group bit with a 10 ms timeout</td></tr>
+              <tr><td>supervisor</td><td>1 (lowest)</td><td>every ~50 ms</td><td>all four check-in bits</td></tr>
+            </tbody>
+          </table></div>
+          <p>The supervisor has the <i>lowest</i> priority on purpose: if any higher task runs away and starves the CPU, the supervisor never gets to feed the watchdog, and the ECU resets. A watchdog fed from a high-priority task would keep a broken ECU alive.</p>
+          <div id="wv-rtos"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>Stage 1 is one cook who does every job in turn; if one dish takes too long, every other dish waits. Stage 2 is a brigade: each cook has one station, and the head chef (the scheduler) always lets the most urgent order through first.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="comms" data-title="Queues and events">
+          <div class="sec-head"><h2><span class="sec-num">25.2</span>Queues and events</h2></div>
+          <p>Tasks share nothing by accident. Three FreeRTOS objects carry all the data:</p>
+          <ul>
+            <li>a <b>queue</b> of button edges, input → logic: no edge is lost even if the logic task is late;</li>
+            <li>a one-element <b>mailbox</b> (<code>xQueueOverwrite</code> / <code>xQueuePeek</code>) holding the latest outputs, logic → lamp and can: readers always get the newest complete snapshot, never a half-updated one;</li>
+            <li><b>event groups</b>: one bit "status changed" logic → can, and one bit per task for the supervisor.</li>
+          </ul>
+          <script type="text/plain" id="src-s2-input" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="input" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="87" data-end="110" data-sha="0e33be8744e8">
+static void input_task(void *arg)      /* 10 ms, priority 3: debounce, send edges as events */
+{
+    (void)arg;
+    debounce_t btn[TL_BTN_COUNT];
+    for (uint32_t b = 0U; b < (uint32_t)TL_BTN_COUNT; ++b)
+    {
+        debounce_init(&btn[b], 20U, false, now_ms());
+    }
+    TickType_t wake = xTaskGetTickCount();
+    for (;;)
+    {
+        vTaskDelayUntil(&wake, pdMS_TO_TICKS(10));
+        for (uint32_t b = 0U; b < (uint32_t)TL_BTN_COUNT; ++b)
+        {
+            const debounce_event_t ev = debounce_update(&btn[b], tl_hw_button_pressed((tl_button_t)b), now_ms());
+            if (ev != DEBOUNCE_NONE)
+            {
+                const input_event_t e = {(uint8_t)b, ev == DEBOUNCE_PRESSED};
+                (void)xQueueSend(s_events, &e, 0);         /* never block the sampling loop */   // «1»
+            }
+        }
+        (void)xEventGroupSetBits(s_alive, ALIVE_INPUT);
+    }
+}
+</script>
+          <div id="ex-s2-input"></div>
+          <script type="text/plain" id="src-s2-logic" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="logic" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="114" data-end="176" data-sha="0e33be8744e8">
+static void logic_task(void *arg)      /* 10 ms, priority 3: lamp monitor + state machine */
+{
+    (void)arg;
+    turnlight_t tl;
+    tl_inputs_t in = {0};
+    lampmon_t mon;
+    snapshot_t snap = {0};
+    tl_init(&tl);
+    lampmon_init(&mon);
+    TickType_t wake = xTaskGetTickCount();
+    for (;;)
+    {
+        vTaskDelayUntil(&wake, pdMS_TO_TICKS(10));
+        input_event_t e;
+        while (xQueueReceive(s_events, &e, 0) == pdTRUE)  /* drain every edge since last time */   // «2»
+        {
+            if (e.button == (uint8_t)TL_BTN_HAZARD)
+            {
+                in.hazard_pressed = in.hazard_pressed || e.pressed;
+            }
+            else
+            {
+                in.stalk[e.button] = e.pressed;
+            }
+        }
+        lampmon_event_t mev[TL_SIDES];
+        lampmon_step(&mon, snap.out.lamp, tl_hw_lamp_current(), 10U, mev);
+        bool changed = false;
+        for (uint32_t i = 0U; i < (uint32_t)TL_SIDES; ++i)
+        {
+            if (mev[i] != LAMPMON_NO_CHANGE)
+            {
+                in.lamp_failed[i] = mon.failed[i];
+                snap.failed[i] = mon.failed[i];
+                changed = true;
+                log3("dem: TL_E_LAMP_OUT_", SIDE[i], (mev[i] == LAMPMON_FAILED) ? " failed\n" : " passed\n");
+            }
+        }
+        const tl_outputs_t before = snap.out;
+        if (tl_step(&tl, &in, 10U, &snap.out))
+        {
+            changed = true;
+            for (uint32_t i = 0U; i < (uint32_t)TL_SIDES; ++i)
+            {
+                if (before.lamp[i] != snap.out.lamp[i])
+                {
+                    log3("lamp ", SIDE[i], snap.out.lamp[i] ? " 1\n" : " 0\n");
+                }
+            }
+            if (before.hazard != snap.out.hazard)
+            {
+                log3(snap.out.hazard ? "tl: hazard on\n" : "tl: hazard off\n", '\0', "");
+            }
+        }
+        in.hazard_pressed = false;
+        (void)xQueueOverwrite(s_mailbox, &snap);           /* the newest outputs replace the old */   // «3»
+        if (changed)
+        {
+            (void)xEventGroupSetBits(s_flags, EV_STATUS_CHANGED);   // «4»
+        }
+        (void)xEventGroupSetBits(s_alive, ALIVE_LOGIC);
+    }
+}
+</script>
+          <div id="ex-s2-logic"></div>
+          <script type="text/plain" id="src-s2-can" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="can" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="194" data-end="242" data-sha="0e33be8744e8">
+static void can_task(void *arg)        /* priority 2: on change, or every 10 ms for RX + the 100 ms cycle */
+{
+    (void)arg;
+    tl_comm_t comm;
+    tl_status_t st = {0};
+    snapshot_t snap = {0};
+    tl_comm_init(&comm);
+    st.reset_code = s_reset_code;
+    TickType_t last_tick = xTaskGetTickCount();
+    uint32_t since_tx_ms = 0U;
+    for (;;)
+    {
+        const EventBits_t ev = xEventGroupWaitBits(s_flags, EV_STATUS_CHANGED, pdTRUE, pdFALSE, pdMS_TO_TICKS(10));   // «5»
+        const TickType_t now = xTaskGetTickCount();
+        const uint32_t dt = (uint32_t)(now - last_tick);
+        last_tick = now;
+        bool ack = false;
+        can_frame_t rx;
+        while (can_receive(&rx))
+        {
+            ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.dlc >= 1U));
+        }
+        bool send = (ev & EV_STATUS_CHANGED) != 0U;
+        if (tl_comm_step(&comm, ack, dt))
+        {
+            send = true;
+            log3(comm.lost ? "dem: TL_E_CLUSTER_LOST failed\n" : "dem: TL_E_CLUSTER_LOST passed\n", '\0', "");
+        }
+        since_tx_ms += dt;
+        if (send || (since_tx_ms >= TL_STATUS_CYCLE_MS))
+        {
+            (void)xQueuePeek(s_mailbox, &snap, 0);
+            st.lamp_left = snap.out.lamp[TL_LEFT];
+            st.lamp_right = snap.out.lamp[TL_RIGHT];
+            st.ind_left = snap.out.indicating[TL_LEFT];
+            st.ind_right = snap.out.indicating[TL_RIGHT];
+            st.hazard = snap.out.hazard;
+            st.out_left = snap.failed[TL_LEFT];
+            st.out_right = snap.failed[TL_RIGHT];
+            st.cluster_lost = comm.lost;
+            st.alive++;
+            can_frame_t tx = {.id = TL_CAN_ID_STATUS, .dlc = TL_STATUS_DLC, .data = {0}};
+            tl_status_pack(&st, tx.data);
+            (void)can_send(&tx);
+            since_tx_ms = 0U;
+        }
+        (void)xEventGroupSetBits(s_alive, ALIVE_CAN);
+    }
+}
+</script>
+          <div id="ex-s2-can"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The UART is shared too</span><p>Four tasks print to one UART. Without the mutex in <code>log3()</code>, a higher-priority task could interrupt a line halfway and mix two log messages, and the Renode tests, which read whole lines, would fail at random. Any resource used by more than one task needs a lock or a single owner.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="timing" data-title="Timing and watchdog supervision">
+          <div class="sec-head"><h2><span class="sec-num">25.3</span>Timing and watchdog supervision</h2></div>
+          <script type="text/plain" id="src-s2-sup" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="supervisor" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="246" data-end="259" data-sha="0e33be8744e8">
+static void supervisor_task(void *arg) /* priority 1 (lowest): feeds IWDG only when everyone checked in */
+{
+    (void)arg;
+    for (;;)
+    {
+        const EventBits_t got = xEventGroupWaitBits(s_alive, ALIVE_ALL, pdTRUE, pdTRUE, pdMS_TO_TICKS(50));   // «6»
+        if ((got & ALIVE_ALL) == ALIVE_ALL)
+        {
+            tl_hw_wdg_feed();
+            led_toggle();
+            vTaskDelay(pdMS_TO_TICKS(40));                 /* a fresh round of check-ins */
+        }
+    }
+}
+</script>
+          <div id="ex-s2-sup"></div>
+          <p>What to measure on the board before calling stage 2 done (the course has not measured these on hardware yet):</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Number</th><th>How</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr><td>Stack high-water mark per task</td><td><code>uxTaskGetStackHighWaterMark()</code> after exercising every path (module 14)</td><td>size the 256-word stacks to the real need plus margin</td></tr>
+              <tr><td>CPU load</td><td>toggle a pin in the idle task or use FreeRTOS run-time stats with a timer</td><td>headroom for future features</td></tr>
+              <tr><td>Worst-case lamp jitter</td><td>logic analyser on PA6 edges</td><td>the 5 ms ramp must stay smooth under CAN load</td></tr>
+              <tr><td>Watchdog margin</td><td>stall one task in the debugger (with <code>DBG_IWDG_STOP</code> cleared)</td><td>proves the supervisor really stops feeding</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section class="doc-section" id="diff" data-title="What changed">
+          <div class="sec-head"><h2><span class="sec-num">25.4</span>What changed</h2></div>
+          <p>The same requirement, two integrations: the supervisor.</p>
+          <div class="cmp-host" id="cmp-sup"></div>
+          <script type="text/plain" id="src-c-s1sup" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="supervisor" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="148" data-end="155" data-sha="6868106ee151">
+static void job_supervisor(void)       /* 50 ms: feed the watchdog only if every job ran (TL-REQ-009) */
+{
+    if (s_alive == ALIVE_ALL)   // «8»
+    {
+        tl_hw_wdg_feed();
+    }
+    s_alive = 0U;
+}
+</script>
+          <script type="text/plain" id="src-c-s2sup" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="supervisor" data-lang="c" data-file="stage2-freertos/src/main.c" data-start="246" data-end="259" data-sha="0e33be8744e8">
+static void supervisor_task(void *arg) /* priority 1 (lowest): feeds IWDG only when everyone checked in */
+{
+    (void)arg;
+    for (;;)
+    {
+        const EventBits_t got = xEventGroupWaitBits(s_alive, ALIVE_ALL, pdTRUE, pdTRUE, pdMS_TO_TICKS(50));   // «6»
+        if ((got & ALIVE_ALL) == ALIVE_ALL)
+        {
+            tl_hw_wdg_feed();
+            led_toggle();
+            vTaskDelay(pdMS_TO_TICKS(40));                 /* a fresh round of check-ins */
+        }
+    }
+}
+</script>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th><span class="sr-only">Aspect</span></th><th>Stage 1: bare metal</th><th>Stage 2: FreeRTOS</th></tr></thead>
+            <tbody>
+              <tr><td>Flash / RAM (debug build)</td><td>about 7.6 KB / 1.4 KB</td><td>about 21 KB / 8.6 KB (kernel + 5 stacks)</td></tr>
+              <tr><td>A slow job</td><td>delays every other job</td><td>only delays lower-priority tasks</td></tr>
+              <tr><td>Waiting in the middle of a job</td><td>impossible; split into states</td><td>natural: block on a queue or event</td></tr>
+              <tr><td>Shared data</td><td>plain globals, one context</td><td>queues, mailbox, mutex</td></tr>
+              <tr><td>New failure modes</td><td>overruns</td><td>priority inversion, stack overflow, deadlock</td></tr>
+              <tr><td>Acceptance suite</td><td colspan="2">identical, and passes for both</td></tr>
+            </tbody>
+          </table></div>
+          <p>For an ECU this small, bare metal is a perfectly good answer. The RTOS pays off when jobs start to wait for things (a flash write, a diagnostic session, a bus) and when more people add features.</p>
+          <div id="ck-cap2"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/compare.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/capstone-rtos.js?v=__BUILD__"></script>
+</body>
+</html>
