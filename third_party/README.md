@@ -8,8 +8,9 @@ this repository builds offline: there are no git submodules and no CMake `FetchC
 | [`cmsis_core`](cmsis_core/) | ARM-software/CMSIS_6 | see `tools/versions.json` | Apache-2.0 | all firmware (`core_cm3.h`) |
 | [`cmsis_device_f1`](cmsis_device_f1/) | STMicroelectronics/cmsis-device-f1 | see `tools/versions.json` | Apache-2.0 | all firmware (`stm32f103xb.h`) |
 | [`unity`](unity/) | ThrowTheSwitch/Unity | see `tools/versions.json` | MIT | host unit tests |
+| [`freertos_kernel`](freertos_kernel/) | FreeRTOS/FreeRTOS-Kernel | see `tools/versions.json` | MIT | example 10, capstone stage 2, `autosar/os_shim` |
 
-Planned later: `freertos_kernel` (Phase 5), `cmock` (only when a test needs mocks).
+`cmock` is vendored only when a test needs mocks (none does yet).
 
 Rules (CLAUDE.md rule 10):
 - Never edit files here. Each folder has the upstream LICENSE and a README with URL, tag, commit and file hashes.

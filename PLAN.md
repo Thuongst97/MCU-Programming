@@ -4,8 +4,10 @@
 > to AUTOSAR-structured automotive firmware, with every example running on one cheap board:
 > the **STM32F103C8T6 "Blue Pill"** programmed through an **ST-Link V2** over SWD.
 
-Status: **Phase 1 (site foundation) implemented 2026-10-24** (see §11.2). All former open questions are
-decided (§12.2). No lesson content or example firmware yet; that starts in Phase 2.
+Status: **Phases 1–8 implemented 2026-10-24/25** (see §11.2): all 31 pages, examples 00–13, the
+`autosar/` teaching library and the TurnLight capstone. **Still open:** Phase 0 (PDF and hardware
+verification), AUTOSAR requirement IDs (§8.5) and the beta rounds. What is and isn't verified is listed
+in [`docs/verification.md`](docs/verification.md).
 Companion file: [`CLAUDE.md`](CLAUDE.md) (rules for future authoring sessions).
 
 ---
@@ -1354,6 +1356,62 @@ hardware and PDF verifications are still open (they don't block the site foundat
   `tests/site/fixtures/engines.html`.
 - Publishing: Pages deploys from `main` via `pages.yml`; the repository owner must set
   Settings → Pages → Source = "GitHub Actions" once.
+
+**Phase 2 — MVP: setup module (2026-10-24/25).**
+- Built: `examples/common` (CMake presets + toolchain file, 64 KB/20 KB linker script, C startup, BSP,
+  `bluepill.cfg`/`bluepill-clone.cfg`, Renode platform with our RCC overlay), examples 00 (`bare/`, `hal/`,
+  `ll/`), 01 and 02 with Robot tests, `fetch-svd.py`, `elf2memmap.py`, `gen-catalog.py`, `install-tools.py`;
+  engines Pinout, Register, MemoryMap and Checklist; pages `setup`, `board`, `troubleshooting`.
+- Not done: the exit criterion (a clean-machine run on hardware on ≥ 2 OSes). Every build ran on Linux,
+  in CI and in Renode only.
+
+**Phase 3 — from reset to main (2026-10-25).** Modules 01, 03–07; examples 03 (PWM + input capture) and
+04 (UART shell + ring buffer, host-tested); engines ClockTree, Waveform (+ protocol generators), Calc,
+StateMachine, Compare.
+
+**Phase 4 — peripherals (2026-10-25).** Modules 08–13; examples 05–09 and 11. The Renode platform gained
+SPI1/2 + SPI flash, bxCAN (two nodes on a CANHub), IWDG, ADC1 and DBGMCU models.
+- Not done: the exit criterion "CAN demo works between 2 physical boards" (simulated only).
+
+**Phase 5 — embedded engineering (2026-10-25).** Modules 14–17; examples 10 (FreeRTOS, vendored kernel)
+and 12 (UART bootloader + application at `0x08004000`, CRC-32 framed protocol, `upload.py`); `host-tests` and
+`static-analysis` CI jobs; `tools/run-misra.py` (cppcheck MISRA addon with a committed baseline, blocking
+for new findings); bad-vs-good gallery v1 with host tests; deviation template + DEV-001…005.
+- CMock wasn't needed: tested code is pure logic split from the hardware, and the one I/O seam (the shell's
+  output) is an injected function pointer.
+
+**Phase 6 — AUTOSAR track (2026-10-25).** Modules 18–23; `autosar/` (Std/Platform types, Compiler, MemMap,
+Det, Mcu, Port, Dio, Pwm, Adc, Wdg, Can, CanIf, PduR, Com, Dem, WdgM, WdgIf, IoHwAb, EcuM, `os_shim`);
+`check-autosar.py`; `gen-autosar-cfg.py` (MemMap + `Compiler_Cfg.h` from `cfg/modules.txt`).
+- **Exit criterion not met:** no requirement ID is cited, because autosar.org was unreachable from the
+  build environment and rule 13b forbids IDs from memory. `tools/autosar-ids.txt` is empty;
+  `docs/autosar-self-review.md` lists the 26 open items and every AUTOSAR page carries a
+  "Verification status" note.
+- Deviations: **Gpt and Fls are not implemented** (the capstone uses the OS counter as its only time
+  base and has no NV data); the page lists them as "not implemented" instead of stubbing them. **Dcm,
+  NvM, MemIf, Fee and CanTp are taught as concepts** (module 22 widgets), with no code. The optional
+  `tools/rte-gen` was not written: the RTE is hand-written and labelled GENERATED-in-production.
+
+**Phase 7 — capstone (2026-10-25).** `capstone/turnlight` stages 1 (bare-metal scheduler), 2 (FreeRTOS,
+5 tasks) and 3 (AUTOSAR-style: SWCs `TurnLight` + `LampMonitor`, RTE, cfg, integration) + the cluster
+node; shared pure logic with host tests; requirements, CAN matrix and acceptance docs; modules 24–26.
+One Robot suite (7 requirement tests) passes against all three stages in Renode.
+- Deviation from §7: `RE_LampMonitor` runs every **10 ms**, not 100 ms, so all stages detect a lamp
+  fault within the same time and one acceptance suite fits all three.
+- Not done: the hardware checklist sign-off.
+
+**Phase 8 — polish and extras (2026-10-25).** Appendix C (`automotive-mcus`) and D (`ll-drivers`),
+example 13 LIN two nodes (UART level, host-tested PID/checksum, hardware-only: Renode has no LIN
+model) with its explorers on `can.html#lin`, glossary 79 → 217 terms, `tools/check-budget.py`
+(heaviest page ≈ 132 KB transferred), accessibility pass, contributor docs (`CONTRIBUTING.md`),
+`docs/verification.md`, `docs/beta-feedback-template.md`.
+- Accessibility: axe-core (WCAG 2 A/AA + best practice) over all 32 pages in both themes, 0 violations
+  after fixes (code line-number contrast, light-theme copper `#9a5118`, widget titles as `h3.w-title`,
+  interactive SVGs as `role="group"`, focusable waveform canvas, labelled table corner cells).
+- Deviation: the page-weight budget is measured as **transferred (gzip)** bytes, as GitHub Pages
+  serves them. Raw, unminified sizes reach ~430 KB on `setup.html` because readers are meant to open
+  our sources; `check-budget.py` prints both.
+- Not done: beta round 2, proofreading by a second person.
 
 ---
 
