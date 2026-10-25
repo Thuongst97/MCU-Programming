@@ -1021,7 +1021,7 @@
     let cur = -1, timer = null;
     const D = window.MCU && window.MCU.Diagram;
 
-    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.ariaLabel || T.ariaDefault)}"><defs>`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="group" aria-label="${esc(opts.ariaLabel || T.ariaDefault)}"><defs>`;
     SEQ_KINDS.forEach((k) => {
       svg += `<marker id="${host.id}-ah-${k}" class="k-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>`;
     });
@@ -1093,11 +1093,11 @@
       count.textContent = `${cur + 1} / ${steps.length}`;
       prog.style.width = ((cur + 1) / steps.length) * 100 + "%";
       if (!s) {
-        main.innerHTML = `<h4>${esc(T.ready)}</h4><p class="muted">${opts.intro || T.intro}</p>`;
+        main.innerHTML = `<h3 class="w-title">${esc(T.ready)}</h3><p class="muted">${opts.intro || T.intro}</p>`;
         side.innerHTML = opts.introSide || `<p class="muted small">${esc(T.introSide)}</p>`;
       } else {
         main.innerHTML = `<div class="seq-tags"><span class="badge gray">${esc(T.step(cur + 1))}</span>${(s.tags || []).map((t) => `<span class="badge ${t[1] || ""}">${esc(t[0])}</span>`).join("")}</div>
-          <h4>${esc(s.title || s.label)}</h4><div>${s.detail || ""}</div>`;
+          <h3 class="w-title">${esc(s.title || s.label)}</h3><div>${s.detail || ""}</div>`;
         side.innerHTML = (s.code ? codeBlockHTML({ code: s.code, lang: s.codeLang || "c", file: s.codeFile || "", label: s.codeLang || "c" }) : "") +
           (s.analogy ? `<div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">${esc(S.callout.analogy)}</span>${s.analogy}</div></div>` : "");
         wireCopy(side);

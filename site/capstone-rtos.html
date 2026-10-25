@@ -265,7 +265,7 @@ static void supervisor_task(void *arg) /* priority 1 (lowest): feeds IWDG only w
 }
 </script>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th></th><th>Stage 1: bare metal</th><th>Stage 2: FreeRTOS</th></tr></thead>
+            <thead><tr><th><span class="sr-only">Aspect</span></th><th>Stage 1: bare metal</th><th>Stage 2: FreeRTOS</th></tr></thead>
             <tbody>
               <tr><td>Flash / RAM (debug build)</td><td>about 7.6 KB / 1.4 KB</td><td>about 21 KB / 8.6 KB (kernel + 5 stacks)</td></tr>
               <tr><td>A slow job</td><td>delays every other job</td><td>only delays lower-priority tasks</td></tr>

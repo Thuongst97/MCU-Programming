@@ -290,7 +290,7 @@ rx id 0x00000100 dlc 2 data0 1
           <div class="sec-head"><h2><span class="sec-num">12.9</span>CAN FD in theory</h2></div>
           <p><b>CAN FD</b> (flexible data-rate, ISO 11898-1:2015) keeps arbitration at the classic bit rate, then switches to a faster rate for the data phase and allows up to 64 data bytes. The F103's bxCAN does <b>not</b> support CAN FD; worse, a classic controller treats an FD frame as an error. Mixed networks need FD-tolerant or FD-capable controllers everywhere.</p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th></th><th>Classic CAN</th><th>CAN FD</th></tr></thead>
+            <thead><tr><th><span class="sr-only">Aspect</span></th><th>Classic CAN</th><th>CAN FD</th></tr></thead>
             <tbody>
               <tr><td>Data per frame</td><td>0–8 bytes</td><td>0–64 bytes</td></tr>
               <tr><td>Data-phase bit rate</td><td>same as arbitration (≤ 1 Mbit/s)</td><td>faster (2–5 Mbit/s typical)</td></tr>
@@ -305,7 +305,7 @@ rx id 0x00000100 dlc 2 data0 1
           <div class="sec-head"><h2><span class="sec-num">12.10</span>LIN in theory</h2></div>
           <p><b>LIN</b> is CAN's cheap little sibling for simple functions (switch panels, mirror motors, rain sensors). It is a single wire at up to 20 kbit/s with one <b>master</b> that runs a fixed <b>schedule table</b> and polls slaves; slaves never speak unasked, so there is no arbitration. A LIN node is often just a UART plus a transceiver, which is why the F1's USART has a LIN mode (<a href="uart.html#lin-mode">module 08</a>).</p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th></th><th>CAN</th><th>LIN</th></tr></thead>
+            <thead><tr><th><span class="sr-only">Aspect</span></th><th>CAN</th><th>LIN</th></tr></thead>
             <tbody>
               <tr><td>Wires</td><td>2 (differential)</td><td>1 (+ ground, 12 V)</td></tr>
               <tr><td>Speed</td><td>up to 1 Mbit/s (classic)</td><td>up to 20 kbit/s</td></tr>

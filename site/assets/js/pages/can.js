@@ -59,7 +59,7 @@
       rows += `</tr>`;
     });
     rows += `<tr class="arb-bus"><td>Bus (wired-AND)</td>${bus.map((b) => `<td>${b}</td>`).join("")}</tr>`;
-    $("#arb-table").innerHTML = `<table class="t arb"><thead><tr><th></th>${Array.from({ length: 11 }, (_, i) => `<th>ID${10 - i}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>`;
+    $("#arb-table").innerHTML = `<table class="t arb"><thead><tr><th><span class="sr-only">Sender</span></th>${Array.from({ length: 11 }, (_, i) => `<th>ID${10 - i}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>`;
     const winners = nodes.filter((n) => n.out < 0);
     $("#arb-out").innerHTML = winners.length === 1
       ? `Node <b>${winners[0].name}</b> wins and sends its frame unharmed. ${nodes.filter((n) => n.out >= 0).map((n) => `Node ${n.name} lost at bit ID${10 - n.out}`).join("; ")}; losers retry after the frame.`

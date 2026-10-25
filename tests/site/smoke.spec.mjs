@@ -39,6 +39,7 @@ async function publishedPages(browser) {
 test("every published page loads cleanly in both themes", async ({ browser }) => {
   const pages = await publishedPages(browser);
   expect(pages.length).toBeGreaterThan(1);
+  test.setTimeout(pages.length * 2 * 5_000);   // grows with the site: ~5 s budget per page and theme
   for (const file of pages) {
     for (const scheme of ["dark", "light"]) {
       const { page, context, problems } = await open(browser, SITE + file, scheme);
@@ -56,6 +57,7 @@ test("every published page loads cleanly in both themes", async ({ browser }) =>
 
 test("every same-origin link and anchor resolves", async ({ browser, request }) => {
   const pages = await publishedPages(browser);
+  test.setTimeout(Math.max(60_000, pages.length * 4_000));
   const anchorsByPage = {};
   const targets = new Map();
   for (const file of pages) {
@@ -122,7 +124,11 @@ test("glossary filters by text and category", async ({ browser }) => {
   const all = await page.locator(".gloss-item").count();
   expect(all).toBeGreaterThan(50);
   await page.fill("#g-search", "bxcan");
-  await expect(page.locator(".gloss-item")).toHaveCount(2); // bxCAN itself + CAN mentions it
+  const hits = page.locator(".gloss-item");
+  await expect(hits).not.toHaveCount(all);
+  const texts = await hits.allInnerTexts();
+  expect(texts.length).toBeGreaterThan(1);                  // bxCAN itself + terms that mention it
+  for (const t of texts) expect(t.toLowerCase()).toContain("bxcan");
   await page.fill("#g-search", "");
   await page.click('.gloss-cat[data-c="autosar"]');
   const n = await page.locator(".gloss-item").count();
@@ -153,7 +159,7 @@ test("engines render and respond (fixture page)", async ({ browser }) => {
   // pinout: wiring view drew parts; clicking a pin fills the side panel; search highlights
   await expect(page.locator("#po-demo .po-ext")).toHaveCount(3);
   await page.click('#po-demo [data-pin="PA9"] .po-dot');
-  await expect(page.locator("#po-demo .po-panel h4")).toContainText("PA9");
+  await expect(page.locator("#po-demo .po-panel .w-title")).toContainText("PA9");
   await page.fill("#po-demo .po-search", "CAN_TX");
   await expect(page.locator("#po-demo .po-pin.match")).toHaveCount(2);
   // register: the C expression follows the value; toggling a bit changes it

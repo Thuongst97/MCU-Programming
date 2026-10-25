@@ -59,7 +59,7 @@
         ${s.sub ? `<text class="sm-sub" x="${s.x + BW / 2}" y="${s.y + 40}" text-anchor="middle">${esc(s.sub)}</text>` : ""}</g>`;
     });
     host.classList.add("sm-host", "glass");
-    host.innerHTML = `<div class="sm-canvas"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(spec.ariaLabel || S.aria)}">${svg}</svg></div>
+    host.innerHTML = `<div class="sm-canvas"><svg viewBox="0 0 ${W} ${H}" role="group" aria-label="${esc(spec.ariaLabel || S.aria)}">${svg}</svg></div>
       <div class="sm-ctl"><span class="small muted">${esc(S.events)}</span><div class="sm-events"></div><button type="button" class="btn sm ghost" data-act="reset">${esc(S.reset)}</button></div>
       <div class="sm-info" aria-live="polite"></div>`;
     const info = host.querySelector(".sm-info"), events = host.querySelector(".sm-events");
@@ -70,7 +70,7 @@
       const outs = spec.transitions.map((t, i) => [t, i]).filter(([t]) => t.from === cur);
       events.innerHTML = outs.length ? outs.map(([t, i]) => `<button type="button" class="btn sm" data-fire="${i}">${esc(t.label)}</button>`).join("") : `<span class="small muted">${esc(S.none)}</span>`;
       const t = lastT !== null && !viewId ? spec.transitions[lastT] : null;
-      info.innerHTML = `<h4>${esc(v.label)}${v.id === cur ? ` <span class="badge green">${esc(S.current)}</span>` : ""}</h4><div>${v.desc || ""}</div>${t && t.desc ? `<p class="small muted"><b>${esc(t.label)}:</b> ${t.desc}</p>` : ""}`;
+      info.innerHTML = `<h3 class="w-title">${esc(v.label)}${v.id === cur ? ` <span class="badge green">${esc(S.current)}</span>` : ""}</h3><div>${v.desc || ""}</div>${t && t.desc ? `<p class="small muted"><b>${esc(t.label)}:</b> ${t.desc}</p>` : ""}`;
     };
     host.addEventListener("click", (e) => {
       const f = e.target.closest("[data-fire]");

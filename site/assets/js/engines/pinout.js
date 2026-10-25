@@ -165,7 +165,7 @@
     s += wireSvg + pinSvg + partSvg;
     const title = opts.title || `${data.board.name} pinout`;
     const style = opts.standalone ? `<style>${STANDALONE_CSS}</style>` : "";
-    const svg = `<svg class="po-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${G.W} ${height}" role="img" aria-label="${esc(title)}">${style}<title>${esc(title)}</title>${s}</svg>`;
+    const svg = `<svg class="po-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${G.W} ${height}" role="${opts.standalone ? "img" : "group"}" aria-label="${esc(title)}">${style}<title>${esc(title)}</title>${s}</svg>`;
     return { svg, height };
   }
 
@@ -205,9 +205,9 @@
       const info = k && data.pins[k];
       const pw = k && data.power[k];
       if (!k || (!info && !pw)) { panel.innerHTML = `<p class="muted small">${S.hint}</p>`; return; }
-      if (pw) { panel.innerHTML = `<h4>${k}</h4><p>${pw.notes || ""}</p>`; return; }
+      if (pw) { panel.innerHTML = `<h3 class="w-title">${k}</h3><p>${pw.notes || ""}</p>`; return; }
       const chip = (t) => `<code>${t}</code>`;
-      panel.innerHTML = `<h4>${k} <span class="badge ${info.ft ? "green" : "amber"}">${info.ft ? S.ft : S.nft}</span></h4>
+      panel.innerHTML = `<h3 class="w-title">${k} <span class="badge ${info.ft ? "green" : "amber"}">${info.ft ? S.ft : S.nft}</span></h3>
         <p class="small muted">${S.lqfp(info.lqfp)}</p>
         <p><b>${S.af}</b><br>${info.af.map(chip).join(" ")}</p>
         ${info.remap.length ? `<p><b>${S.remap}</b><br>${info.remap.map(chip).join(" ")}</p>` : ""}

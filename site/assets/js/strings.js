@@ -133,6 +133,7 @@ window.MCU_STRINGS = {
     min: (m) => `minimum ${m}. `,
     checked: (d) => `Versions pinned in tools/versions.json, last checked ${d}. Newer versions usually work; these are the ones CI uses.`,
   },
+  waveform: { aria: "Timing diagram" },
   clocktree: {
     aria: "STM32F1 clock tree",
     ctl: { src: "PLL source", xtpre: "HSE pre-divider", mul: "PLL multiplier", sw: "System clock (SW)", hpre: "AHB prescaler", ppre1: "APB1 prescaler", ppre2: "APB2 prescaler", adcpre: "ADC prescaler", usbpre: "USB prescaler" },

@@ -453,7 +453,7 @@ app: version 1, vector table at 0x08004000, 72 MHz
           <div class="sec-head"><h2><span class="sec-num">16.7</span>Read-out and write protection</h2></div>
           <p>Option bytes (a small flash area at <code>0x1FFFF800</code>, PM0075) set two kinds of protection on the F103:</p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th></th><th>Read-out protection (RDP)</th><th>Write protection (WRP)</th></tr></thead>
+            <thead><tr><th><span class="sr-only">Aspect</span></th><th>Read-out protection (RDP)</th><th>Write protection (WRP)</th></tr></thead>
             <tbody>
               <tr><td>Protects against</td><td>reading the firmware through SWD or the system bootloader</td><td>accidental erase or programming</td></tr>
               <tr><td>Granularity</td><td>whole flash</td><td>4 KB (4 pages) per bit on medium-density devices</td></tr>

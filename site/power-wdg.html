@@ -101,7 +101,7 @@ static void iwdg_feed(void)
           <div class="sec-head"><h2><span class="sec-num">13.3</span>Window watchdog</h2></div>
           <p>The <b>window watchdog</b> (WWDG) runs from PCLK1 and catches a second class of bug: refreshing too <i>early</i>. Its 7-bit counter counts down; a reset happens if it drops below <code>0x40</code>, or if software refreshes it while it is still above the window value <code>W</code> (RM0008 §20). Refreshes are only accepted inside the window, so a loop that runs too fast, for example because it skipped work, also resets the chip.</p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th></th><th>IWDG</th><th>WWDG</th></tr></thead>
+            <thead><tr><th><span class="sr-only">Aspect</span></th><th>IWDG</th><th>WWDG</th></tr></thead>
             <tbody>
               <tr><td>Clock</td><td>LSI (~40 kHz), keeps running if the main clock fails</td><td>PCLK1 ÷ 4096 ÷ 2<sup>WDGTB</sup></td></tr>
               <tr><td>Catches</td><td>Software stuck (no refresh)</td><td>Software stuck <i>or</i> running too fast</td></tr>

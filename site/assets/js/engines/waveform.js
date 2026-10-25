@@ -221,13 +221,13 @@
       s += `<line class="wv-mark ${m.cls || ""}" x1="${X(m.at)}" y1="${TOP - 4}" x2="${X(m.at)}" y2="${H - 6}"/>`;
       if (m.text) s += `<text class="wv-marktext" x="${X(m.at) + 3}" y="${TOP + 6}">${esc(m.text)}</text>`;
     });
-    return `<svg class="wv-svg" viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W, 1400)}px" role="img" aria-label="${esc(spec.title || "Timing diagram")}">${s}</svg>`;
+    return `<svg class="wv-svg" viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W, 1400)}px" role="img" aria-label="${esc(spec.title || window.MCU_STRINGS.waveform.aria)}">${s}</svg>`;
   }
 
   /** mount(host, spec | () => spec). Returns { update(spec) } so pages can bind controls to generators. */
   function mount(host, spec) {
     host.classList.add("wv-host");
-    const draw = (sp) => { host.innerHTML = `<div class="wv-canvas">${render(sp)}</div>`; };
+    const draw = (sp) => { host.innerHTML = `<div class="wv-canvas" tabindex="0">${render(sp)}</div>`; };
     draw(spec);
     return { update: draw };
   }

@@ -248,7 +248,7 @@ LoopFillZerobss:
 </script>
           <p>It does the same four things as our C version, in a slightly different order:</p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th></th><th>ST assembly</th><th>Course C (<code>startup.c</code>)</th></tr></thead>
+            <thead><tr><th><span class="sr-only">Aspect</span></th><th>ST assembly</th><th>Course C (<code>startup.c</code>)</th></tr></thead>
             <tbody>
               <tr><td>Order</td><td><code>SystemInit()</code> first, then copy and zero</td><td>Copy and zero first, then <code>SystemInit()</code>, so <code>SystemInit</code> may use initialised globals</td></tr>
               <tr><td>C++ constructors</td><td>Calls <code>__libc_init_array</code></td><td>Not needed: no C++, no constructors (and we link with <code>-nostartfiles</code>)</td></tr>

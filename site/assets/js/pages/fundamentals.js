@@ -78,12 +78,12 @@
       <text class="lg-sub" x="164" y="${y + 31}">${esc(r.s)}</text></g>
       <text class="hd-sub" x="140" y="${y + 24}" text-anchor="end">${esc(r.a)}</text>`;
   });
-  host.innerHTML = `<svg class="lg-svg" viewBox="0 0 ${W} ${10 + REGIONS.length * (RH + 6)}" role="img" aria-label="STM32F103 address space, highest addresses at the top">${svg}</svg><div class="sm-info" id="mm-space-info"></div>`;
+  host.innerHTML = `<svg class="lg-svg" viewBox="0 0 ${W} ${10 + REGIONS.length * (RH + 6)}" role="group" aria-label="STM32F103 address space, highest addresses at the top">${svg}</svg><div class="sm-info" id="mm-space-info"></div>`;
   const info = $("#mm-space-info");
   const show = (i) => {
     const r = REGIONS[i];
     host.querySelectorAll("[data-r]").forEach((g) => g.classList.toggle("focus", +g.dataset.r === i));
-    info.innerHTML = `<h4><code>${esc(r.a)}</code> · ${esc(r.n)}</h4><p>${r.d}</p>`;
+    info.innerHTML = `<h3 class="w-title"><code>${esc(r.a)}</code> · ${esc(r.n)}</h3><p>${r.d}</p>`;
   };
   host.addEventListener("click", (e) => { const g = e.target.closest("[data-r]"); if (g) show(+g.dataset.r); });
   host.addEventListener("keydown", (e) => { const g = e.target.closest("[data-r]"); if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); show(+g.dataset.r); } });

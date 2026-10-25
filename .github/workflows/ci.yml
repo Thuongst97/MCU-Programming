@@ -30,6 +30,8 @@ jobs:
         run: python3 tools/embed-code.py --check
       - name: Register data matches the CMSIS header
         run: python3 tools/check-regs.py
+      - name: Page-weight budget (≤ 400 KB transferred per page, fonts excluded)
+        run: python3 tools/check-budget.py
       - name: Hero art is up to date
         run: python3 tools/hero-art.py --check
       - name: Vendored third-party code is intact

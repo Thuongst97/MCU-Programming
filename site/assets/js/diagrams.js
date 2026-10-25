@@ -364,7 +364,7 @@
     const toneNames = { ...S.layered.tones, ...(spec.toneLabels || {}) };
     const tones = Object.keys(S.layered.tones).filter((t) => Object.values(nodes).some((n) => n._tone === t));
     host.classList.add("lg-host");
-    host.innerHTML = `<svg class="lg-svg" viewBox="0 0 1000 ${H}" role="img" aria-label="${esc(spec.label || S.layered.ariaDefault)}">${s}</svg>
+    host.innerHTML = `<svg class="lg-svg" viewBox="0 0 1000 ${H}" role="group" aria-label="${esc(spec.label || S.layered.ariaDefault)}">${s}</svg>
       <div class="lg-legend lg-tones">${tones.map((t) => `<span class="tn-${t}"><b></b>${esc(toneNames[t])}</span>`).join("")}</div>
       <div class="lg-legend">${kinds.map((k) => `<span class="${k}"><i></i>${esc(S.layered.kinds[k] || k)}</span>`).join("")}${boundaries.length ? `<span class="bnd"><i></i>${esc(S.layered.boundary)}</span>` : ""}<span class="hint">${esc(S.layered.hint)}</span></div>`;
 
