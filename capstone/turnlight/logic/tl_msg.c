@@ -8,7 +8,7 @@ void tl_status_pack(const tl_status_t *s, uint8_t data[TL_STATUS_DLC])
                         (s->ind_left ? 0x04U : 0U) | (s->ind_right ? 0x08U : 0U) |
                         (s->hazard ? 0x10U : 0U) | (s->out_left ? 0x20U : 0U) |
                         (s->out_right ? 0x40U : 0U) | (s->cluster_lost ? 0x80U : 0U));
-    data[1] = s->reset_cause;
+    data[1] = s->reset_code;
     data[2] = s->alive;
     data[3] = 0U;                                           /* reserved: always send 0 */
 }
@@ -27,7 +27,7 @@ bool tl_status_unpack(const uint8_t *data, uint8_t dlc, tl_status_t *s)
     s->out_left = (data[0] & 0x20U) != 0U;
     s->out_right = (data[0] & 0x40U) != 0U;
     s->cluster_lost = (data[0] & 0x80U) != 0U;
-    s->reset_cause = data[1];
+    s->reset_code = data[1];
     s->alive = data[2];
     return true;
 }

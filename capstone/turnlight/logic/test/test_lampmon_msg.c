@@ -41,7 +41,7 @@ static void test_status_round_trip(void)
     s.hazard = true;
     s.out_left = true;
     s.cluster_lost = true;
-    s.reset_cause = (uint8_t)TL_RESET_IWDG;
+    s.reset_code = (uint8_t)TL_RESET_IWDG;
     s.alive = 200U;
     uint8_t d[TL_STATUS_DLC];
     tl_status_pack(&s, d);
@@ -50,7 +50,7 @@ static void test_status_round_trip(void)
     TEST_ASSERT_TRUE(tl_status_unpack(d, TL_STATUS_DLC, &r));
     TEST_ASSERT_EQUAL_MEMORY(&s, &r, sizeof s);
     TEST_ASSERT_FALSE(tl_status_unpack(d, 3U, &r));         /* wrong DLC is rejected */
-    TEST_ASSERT_EQUAL_STRING("independent watchdog", tl_reset_name(r.reset_cause));
+    TEST_ASSERT_EQUAL_STRING("independent watchdog", tl_reset_name(r.reset_code));
 }
 
 static void test_cluster_lost_after_500_ms(void)              /* TL-REQ-007 */

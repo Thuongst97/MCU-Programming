@@ -153,7 +153,7 @@ static void test_unknown_command_is_reported(void)
             <li><b>cppcheck</b>: finds undefined behaviour, out-of-bounds indexes, uninitialised variables, and with its MISRA addon checks a large share of the MISRA C rules. Run in CI by <code>tools/run-misra.py</code>.</li>
             <li><b>GCC's <code>-fanalyzer</code></b> and <b>clang-tidy</b>: deeper path-sensitive checks; slower, useful before a release.</li>
           </ul>
-          <script type="text/plain" data-code data-src="tools/run-misra.py" data-lines="1-17" data-lang="sh" data-file="tools/run-misra.py" data-start="1" data-end="17" data-sha="41e25a4dd60e">
+          <script type="text/plain" data-code data-src="tools/run-misra.py" data-lines="1-17" data-lang="sh" data-file="tools/run-misra.py" data-start="1" data-end="17" data-sha="1d68c83c9f5e">
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 """Static analysis with cppcheck and its MISRA C:2012 addon, as a ratchet (PLAN.md §10, CLAUDE.md rule 7).
@@ -163,14 +163,14 @@ static void test_unknown_command_is_reported(void)
   python3 tools/run-misra.py --list     # print every finding
 
 The addon runs WITHOUT a rule-texts file: findings name the rule number only. Rules disapplied for
-the whole project are listed in DISAPPLIED, each with its record in docs/misra/. A single deviation in
-code uses an inline suppression that names its record:
-    // cppcheck-suppress misra-c2012-11.4 ; DEV-002
+the whole project are listed in DISAPPLIED, each with its record in docs/misra/. Deviations limited to
+one place are listed in SCOPED with their record. A single deviation in code uses an inline
+suppression that names its record:
+    // cppcheck-suppress misra-c2012-11.5 ; DEV-002
 New code must be clean; the baseline only shrinks.
 """
 import argparse
 import json
-import re
 </script>
           <p>The tool works as a <b>ratchet</b>: the findings that existed when the check was introduced are counted per file and rule in <code>tools/misra-baseline.json</code>. CI fails when any count goes up, so new code must be clean while old findings are fixed one by one.</p>
         </section>
@@ -284,7 +284,7 @@ What prevents the problem the rule is about: the reasoning, the tests, review ev
 ## Review
 When this deviation is re-examined (for example at every release, or when the code changes).
 </script>
-          <p>The course's own stance (<code>docs/misra/compliance.md</code>): mandatory and required rules are never disapplied, advisory Rule 15.5 is disapplied for the whole project with a recorded reason (early returns in guard clauses), and any single exception is marked in the code with an inline suppression naming its record, such as <code>// cppcheck-suppress misra-c2012-11.4 ; DEV-002</code>.</p>
+          <p>The course's own stance (<code>docs/misra/compliance.md</code>): mandatory and required rules are never disapplied, advisory Rule 15.5 is disapplied for the whole project with a recorded reason (early returns in guard clauses), and any single exception is marked in the code with an inline suppression naming its record, such as <code>// cppcheck-suppress misra-c2012-11.5 ; DEV-002</code>.</p>
           <div class="callout tip"><div class="ci">💡</div><div><span class="ct">A good deviation is rare and boring</span><p>If you write the same deviation five times, change the design instead (wrap the construct in one function with one deviation). Reviewers trust a project with three precise deviations more than one with three hundred vague ones.</p></div></div>
           <div id="ck-quality"></div>
         </section>

@@ -117,7 +117,7 @@ uint16_t tl_hw_lamp_current(void)
     return 0U;                                                             /* reads as "lamp out": safe side */
 }
 
-uint8_t tl_hw_reset_cause(void)
+uint8_t tl_hw_reset_code(void)
 {
     const uint32_t csr = RCC->CSR;
     RCC->CSR |= RCC_CSR_RMVF;

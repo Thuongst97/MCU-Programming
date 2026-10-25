@@ -62,7 +62,7 @@ static StaticEventGroup_t s_flags_cb, s_alive_cb;
 static EventGroupHandle_t s_flags, s_alive;
 static StaticSemaphore_t s_log_cb;
 static SemaphoreHandle_t s_log;
-static uint8_t s_reset_cause;
+static uint8_t s_reset_code;
 
 static uint32_t now_ms(void)
 {
@@ -198,7 +198,7 @@ static void can_task(void *arg)        /* priority 2: on change, or every 10 ms 
     tl_status_t st = {0};
     snapshot_t snap = {0};
     tl_comm_init(&comm);
-    st.reset_cause = s_reset_cause;
+    st.reset_code = s_reset_code;
     TickType_t last_tick = xTaskGetTickCount();
     uint32_t since_tx_ms = 0U;
     for (;;)
@@ -270,9 +270,9 @@ int main(void)
     uart_log_init(115200U);
     led_init();
     NVIC_SetPriorityGrouping(0U);
-    s_reset_cause = tl_hw_reset_cause();                    /* TL-REQ-010 */
+    s_reset_code = tl_hw_reset_code();                    /* TL-REQ-010 */
     uart_puts("\nTurnLight stage 2 (FreeRTOS), reset cause: ");
-    uart_puts(tl_reset_name(s_reset_cause));
+    uart_puts(tl_reset_name(s_reset_code));
     uart_puts((clk == CLOCK_OK) ? "\n" : ", clock fault\n");
     if (!tl_hw_init())
     {

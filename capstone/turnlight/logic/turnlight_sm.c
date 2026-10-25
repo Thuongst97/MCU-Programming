@@ -48,7 +48,7 @@ static void stalk_logic(turnlight_t *t, const tl_inputs_t *in)
         const tl_side_t s = (tl_side_t)i;
         const bool pressed = in->stalk[s] && !t->prev_stalk[s];
         const bool released = !in->stalk[s] && t->prev_stalk[s];
-        if (pressed && !(t->mode == TL_MODE_TURN && t->side == other(s)))
+        if (pressed && !((t->mode == TL_MODE_TURN) && (t->side == other(s))))
         {
             start_turn(t, s);                               /* a new request wins over comfort */  // «1»
         }
@@ -64,7 +64,8 @@ static void stalk_logic(turnlight_t *t, const tl_inputs_t *in)
 // [region:step]
 bool tl_step(turnlight_t *t, const tl_inputs_t *in, uint32_t dt_ms, tl_outputs_t *out)
 {
-    const tl_outputs_t before = *out;
+    tl_outputs_t before;
+    before = *out;
 
     if (in->hazard_pressed)
     {

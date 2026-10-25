@@ -118,33 +118,40 @@ TL-REQ-010 Reset Cause
     [Template]    Boot Reports The Reset Cause
     ${STAGE1}
     ${STAGE2}
+    ${STAGE3}
 
 TL-REQ-001 Left Stalk
     [Template]    Left Stalk Flashes The Left Lamp Only
     ${STAGE1}
     ${STAGE2}
+    ${STAGE3}
 
 TL-REQ-003 Hazard
     [Template]    Hazard Overrides The Stalk
     ${STAGE1}
     ${STAGE2}
+    ${STAGE3}
 
 TL-REQ-004 Comfort Blink
     [Template]    A Tap Gives Exactly Three Flashes
     ${STAGE1}
     ${STAGE2}
+    ${STAGE3}
 
 TL-REQ-005 Lamp Out
     [Template]    A Lamp Without Current Is Reported
     ${STAGE1}
     ${STAGE2}
+    ${STAGE3}
 
 TL-REQ-006 CAN Status To Cluster
     [Template]    The Cluster Shows The Lamps Over CAN
     ${STAGE1}
     ${STAGE2}
+    ${STAGE3}
 
 TL-REQ-007 Cluster Supervision
     [Template]    A Missing Cluster Is Detected
     ${STAGE1}
     ${STAGE2}
+    ${STAGE3}

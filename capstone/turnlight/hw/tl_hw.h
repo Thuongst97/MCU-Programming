@@ -26,7 +26,7 @@ bool tl_hw_init(void);                                  /* false if the ADC did 
 bool tl_hw_button_pressed(tl_button_t b);               /* raw level, not debounced */
 void tl_hw_lamp_ramp(const bool on[TL_SIDES], uint32_t dt_ms);   /* call every few ms */
 uint16_t tl_hw_lamp_current(void);                      /* 12-bit ADC reading, 0 on timeout */
-uint8_t tl_hw_reset_cause(void);                        /* tl_reset_cause_t; clears the flags */
+uint8_t tl_hw_reset_code(void);                        /* tl_reset_code_t; clears the flags */
 void tl_hw_wdg_start(void);
 void tl_hw_wdg_feed(void);
 

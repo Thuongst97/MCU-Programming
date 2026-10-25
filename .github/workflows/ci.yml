@@ -44,6 +44,10 @@ jobs:
         run: python3 tools/gen-catalog.py --check
       - name: Generated font for example 06 is up to date
         run: python3 tools/gen-font.py --check
+      - name: AUTOSAR conventions (naming, MemMap, DET, banners, SWC includes)
+        run: python3 tools/check-autosar.py
+      - name: Generated AUTOSAR configuration headers are up to date
+        run: python3 tools/gen-autosar-cfg.py --check capstone/turnlight/stage3-autosar/cfg
 
   browser-smoke:
     name: Browser smoke test (Playwright)

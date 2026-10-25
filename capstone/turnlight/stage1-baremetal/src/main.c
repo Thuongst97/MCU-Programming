@@ -176,9 +176,9 @@ int main(void)
     systick_init_1ms();
     uart_log_init(115200U);
     led_init();
-    s_status.reset_cause = tl_hw_reset_cause();                             /* TL-REQ-010 */
+    s_status.reset_code = tl_hw_reset_code();                             /* TL-REQ-010 */
     uart_puts("\nTurnLight stage 1 (bare metal), reset cause: ");
-    uart_puts(tl_reset_name(s_status.reset_cause));
+    uart_puts(tl_reset_name(s_status.reset_code));
     uart_puts((clk == CLOCK_OK) ? "\n" : ", clock fault\n");
     if (!tl_hw_init())
     {

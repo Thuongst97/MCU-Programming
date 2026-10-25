@@ -31,9 +31,6 @@
   "misra-c2012-12.1": 1,
   "misra-c2012-8.9": 1
  },
- "examples/07-spi-flash-w25q/src/w25q.h": {
-  "misra-c2012-2.5": 1
- },
  "examples/08-iwdg-hardfault/src/faultdecode.c": {
   "misra-c2012-12.1": 2,
   "misra-c2012-17.7": 2,
@@ -41,8 +38,5 @@
  },
  "examples/12-uart-bootloader/src/proto.c": {
   "misra-c2012-10.6": 1
- },
- "examples/12-uart-bootloader/src/proto.h": {
-  "misra-c2012-2.5": 2
  }
 }

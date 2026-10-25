@@ -5,7 +5,7 @@
  *   TurnLightStatus 0x3A0, DLC 4, ECU -> cluster, every 100 ms and on change
  *     byte 0  bit 0 LampLeft   bit 1 LampRight   bit 2 IndLeft   bit 3 IndRight
  *             bit 4 Hazard     bit 5 LampOutLeft bit 6 LampOutRight bit 7 ClusterLost
- *     byte 1  ResetCause (tl_reset_cause_t)
+ *     byte 1  ResetCause (tl_reset_code_t)
  *     byte 2  AliveCounter (increments with every frame)
  *     byte 3  reserved, 0
  *   ClusterAck 0x3A1, DLC 1, cluster -> ECU, every 100 ms: byte 0 echoes the last AliveCounter
@@ -26,12 +26,19 @@ typedef enum
 {
     TL_RESET_POWER_ON = 0, TL_RESET_PIN, TL_RESET_SOFTWARE, TL_RESET_IWDG, TL_RESET_WWDG, TL_RESET_LOW_POWER,
     TL_RESET_UNKNOWN
-} tl_reset_cause_t;
+} tl_reset_code_t;
 
 typedef struct
 {
-    bool lamp_left, lamp_right, ind_left, ind_right, hazard, out_left, out_right, cluster_lost;
-    uint8_t reset_cause;
+    bool lamp_left;
+    bool lamp_right;
+    bool ind_left;
+    bool ind_right;
+    bool hazard;
+    bool out_left;
+    bool out_right;
+    bool cluster_lost;
+    uint8_t reset_code;
     uint8_t alive;
 } tl_status_t;
 
