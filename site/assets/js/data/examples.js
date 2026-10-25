@@ -344,5 +344,35 @@ window.MCU_DATA.examples = [
   "sim": "partial",
   "tested_on": [],
   "folder": "11-can-two-nodes"
+ },
+ {
+  "id": "12",
+  "title": "A UART bootloader with CRC-checked updates",
+  "modules": [
+   "bootloader"
+  ],
+  "peripherals": [
+   "FLASH (FPEC)",
+   "USART1",
+   "SysTick",
+   "GPIOA",
+   "GPIOC",
+   "SCB",
+   "NVIC"
+  ],
+  "flavor": "bare-metal (CMSIS registers)",
+  "pins": [
+   "PA0",
+   "PC13",
+   "PA9",
+   "PA10"
+  ],
+  "hw": [
+   "USB-UART adapter",
+   "push button from PA0 to GND (optional)"
+  ],
+  "sim": "partial",
+  "tested_on": [],
+  "folder": "12-uart-bootloader"
  }
 ];

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+# Example 12 in Renode: the bootloader starts with an empty application slot and waits.
+# Send an update from the monitor:
+#   python3 examples/12-uart-bootloader/host/upload.py --frames-out frames.bin build/.../12-application.bin
+#   uart_send_file sysbus.usart1 @frames.bin
+# or connect upload.py over TCP:  emulation CreateServerSocketTerminal 3456 "bl" false
+#                                  connector Connect sysbus.usart1 bl
+$name?="blue-pill-12"
+include $ORIGIN/../../common/renode/bluepill.resc
+machine LoadPlatformDescriptionFromString "button: Miscellaneous.Button @ gpioPortA 0 { invert: true; -> gpioPortA@0 }"
+include $ORIGIN/../../common/renode/uart_send.py
+start

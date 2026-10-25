@@ -43,6 +43,8 @@
         { pin: "B9", to: "sn65.D" }, { pin: "B8", to: "sn65.R" }, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
     "10": { title: "Example 10: optional button on PA0 (EXTI0 → semaphore)", highlight: ["PA0", "PC13", "PA9", "PA10"],
       wiring: [...SWD, ...UART, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
+    "12": { title: "Example 12: USB-UART for updates, optional button on PA0 (stay in the bootloader)", highlight: ["PA0", "PC13", "PA9", "PA10"],
+      wiring: [...SWD, ...UART, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
     "03": { title: "Example 03: LED on PA6 (TIM3 CH1), jumper PA6 → PA0 (TIM2 CH1)", highlight: ["PA6", "PA0", "PA9", "PA10"],
       wiring: [...SWD, ...UART, { pin: "A6", to: "led.A" }, { pin: "right:GND", to: "led.K", kind: "ground" }, { pin: "A6", to: "jumper.1" }, { pin: "A0", to: "jumper.2" }] },
   };
