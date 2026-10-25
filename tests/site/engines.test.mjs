@@ -126,10 +126,12 @@ test("CAN bit timing: 500 kbit/s from 36 MHz, exact rate, legal fields", () => {
   assert.ok(list.length > 0);
   for (const r of list) {
     assert.equal(r.brp * r.tq * 500000, 36e6);
-    assert.ok(r.ts1 >= 1 && r.ts1 <= 16 && r.ts2 >= 1 && r.ts2 <= 8);
+    assert.ok(r.ts1 >= 1 && r.ts1 <= 16 && r.ts2 >= 2 && r.ts2 <= 8);
     assert.equal(r.btr & 0x3ff, r.brp - 1);
   }
   assert.ok(Math.abs(list[0].errorPct) <= Math.abs(list[list.length - 1].errorPct));
+  // the classic setting: BRP 4, 18 tq, sample point 88.9 %, CAN_BTR = 0x001E0003
+  assert.equal(list[0].btr, 0x001e0003);
 });
 
 test("clock tree: course setup is legal and needs 2 wait states", () => {

@@ -16,8 +16,10 @@ Create Blue Pill
     Execute Command    machine LoadPlatformDescription @${PLATFORM}
     Execute Command    sysbus LoadELF @${elf}
     Execute Command    cpu VectorTableOffset 0x08000000
-    Create Terminal Tester    sysbus.usart1    timeout=5    machine=${name}
-    Create LED Tester    sysbus.gpioPortC.led    defaultTimeout=2    machine=${name}
+    ${tester}=    Create Terminal Tester    sysbus.usart1    timeout=5    machine=${name}
+    ${led}=    Create LED Tester    sysbus.gpioPortC.led    defaultTimeout=2    machine=${name}
+    Set Test Variable    ${LED_${name}}    ${led}
+    [Return]    ${tester}
 
 Add Button
     [Arguments]    ${port}    ${pin}    ${name}=button

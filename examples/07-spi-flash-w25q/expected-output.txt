@@ -1,0 +1,7 @@
+Example 07: SPI1 + W25Qxx flash (CS on PA4)
+JEDEC ID EF 40 16: Winbond, 4096 KB
+erase sector 0x001000: OK
+erased bytes read 0xFF: OK
+program 256 bytes: OK
+verify (polling): 0 mismatches
+verify (DMA): 0 mismatches

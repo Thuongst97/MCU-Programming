@@ -142,5 +142,178 @@ window.MCU_DATA.examples = [
   "sim": "full",
   "tested_on": [],
   "folder": "04-uart-shell-ringbuffer"
+ },
+ {
+  "id": "05",
+  "title": "ADC on a potentiometer, then scan mode with circular DMA",
+  "modules": [
+   "adc-dma"
+  ],
+  "peripherals": [
+   "ADC1",
+   "DMA1",
+   "GPIOA",
+   "USART1"
+  ],
+  "flavor": "bare metal + host unit tests",
+  "pins": [
+   "PA1",
+   "PA9",
+   "PA10"
+  ],
+  "hw": [
+   "10 kΩ potentiometer (ends to 3.3 V and GND",
+   "wiper to PA1)",
+   "USB-UART adapter"
+  ],
+  "sim": "partial",
+  "tested_on": [],
+  "folder": "05-adc-pot-dma"
+ },
+ {
+  "id": "06",
+  "title": "I2C master and an SSD1306 OLED",
+  "modules": [
+   "i2c"
+  ],
+  "peripherals": [
+   "I2C1",
+   "GPIOB",
+   "USART1"
+  ],
+  "flavor": "bare metal + host unit tests",
+  "pins": [
+   "PB6",
+   "PB7",
+   "PA9",
+   "PA10"
+  ],
+  "hw": [
+   "SSD1306 128×64 I2C OLED module",
+   "USB-UART adapter"
+  ],
+  "sim": "partial",
+  "tested_on": [],
+  "folder": "06-i2c-oled-ssd1306"
+ },
+ {
+  "id": "07",
+  "title": "SPI master and a W25Qxx NOR flash",
+  "modules": [
+   "spi"
+  ],
+  "peripherals": [
+   "SPI1",
+   "DMA1",
+   "GPIOA",
+   "USART1"
+  ],
+  "flavor": "bare metal + host unit tests",
+  "pins": [
+   "PA4",
+   "PA5",
+   "PA6",
+   "PA7",
+   "PA9",
+   "PA10"
+  ],
+  "hw": [
+   "W25Q32 or W25Q64 SPI flash module",
+   "USB-UART adapter"
+  ],
+  "sim": "partial",
+  "tested_on": [],
+  "folder": "07-spi-flash-w25q"
+ },
+ {
+  "id": "08",
+  "title": "Watchdog, reset causes and a HardFault handler that tells you why",
+  "modules": [
+   "power-wdg",
+   "faults-debug"
+  ],
+  "peripherals": [
+   "IWDG",
+   "RCC",
+   "SCB",
+   "DBGMCU",
+   "USART1"
+  ],
+  "flavor": "bare metal + host unit tests",
+  "pins": [
+   "PA9",
+   "PA10",
+   "PC13"
+  ],
+  "hw": [
+   "USB-UART adapter"
+  ],
+  "sim": "partial",
+  "tested_on": [],
+  "folder": "08-iwdg-hardfault"
+ },
+ {
+  "id": "09",
+  "title": "Sleep and Stop modes, waking up on a button",
+  "modules": [
+   "power-wdg"
+  ],
+  "peripherals": [
+   "PWR",
+   "SCB",
+   "EXTI",
+   "AFIO",
+   "SysTick",
+   "USART1"
+  ],
+  "flavor": "bare metal",
+  "pins": [
+   "PA0",
+   "PC13",
+   "PA9",
+   "PA10"
+  ],
+  "hw": [
+   "push button from PA0 to GND",
+   "USB-UART adapter",
+   "multimeter in the 3.3 V supply line (optional)"
+  ],
+  "sim": "partial",
+  "tested_on": [],
+  "folder": "09-lowpower-stop"
+ },
+ {
+  "id": "11",
+  "title": "Two Blue Pills on a CAN bus",
+  "modules": [
+   "can"
+  ],
+  "peripherals": [
+   "bxCAN",
+   "AFIO",
+   "GPIOA",
+   "GPIOB",
+   "NVIC",
+   "USART1"
+  ],
+  "flavor": "bare metal",
+  "pins": [
+   "PB8",
+   "PB9",
+   "PA0",
+   "PC13",
+   "PA9",
+   "PA10"
+  ],
+  "hw": [
+   "second Blue Pill",
+   "2 × SN65HVD230 transceiver modules",
+   "twisted pair",
+   "2 × 120 Ω (if the modules have none)",
+   "push button on node A"
+  ],
+  "sim": "partial",
+  "tested_on": [],
+  "folder": "11-can-two-nodes"
  }
 ];

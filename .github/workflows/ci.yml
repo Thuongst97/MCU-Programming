@@ -42,6 +42,8 @@ jobs:
         run: node tools/export-wiring.mjs --check
       - name: Example catalog and tool-version data are up to date
         run: python3 tools/gen-catalog.py --check
+      - name: Generated font for example 06 is up to date
+        run: python3 tools/gen-font.py --check
 
   browser-smoke:
     name: Browser smoke test (Playwright)

@@ -47,6 +47,13 @@ window.MCU_DATA = window.MCU_DATA || {};
    "load": false
   },
   {
+   "name": ".noinit",
+   "vma": 536871000,
+   "lma": 134224108,
+   "size": 0,
+   "load": false
+  },
+  {
    "name": "._user_heap_stack",
    "vma": 536871000,
    "lma": 134224032,

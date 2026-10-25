@@ -17,9 +17,12 @@ cpu: CPU.CortexM @ sysbus
 nvic: IRQControllers.NVIC @ sysbus 0xE000E000
     priorityMask: 0xF0          // 4 priority bits implemented (stm32f103xb.h: __NVIC_PRIO_BITS 4)
     systickFrequency: 72000000  // fixed: Renode does not derive it from RCC
+    FilterCcrDiv0Write: false   // honour SCB->CCR.DIV_0_TRP (example 08 traps divide-by-zero)
     IRQ -> cpu@0
 
-flash: Memory.MappedMemory @ sysbus 0x08000000
+// With BOOT0 = 0 the flash also appears at address 0 (RM0008 §3.4), where the core fetches its
+// initial SP and reset vector, including after a software or watchdog reset.
+flash: Memory.MappedMemory @ { sysbus 0x08000000; sysbus 0x00000000 }
     size: 0x10000               // 64 KB
 
 sram: Memory.MappedMemory @ sysbus 0x20000000
@@ -141,27 +144,27 @@ afio: GPIOPort.STM32F1AFIO @ sysbus 0x40010000
 
 usart1: UART.STM32_UART @ sysbus <0x40013800, +0x100>
     -> nvic@37
-    DMARequest -> dma1@4 | dma1@5
+    DMARequest -> dma1@3 | dma1@4   // DMA1 ch4 TX, ch5 RX (RM0008 §13.3.7); dma1 inputs are 0-based
 
 usart2: UART.STM32_UART @ sysbus <0x40004400, +0x100>
     -> nvic@38
-    DMARequest -> dma1@6 | dma1@7
+    DMARequest -> dma1@5 | dma1@6   // ch6 RX, ch7 TX
 
 usart3: UART.STM32_UART @ sysbus <0x40004800, +0x100>
     -> nvic@39
-    DMARequest -> dma1@2 | dma1@3
+    DMARequest -> dma1@1 | dma1@2   // ch2 TX, ch3 RX
 
 i2c1: I2C.STM32F1_I2C @ sysbus 0x40005400
     EventInterrupt -> nvic@31
     ErrorInterrupt -> nvic@32
-    TxDMARequest -> dma1@6
-    RxDMARequest -> dma1@7
+    TxDMARequest -> dma1@5   // ch6
+    RxDMARequest -> dma1@6   // ch7
 
 i2c2: I2C.STM32F1_I2C @ sysbus 0x40005800
     EventInterrupt -> nvic@33
     ErrorInterrupt -> nvic@34
-    TxDMARequest -> dma1@4
-    RxDMARequest -> dma1@5
+    TxDMARequest -> dma1@3   // ch4
+    RxDMARequest -> dma1@4   // ch5
 
 dma1: DMA.STM32G0DMA @ sysbus 0x40020000
     numberOfChannels: 7
@@ -169,29 +172,29 @@ dma1: DMA.STM32G0DMA @ sysbus 0x40020000
 
 timer1: Timers.STM32_Timer @ sysbus 0x40012c00
     BreakInterrupt -> nvic@24
-    UpdateInterrupt -> nvic@25 | dma1@5
-    TriggerInterrupt -> nvic@26 | dma1@4
-    CommutationInterrupt -> nvic@26 | dma1@4
-    CaptureCompareInterrupt -> nvic@27 | dma1@2
+    UpdateInterrupt -> nvic@25 | dma1@4
+    TriggerInterrupt -> nvic@26 | dma1@3
+    CommutationInterrupt -> nvic@26 | dma1@3
+    CaptureCompareInterrupt -> nvic@27 | dma1@1
     frequency: 72000000
     initialLimit: 0xFFFF
 
 timer2: Timers.STM32_Timer @ sysbus 0x40000000
     IRQ -> nvic@28
-    UpdateInterrupt -> dma1@2
+    UpdateInterrupt -> dma1@1
     frequency: 72000000
     initialLimit: 0xFFFF
 
 timer3: Timers.STM32_Timer @ sysbus 0x40000400
     IRQ -> nvic@29
-    UpdateInterrupt -> dma1@3
-    TriggerInterrupt -> dma1@6
+    UpdateInterrupt -> dma1@2
+    TriggerInterrupt -> dma1@5
     frequency: 72000000
     initialLimit: 0xFFFF
 
 timer4: Timers.STM32_Timer @ sysbus 0x40000800
     IRQ -> nvic@30
-    UpdateInterrupt -> dma1@7
+    UpdateInterrupt -> dma1@6
     frequency: 72000000
     initialLimit: 0xFFFF
 
@@ -245,6 +248,82 @@ gpioPortB:
     9 -> timer4@03
     10 -> timer2@02
     11 -> timer2@03
+
+// SPI1 (PA4-PA7) with a SPI NOR flash attached for example 07. Renode has no W25Q model; its
+// Micron MT25Q answers the same basic commands (06, 05, 02, 03, 20, 9F) with a Micron JEDEC ID.
+spi1: SPI.STM32SPI @ sysbus 0x40013000
+    series: STM32Series.F1
+    IRQ -> nvic@35
+    DMAReceive -> dma1@1        // DMA1 channel 2 = SPI1_RX (RM0008 §13.3.7); dma1 inputs are 0-based
+    DMASend -> dma1@2           // DMA1 channel 3 = SPI1_TX
+
+spi2: SPI.STM32SPI @ sysbus 0x40003800
+    series: STM32Series.F1
+    IRQ -> nvic@36
+
+spiFlashMem: Memory.MappedMemory @ none
+    size: 0x400000
+
+spiFlash: SPI.Micron_MT25Q @ spi1
+    underlyingMemory: spiFlashMem
+
+// PA4 is the flash's chip select (a plain GPIO in example 07): a rising edge ends the command.
+gpioPortA:
+    4 -> spiFlash@0
+
+// bxCAN (RM0008 chapter 24). Interrupts 19/20 are shared with USB, which is not modelled.
+can1: CAN.STMCAN @ sysbus <0x40006400, +0x400>
+    [0-3] -> nvic@[19-22]
+
+// Independent watchdog on the ~40 kHz LSI (RM0008 chapter 19). A timeout resets the machine.
+iwdg: Timers.STM32_IndependentWatchdog @ sysbus 0x40003000
+    frequency: 40000
+
+// ADC1 (RM0008 chapter 11): Renode's STM32 ADC models the F4 register layout, so this Python model
+// implements the F1 subset the examples use: power-up, reset/self-calibration (CAL, RSTCAL clear
+// themselves), software-started single conversions of the channel in SQR3, EOC, DR.
+// Simulated analog inputs: tests write the raw 12-bit value of channel n to offset 0x300 + 4*n
+// (a test-only register that real hardware does not have). DMA requests are NOT generated.
+adc1: Python.PythonPeripheral @ sysbus 0x40012400
+    size: 0x400
+    initable: true
+    script: '''
+if request.IsInit:
+    regs = {}
+    analog = {1: 2048, 16: 1750, 17: 1489}
+elif request.IsRead:
+    off = request.Offset & 0x3FC
+    if off == 0x4C:
+        request.Value = regs.get(0x4C, 0)
+        regs[0x00] = regs.get(0x00, 0) & ~0x2
+    elif off >= 0x300:
+        request.Value = analog.get((off - 0x300) // 4, 0)
+    else:
+        request.Value = regs.get(off, 0)
+elif request.IsWrite:
+    off = request.Offset & 0x3FC
+    v = request.Value
+    if off >= 0x300:
+        analog[(off - 0x300) // 4] = v & 0xFFF
+    elif off == 0x00:
+        regs[0x00] = regs.get(0x00, 0) & v
+    elif off == 0x08:
+        on = regs.get(0x08, 0) & 1
+        regs[0x08] = v & ~((1 << 2) | (1 << 3) | (1 << 22))
+        start = ((v & (1 << 22)) != 0) or (on and (v & 1) and ((v & 0xE0000) != 0xE0000))
+        if (v & 1) and start:
+            ch = regs.get(0x34, 0) & 0x1F
+            regs[0x4C] = analog.get(ch, 0)
+            regs[0x00] = regs.get(0x00, 0) | 0x12
+    else:
+        regs[off] = v
+'''
+
+// DBGMCU (RM0008 §31.16): IDCODE reads as a medium-density device (DEV_ID 0x410); CR is stored.
+dbgmcu: Python.PythonPeripheral @ sysbus 0xE0042000
+    size: 0x8
+    initable: true
+    script: "regs = {0: 0x20036410, 4: 0} if request.IsInit else regs; request.Value = regs.get(request.Offset & 4, 0) if request.IsRead else request.Value; regs.update({4: request.Value} if (request.IsWrite and (request.Offset & 4)) else {})"
 
 // The on-board LED: PC13 drives its cathode, so the LED is lit when the pin is LOW.
 led: Miscellaneous.LED @ gpioPortC 13

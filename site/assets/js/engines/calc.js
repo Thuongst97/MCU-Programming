@@ -6,7 +6,8 @@
      MCU.Calc.timer({ clk, freq })                 → [{ psc, arr, actual, errorPct }]   best first
      MCU.Calc.canTiming({ pclk, bitrate, sp, sjw }) → [{ brp, tq, ts1, ts2, sjw, sp, btr, errorPct }]  best first
      MCU.Calc.widget(host, "brr" | "timer" | "can", { defaults, onResult })
-   Limits: USART BRR (RM0008 §27.3.4), TIMx PSC/ARR 16 bit (§15.4), CAN_BTR fields (§24.7.7).
+   Limits: USART BRR (RM0008 §27.3.4), TIMx PSC/ARR 16 bit (§15.4), CAN_BTR fields (§24.7.7);
+   TS2 is kept at 2 tq or more.
    ========================================================================= */
 (function (root, factory) {
   const api = factory();
@@ -53,10 +54,12 @@
       if (Math.abs(n - Math.round(n)) > 1e-9) continue;
       const N = Math.round(n);
       if (N < 8 || N > 25) continue;             // 1 + (1..16) + (1..8) quanta, practical minimum 8
-      let t1 = Math.round(sp * N) - 1;            // quanta before the sample point, excluding sync
-      t1 = Math.max(1, Math.min(16, t1));
-      let t2 = N - 1 - t1;
-      if (t2 < 1 || t2 > 8) continue;
+      // quanta before the sample point (excluding sync); keep at least 2 tq after it, because a
+      // node needs time to process the sampled bit (information processing time)
+      let t1 = Math.round(sp * N) - 1;
+      t1 = Math.max(1, Math.min(16, t1, N - 3));
+      const t2 = N - 1 - t1;
+      if (t2 < 2 || t2 > 8) continue;
       const s = Math.min(sjw, 4, t2);
       const real = (1 + t1) / N;
       out.push({ brp, tq: N, ts1: t1, ts2: t2, sjw: s, sp: real,

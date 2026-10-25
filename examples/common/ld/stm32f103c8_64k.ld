@@ -72,6 +72,16 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
+  /* Not touched by the startup code: survives a reset (not a power cycle). Example 08 keeps its
+     fault record here so the next boot can report what crashed. */
+  .noinit (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.noinit)
+    *(.noinit*)
+    . = ALIGN(4);
+  } >RAM
+
   /* Reserve heap + stack so the link fails early when RAM runs out. */
   ._user_heap_stack (NOLOAD) :             /* «7» */
   {
