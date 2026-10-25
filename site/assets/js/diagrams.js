@@ -196,10 +196,11 @@
     let y = 8;
     spec.bands.forEach((b) => {
       const mine = spec.nodes.filter((n) => n.band === b.key);
-      const rows = b.boundary ? 0 : Math.max(1, ...mine.map((n) => (n.row || 0) + (n.rows || 1)));
+      const boundary = b.boundary && mine.length === 0;   // a boundary that holds nodes needs a full band
+      const rows = boundary ? 0 : Math.max(1, ...mine.map((n) => (n.row || 0) + (n.rows || 1)));
       const labelH = 52 + [].concat(b.title || []).length * 14 + [].concat(b.sub || []).length * 12;
-      const h = b.boundary ? LG.BOUNDARY_H : Math.max(b.minH || 0, labelH, LG.PAD * 2 + rows * NODE_H + (rows - 1) * LG.ROW_GAP);
-      bands[b.key] = { ...b, y, h, rows, tone: b.tone || TAG_TONE[b.tag] || "asw" };
+      const h = boundary ? LG.BOUNDARY_H : Math.max(b.minH || 0, labelH, LG.PAD * 2 + rows * NODE_H + (rows - 1) * LG.ROW_GAP);
+      bands[b.key] = { ...b, boundary, y, h, rows, tone: b.tone || TAG_TONE[b.tag] || "asw" };
       y += h + LG.BAND_GAP;
     });
     const H = y - LG.BAND_GAP + 8;

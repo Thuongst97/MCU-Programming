@@ -48,6 +48,7 @@ What was done instead, so the gap is visible and can be closed item by item:
 | 24 | AR release version macros `4.11.0` for R25-11 | every module header | AUTOSAR_CP_TR_ReleaseOverview | pending | ⏳ | no |
 | 25 | Layered architecture terms (ASW, RTE, Services, ECU abstraction, MCAL, CDD) | autosar-arch.html | AUTOSAR_CP_EXP_LayeredSoftwareArchitecture | pending | ⏳ | no |
 | 26 | Methodology terms (ECU extract, ECU configuration, ARXML) | autosar-arch.html#methodology | AUTOSAR_CP_TR_Methodology | pending | ⏳ | no |
+| 27 | CAN FD in the stack: CanIf TX PDUs configured as classic or FD frames; the Can driver configures a data-phase bit timing next to the arbitration one; PduR and Com unaffected apart from I-PDU length | capstone-autosar.html#can-fd | AUTOSAR_CP_SWS_CANInterface, AUTOSAR_CP_SWS_CANDriver | pending | ⏳ | **likely**: CAN FD support arrived during R4.x; confirm which release |
 
 ## Checklist status per page and module
 
