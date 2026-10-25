@@ -1,35 +1,36 @@
 /* SPDX-License-Identifier: MIT
  * Example 12, bootloader: a small UART bootloader in the first 16 KB of flash.
  *
- * At reset it stays in update mode when the button on PA0 is held, when the application slot
+ * At reset it stays in update mode when the USER button B1 is held, when the application slot
  * holds no valid image, or when a HELLO frame arrives within 500 ms. Otherwise it checks the
  * image record and the CRC-32 of the application and jumps to it at 0x08004000.
- * The clock is left as after reset (HSI 8 MHz), so the application starts from known settings.
+ * The clock is left as after reset (HSI16), so the application starts from known settings.
  */
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "board.h"
 #include "flash.h"
+#include "gpio.h"
 #include "layout.h"
 #include "led.h"
 #include "proto.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #include "systick.h"
 #include "uart_log.h"
 
 #define HELLO_WINDOW_MS 500U
-#define APP_PAGES       (APP_SIZE_MAX / FLASH_PAGE_SIZE)
 
 static void button_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
-    GPIOA->CRL = (GPIOA->CRL & ~(GPIO_CRL_MODE0 | GPIO_CRL_CNF0)) | GPIO_CRL_CNF0_1;   /* input, pull-up/down */
-    GPIOA->ODR |= GPIO_ODR_ODR0;                                                       /* ... pull-up */
+    gpio_clock_on(BOARD_BTN_PORT);
+    gpio_mode(BOARD_BTN_PORT, BOARD_BTN_PIN, BSP_GPIO_INPUT);
+    gpio_pull(BOARD_BTN_PORT, BOARD_BTN_PIN, BSP_GPIO_PULLDOWN);
 }
 
 static bool button_held(void)
 {
-    return (GPIOA->IDR & GPIO_IDR_IDR0) == 0U;   /* to GND when pressed */
+    return ((BOARD_BTN_PORT->IDR >> BOARD_BTN_PIN) & 1U) == BOARD_BTN_PRESSED;
 }
 
 // [region:validate]
@@ -47,7 +48,7 @@ static bool app_valid(void)
     const uint32_t *vt = (const uint32_t *)APP_BASE;
     const uint32_t sp = vt[0];
     const uint32_t pc = vt[1];
-    if ((sp < SRAM_BASE) || (sp > (SRAM_BASE + (20UL * 1024UL))) || ((sp & 3U) != 0U))         // «2»
+    if ((sp < SRAM_BASE) || (sp > (SRAM_BASE + (96UL * 1024UL))) || ((sp & 3U) != 0U))         // «2»
     {
         return false;
     }
@@ -72,9 +73,12 @@ __attribute__((noreturn)) static void jump_to_app(void)
         NVIC->ICER[i] = 0xFFFFFFFFUL;                                    /* disable every IRQ ... */ // «6»
         NVIC->ICPR[i] = 0xFFFFFFFFUL;                                    /* ... and forget pending ones */
     }
-    RCC->APB2RSTR |= RCC_APB2RSTR_USART1RST | RCC_APB2RSTR_IOPARST | RCC_APB2RSTR_IOPCRST;   // «7»
-    RCC->APB2RSTR &= ~(RCC_APB2RSTR_USART1RST | RCC_APB2RSTR_IOPARST | RCC_APB2RSTR_IOPCRST);
-    RCC->APB2ENR = 0U;
+    RCC->APB1RSTR2 |= RCC_APB1RSTR2_LPUART1RST;                         /* peripherals back to reset */ // «7»
+    RCC->APB1RSTR2 &= ~RCC_APB1RSTR2_LPUART1RST;
+    RCC->AHB2RSTR |= RCC_AHB2RSTR_GPIOARST | RCC_AHB2RSTR_GPIOCRST;
+    RCC->AHB2RSTR &= ~(RCC_AHB2RSTR_GPIOARST | RCC_AHB2RSTR_GPIOCRST);
+    RCC->APB1ENR2 = 0U;
+    RCC->AHB2ENR = 0U;
     SCB->VTOR = APP_BASE;                                                /* the app's vector table */ // «8»
     __DSB();
     __ISB();
@@ -98,9 +102,10 @@ static bool erase_slot(void)
 {
     flash_unlock();
     bool ok = flash_erase_page(RECORD_ADDR);                             /* the record goes first */  // «11»
-    for (uint32_t p = 0U; ok && (p < APP_PAGES); ++p)
+    const uint32_t page = flash_page_size();                             /* 2 or 4 KB: DBANK decides */
+    for (uint32_t a = APP_BASE; ok && (a < (APP_BASE + APP_SIZE_MAX)); a += page)
     {
-        ok = flash_erase_page(APP_BASE + (p * FLASH_PAGE_SIZE));
+        ok = flash_erase_page(a);
     }
     flash_lock();
     return ok;
@@ -118,13 +123,13 @@ static bool handle(const proto_frame_t *f, bool *run)
         return (f->len == 0U) && erase_slot();
     case CMD_WRITE:
     {
-        if ((f->len < 6U) || ((f->len & 1U) != 0U))                      /* offset + even data */
+        if ((f->len < 12U) || (((f->len - 4U) % 8U) != 0U))             /* offset + double words */
         {
             return false;
         }
         const uint32_t off = get_u32le(f->data);
         const uint32_t n = (uint32_t)f->len - 4U;
-        if (((off & 1U) != 0U) || (off > APP_SIZE_MAX) || (n > (APP_SIZE_MAX - off)))           // «12»
+        if (((off % 8U) != 0U) || (off > APP_SIZE_MAX) || (n > (APP_SIZE_MAX - off)))           // «12»
         {
             return false;                                                /* never outside the slot */
         }
@@ -148,7 +153,7 @@ static bool handle(const proto_frame_t *f, bool *run)
         }
         const image_record_t rec = {RECORD_MAGIC, size, crc, ~(RECORD_MAGIC ^ size ^ crc)};
         flash_unlock();
-        const bool ok = flash_program(RECORD_ADDR, (const uint8_t *)&rec, sizeof rec);         // «14»
+        const bool ok = flash_program(RECORD_ADDR, (const uint8_t *)&rec, sizeof rec);   /* 16 bytes */ // «14»
         flash_lock();
         return ok && app_valid();
     }
@@ -167,7 +172,7 @@ int main(void)
     led_init();
     button_init();
     systick_init_1ms();
-    uart_log_init(115200U);                                              /* HSI 8 MHz: -0.6 % error */
+    uart_log_init(115200U);                                              /* HSI16: BRR = 35556, 0 % error */
 
     const bool valid = app_valid();
     bool update = !valid || button_held();                                                     // «15»

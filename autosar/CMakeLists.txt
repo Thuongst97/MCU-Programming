@@ -11,7 +11,7 @@ function(autosar_add target)
   target_sources(${target} PRIVATE ${_bsw})
   file(GLOB _inc LIST_DIRECTORIES true "${A}/include" "${A}/det" "${A}/mcal/*" "${A}/ecual/*" "${A}/services/*" "${A}/os_shim")
   target_include_directories(${target} PRIVATE ${AR_CFG_DIR} ${_inc})
-  bluepill_freertos(${target} CONFIG_DIR "${AR_CFG_DIR}")
+  nucleo_freertos(${target} CONFIG_DIR "${AR_CFG_DIR}")
   target_include_directories(${target}_freertos SYSTEM PUBLIC "${A}/include" "${A}/os_shim")
 endfunction()
 
@@ -20,4 +20,4 @@ add_library(autosar_gallery STATIC "${CMAKE_CURRENT_SOURCE_DIR}/gallery/gallery.
 target_compile_options(autosar_gallery PRIVATE ${MCU_C_FLAGS} -Wno-conversion -Wno-sign-conversion -Wno-missing-prototypes)   # noted: bad code on purpose
 target_include_directories(autosar_gallery PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/det"
   "${MCU_ROOT}/capstone/turnlight/stage3-autosar/cfg")
-target_link_libraries(autosar_gallery PRIVATE bluepill_cmsis)
+target_link_libraries(autosar_gallery PRIVATE nucleo_cmsis)

@@ -2,11 +2,10 @@
 id: "08"
 title: Watchdog, reset causes and a HardFault handler that tells you why
 modules: [power-wdg, faults-debug]
-peripherals: [IWDG, RCC, SCB, DBGMCU, USART1]
+peripherals: [IWDG, RCC, SCB, DBGMCU, LPUART1]
 flavor: bare metal + host unit tests
-pins: [PA9, PA10, PC13]
-hw: [USB-UART adapter]
-sim: partial
+pins: [PA2, PA3, PA5]
+hw: [NUCLEO-G474RE]
 tested_on: []
 ---
 # 08 — Watchdog, reset causes and a HardFault handler that tells you why
@@ -20,18 +19,20 @@ the main loop. Keys in the terminal cause faults on purpose:
 | `d` | divide by zero with `SCB->CCR.DIV_0_TRP` set | `DIVBYZERO FORCED` |
 | `u` | the permanently undefined instruction `UDF #0` | `UNDEFINSTR FORCED` |
 | `i` | a call through a function pointer with the Thumb bit cleared | `INVSTATE FORCED` |
-| `b` | a read from `0x60000000`, where the C8 has no memory | `PRECISERR BFARVALID FORCED` on hardware |
+| `b` | a read from `0x10008000`, the reserved space just past CCM SRAM | `PRECISERR BFARVALID FORCED` expected |
 | `w` | stop feeding the watchdog | reset after about 1 s, cause "independent watchdog" |
 
 The HardFault handler finds the exception frame on the right stack, stores CFSR, HFSR, MMFAR,
 BFAR, PC and LR in a `.noinit` section that survives the reset, prints the decoded flags and
-resets. Decoding is unit-tested on the host.
+resets. Decoding is unit-tested on the host, including the Cortex-M4F's two lazy FPU stacking
+errors (`MLSPERR`, `LSPERR`).
 
 ## Expected output
 See [`expected-output.txt`](expected-output.txt) (after pressing `d`).
 
-## Simulation fidelity (Renode)
-- ✅ UsageFaults (divide by zero, undefined instruction, invalid state), the stacked PC, the `.noinit` record across the reset, the watchdog reset.
-- ⚠️ No BusFault: Renode returns 0 for reads of unmapped addresses (`b` prints "returned without a fault").
-- ⚠️ The reset cause always reads "power-on": the course's RCC model does not track why the machine was reset.
-- ❌ LSI frequency variation (30–60 kHz) is not modelled. Not tested on a Blue Pill yet.
+## How this was verified
+- ✅ Builds in CI; fault and reset-cause decoding are unit-tested on the host.
+- ⚠️ The `b` key's BusFault depends on the bus matrix answering a reserved address with an error;
+  confirm on hardware.
+- ❌ Not run on a NUCLEO-G474RE yet. The LSI (about 32 kHz) varies between chips, so the
+  timeout is "about 1 s".

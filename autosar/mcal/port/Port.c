@@ -4,7 +4,7 @@
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  */
 #include "Port.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #if (PORT_DEV_ERROR_DETECT == STD_ON)
 #include "Det.h"
 #define PORT_DET(api, err) ((void)Det_ReportError(PORT_MODULE_ID, 0U, (api), (err)))

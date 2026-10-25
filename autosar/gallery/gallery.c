@@ -9,7 +9,7 @@
  */
 #include "Std_Types.h"
 #include "Det.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 
 void Gallery_Use(void);   /* keeps every example referenced */
 

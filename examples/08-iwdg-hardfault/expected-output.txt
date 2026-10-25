@@ -1,4 +1,4 @@
-Example 08 boot, reset cause: power-on
+Example 08 boot, reset cause: power-on or brown-out
 keys: d = divide by 0, u = undefined instruction, i = invalid state, b = bus fault,
       w = stop feeding the watchdog, h = this help
 

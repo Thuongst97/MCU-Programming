@@ -1,7 +1,7 @@
 boot: no valid application
-yyyyyyyyyyyyyapp: version 1, vector table at 0x08004000, 72 MHz
+yyyyyyyyyyyyyapp: version 1, vector table at 0x08004000, 170 MHz
 app: send r to reboot into the bootloader
 app: reboot
 boot: application valid
 boot: starting application
-app: version 1, vector table at 0x08004000, 72 MHz
+app: version 1, vector table at 0x08004000, 170 MHz

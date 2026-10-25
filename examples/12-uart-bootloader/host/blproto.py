@@ -18,8 +18,8 @@ def frame(cmd: int, payload: bytes = b"") -> bytes:
 
 def image_frames(image: bytes):
     """Yield (description, frame) for a complete update: erase, writes, done, run."""
-    if len(image) % 2:
-        image += b"\xff"                     # the F1 programs half-words
+    if len(image) % 8:
+        image += b"\xff" * (8 - len(image) % 8)   # the G4 programs 64-bit double words
     yield "erase", frame(ERASE)
     for off in range(0, len(image), CHUNK):
         yield f"write {off:#06x}", frame(WRITE, struct.pack("<I", off) + image[off:off + CHUNK])

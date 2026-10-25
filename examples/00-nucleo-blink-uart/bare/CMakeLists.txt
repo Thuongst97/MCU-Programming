@@ -8,10 +8,9 @@ if(NOT CMAKE_TOOLCHAIN_FILE AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_LIST_DIR}/../../common/cmake/arm-none-eabi.cmake")
 endif()
 project(ex00_bare LANGUAGES C)
-include("${CMAKE_CURRENT_LIST_DIR}/../../common/cmake/bluepill.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/../../common/cmake/nucleo.cmake")
 
-bluepill_add_executable(00-bluepill-blink-uart
+nucleo_add_executable(00-nucleo-blink-uart
   SOURCES src/main.c src/startup.c src/system.c
-  LINKER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/ld/stm32f103c8_64k.ld"
-  OWN_STARTUP NO_BSP
-  RENODE_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/renode/00.resc")
+  LINKER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/ld/stm32g474re.ld"
+  OWN_STARTUP NO_BSP)

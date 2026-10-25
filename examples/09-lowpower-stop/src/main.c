@@ -1,36 +1,42 @@
 /* SPDX-License-Identifier: MIT
  * Example 09: Sleep and Stop modes. First the CPU sleeps between SysTick interrupts (Sleep mode)
- * and counts its wake-ups; then it enters Stop mode, where all clocks in the 1.8 V domain stop,
- * and wakes up when the button on PA0 is pressed (EXTI line 0). After Stop the chip runs on HSI,
- * so the clock tree is rebuilt before printing. RM0008 §5.3 (low-power modes), PM0056 §2.5.
+ * and counts its wake-ups; then it enters Stop 1 mode, where the clocks of the core domain stop,
+ * and wakes up when the blue USER button B1 (PC13, EXTI line 13) is pressed. After Stop the chip
+ * runs on HSI16, so the clock tree is rebuilt before printing.
+ * RM0440 "Low-power modes" (PWR), PM0214 "Power management".
  */
 #include <stdint.h>
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
+#include "board.h"
 #include "clock.h"
+#include "gpio.h"
 #include "led.h"
 #include "systick.h"
 #include "uart_log.h"
 
 static volatile uint32_t s_wakeups;
 
-void EXTI0_IRQHandler(void);
-void EXTI0_IRQHandler(void)
+void EXTI15_10_IRQHandler(void);
+void EXTI15_10_IRQHandler(void)
 {
-    EXTI->PR = EXTI_PR_PR0;
+    EXTI->PR1 = EXTI_PR1_PIF13;
     s_wakeups++;
 }
 
 static void button_wakeup_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_AFIOEN;
-    GPIOA->CRL = (GPIOA->CRL & ~(GPIO_CRL_CNF0 | GPIO_CRL_MODE0)) | GPIO_CRL_CNF0_1;
-    GPIOA->BSRR = GPIO_BSRR_BS0;                                      /* pull-up */
-    AFIO->EXTICR[0] = (AFIO->EXTICR[0] & ~AFIO_EXTICR1_EXTI0) | AFIO_EXTICR1_EXTI0_PA;
-    EXTI->FTSR |= EXTI_FTSR_TR0;
-    EXTI->PR = EXTI_PR_PR0;
-    EXTI->IMR |= EXTI_IMR_MR0;                                        /* an EXTI line can wake from Stop */
-    NVIC_SetPriority(EXTI0_IRQn, 4U);
-    NVIC_EnableIRQ(EXTI0_IRQn);
+    gpio_clock_on(BOARD_BTN_PORT);
+    gpio_mode(BOARD_BTN_PORT, BOARD_BTN_PIN, BSP_GPIO_INPUT);
+    gpio_pull(BOARD_BTN_PORT, BOARD_BTN_PIN, BSP_GPIO_PULLDOWN);
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+    (void)RCC->APB2ENR;
+    SYSCFG->EXTICR[3] = (SYSCFG->EXTICR[3] & ~SYSCFG_EXTICR4_EXTI13) | SYSCFG_EXTICR4_EXTI13_PC;
+    EXTI->RTSR1 |= EXTI_RTSR1_RT13;                                   /* pressed = rising (ST BSP) */
+    EXTI->FTSR1 |= EXTI_FTSR1_FT13;                                   /* ... or falling, if yours is the other way */
+    EXTI->PR1 = EXTI_PR1_PIF13;
+    EXTI->IMR1 |= EXTI_IMR1_IM13;                                     /* an EXTI line can wake from Stop */
+    NVIC_SetPriority(EXTI15_10_IRQn, 4U);
+    NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 // [region:sleep]
@@ -51,24 +57,24 @@ static uint32_t sleep_for_one_second(void)
 // [region:stop]
 static void enter_stop(void)
 {
-    RCC->APB1ENR |= RCC_APB1ENR_PWREN;                                /* PWR registers need their clock */      // «3»
-    PWR->CR |= PWR_CR_LPDS;                                           /* regulator in low-power mode */
-    PWR->CR &= ~PWR_CR_PDDS;                                          /* deepsleep = Stop, not Standby */       // «4»
-    PWR->CR |= PWR_CR_CWUF;                                           /* clear the wake-up flag */
+    RCC->APB1ENR1 |= RCC_APB1ENR1_PWREN;                              /* PWR registers need their clock */      // «3»
+    (void)RCC->APB1ENR1;
+    PWR->CR1 = (PWR->CR1 & ~PWR_CR1_LPMS) | PWR_CR1_LPMS_STOP1;       /* deepsleep = Stop 1 (low-power regulator) */ // «4»
+    PWR->SCR = PWR_SCR_CWUF;                                          /* clear the wake-up flags */
     SysTick->CTRL &= ~SysTick_CTRL_ENABLE_Msk;                        /* its interrupt would end Stop at once */ // «5»
     SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
     __DSB();
-    __WFI();                                                          /* clocks stop here until EXTI0 */       // «6»
+    __WFI();                                                          /* clocks stop here until EXTI13 */      // «6»
     SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
-    /* Woken up: the system clock is now HSI 8 MHz and the PLL and HSE are off (RM0008 §5.3.5). */
-    (void)clock_init_72mhz();                                                                                  // «7»
+    /* Woken up: the system clock is now HSI16 and the PLL is off (RM0440 "Stop 1 mode"). */
+    (void)clock_init_170mhz();                                                                                  // «7»
     systick_init_1ms();
 }
 // [endregion]
 
 int main(void)
 {
-    (void)clock_init_72mhz();
+    (void)clock_init_170mhz();
     systick_init_1ms();
     uart_log_init(115200U);
     led_init();
@@ -84,7 +90,7 @@ int main(void)
     // [region:main]
     for (uint32_t n = 1U;; ++n)
     {
-        uart_puts("stop mode: press the button on PA0 to wake up\n");
+        uart_puts("stop mode: press the blue USER button (B1) to wake up\n");
         delay_ms(5U);                                                 /* let the last byte leave the UART */  // «8»
         led_off();
         enter_stop();

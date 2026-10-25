@@ -19,6 +19,13 @@ static void test_bus_fault_with_address(void)
     TEST_ASSERT_EQUAL_STRING("BFARVALID PRECISERR", fault_describe((1UL << 15) | (1UL << 9), 0U, buf, sizeof buf));
 }
 
+static void test_fpu_lazy_stacking_errors(void)
+{
+    char buf[64];
+    TEST_ASSERT_EQUAL_STRING("LSPERR", fault_describe(1UL << 13, 0U, buf, sizeof buf));    /* Cortex-M4F only */
+    TEST_ASSERT_EQUAL_STRING("MLSPERR", fault_describe(1UL << 5, 0U, buf, sizeof buf));
+}
+
 static void test_nothing_set_and_small_buffer(void)
 {
     char buf[64];
@@ -30,7 +37,8 @@ static void test_nothing_set_and_small_buffer(void)
 static void test_reset_cause_priority(void)
 {
     TEST_ASSERT_EQUAL_STRING("independent watchdog", reset_cause((1UL << 29) | (1UL << 26)));
-    TEST_ASSERT_EQUAL_STRING("power-on", reset_cause(0x0C000000UL));
+    TEST_ASSERT_EQUAL_STRING("power-on or brown-out", reset_cause(0x0C000000UL));   /* BOR + pin, as at power-up */
+    TEST_ASSERT_EQUAL_STRING("option byte loader", reset_cause((1UL << 25) | (1UL << 26)));
     TEST_ASSERT_EQUAL_STRING("software (SYSRESETREQ)", reset_cause((1UL << 28) | (1UL << 26)));
     TEST_ASSERT_EQUAL_STRING("reset pin", reset_cause(1UL << 26));
     TEST_ASSERT_EQUAL_STRING("unknown", reset_cause(0U));
@@ -42,6 +50,7 @@ int main(void)
     RUN_TEST(test_usage_fault_escalated);
     RUN_TEST(test_bus_fault_with_address);
     RUN_TEST(test_nothing_set_and_small_buffer);
+    RUN_TEST(test_fpu_lazy_stacking_errors);
     RUN_TEST(test_reset_cause_priority);
     return UNITY_END();
 }

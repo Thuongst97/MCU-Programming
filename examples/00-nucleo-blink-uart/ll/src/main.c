@@ -3,12 +3,13 @@
  * LL functions are tiny static inline wrappers around single register accesses, so this compiles
  * to almost the same instructions as ../bare. Compare each line with its register equivalent.
  */
-#include "stm32f1xx_ll_bus.h"
-#include "stm32f1xx_ll_gpio.h"
-#include "stm32f1xx_ll_rcc.h"
-#include "stm32f1xx_ll_system.h"
-#include "stm32f1xx_ll_usart.h"
-#include "stm32f1xx_ll_cortex.h"
+#include "stm32g4xx_ll_bus.h"
+#include "stm32g4xx_ll_gpio.h"
+#include "stm32g4xx_ll_rcc.h"
+#include "stm32g4xx_ll_pwr.h"
+#include "stm32g4xx_ll_system.h"
+#include "stm32g4xx_ll_lpuart.h"
+#include "stm32g4xx_ll_cortex.h"
 
 static volatile uint32_t s_ms;
 
@@ -21,25 +22,27 @@ void SysTick_Handler(void)
 #define WAIT_LOOPS 200000U
 
 // [region:clock]
-static int clock_72mhz(void)
+static int clock_170mhz(void)
 {
     uint32_t n;
-    LL_RCC_HSE_Enable();                                          /* RCC->CR |= RCC_CR_HSEON */         // «1»
-    for (n = 0U; (LL_RCC_HSE_IsReady() == 0U) && (n < WAIT_LOOPS); ++n) { }
-    if (n == WAIT_LOOPS) { return 1; }
-    LL_FLASH_SetLatency(LL_FLASH_LATENCY_2);                      /* FLASH->ACR LATENCY field = 2 */  // «2»
+    LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);            /* RCC->APB1ENR1 |= PWREN */
+    LL_PWR_EnableRange1BoostMode();                               /* PWR->CR5 &= ~R1MODE */            // «1»
+    LL_FLASH_SetLatency(LL_FLASH_LATENCY_4);                      /* FLASH->ACR LATENCY = 4 WS */      // «2»
     LL_FLASH_EnablePrefetch();
-    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE_DIV_1, LL_RCC_PLL_MUL_9);                       // «3»
+    LL_FLASH_EnableInstCache();
+    LL_FLASH_EnableDataCache();
+    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI, LL_RCC_PLLM_DIV_4, 85U, LL_RCC_PLLR_DIV_2);     // «3»
+    LL_RCC_PLL_EnableDomain_SYS();                                /* PLLREN */
     LL_RCC_PLL_Enable();
     for (n = 0U; (LL_RCC_PLL_IsReady() == 0U) && (n < WAIT_LOOPS); ++n) { }
-    if (n == WAIT_LOOPS) { return 2; }
-    LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
-    LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_2);                   /* APB1 <= 36 MHz */
-    LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_1);
+    if (n == WAIT_LOOPS) { return 1; }
+    LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_2);                  /* the /2 step above 80 MHz */
     LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);                                                 // «4»
     for (n = 0U; (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL) && (n < WAIT_LOOPS); ++n) { }
-    if (n == WAIT_LOOPS) { return 3; }
-    SystemCoreClock = 72000000U;
+    if (n == WAIT_LOOPS) { return 2; }
+    for (volatile uint32_t d = 0U; d < 100U; ++d) { }            /* >= 1 us at 85 MHz */
+    LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
+    SystemCoreClock = 170000000U;
     return 0;
 }
 // [endregion]
@@ -47,17 +50,17 @@ static int clock_72mhz(void)
 // [region:io]
 static void io_init(void)
 {
-    LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOA | LL_APB2_GRP1_PERIPH_GPIOC | LL_APB2_GRP1_PERIPH_USART1); // «5»
-    LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_13, LL_GPIO_MODE_OUTPUT);                                   // «6»
-    LL_GPIO_SetPinSpeed(GPIOC, LL_GPIO_PIN_13, LL_GPIO_SPEED_FREQ_LOW);
-    LL_GPIO_SetPinOutputType(GPIOC, LL_GPIO_PIN_13, LL_GPIO_OUTPUT_PUSHPULL);
-    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_9, LL_GPIO_MODE_ALTERNATE);
-    LL_GPIO_SetPinSpeed(GPIOA, LL_GPIO_PIN_9, LL_GPIO_SPEED_FREQ_HIGH);
-    LL_GPIO_SetPinOutputType(GPIOA, LL_GPIO_PIN_9, LL_GPIO_OUTPUT_PUSHPULL);
-    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_10, LL_GPIO_MODE_FLOATING);
-    LL_USART_SetBaudRate(USART1, SystemCoreClock, 115200U);      /* computes BRR for you */          // «7»
-    LL_USART_SetTransferDirection(USART1, LL_USART_DIRECTION_TX_RX);
-    LL_USART_Enable(USART1);
+    LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);                                              // «5»
+    LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_LPUART1);
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_5, LL_GPIO_MODE_OUTPUT);                                    // «6»
+    LL_GPIO_SetPinOutputType(GPIOA, LL_GPIO_PIN_5, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_2, LL_GPIO_AF_12);   /* LPUART1_TX */
+    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_3, LL_GPIO_AF_12);   /* LPUART1_RX */
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_2, LL_GPIO_MODE_ALTERNATE);
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_3, LL_GPIO_MODE_ALTERNATE);
+    LL_LPUART_SetBaudRate(LPUART1, SystemCoreClock, LL_LPUART_PRESCALER_DIV1, 115200U);   /* computes BRR */ // «7»
+    LL_LPUART_SetTransferDirection(LPUART1, LL_LPUART_DIRECTION_TX_RX);
+    LL_LPUART_Enable(LPUART1);
 }
 // [endregion]
 
@@ -65,8 +68,8 @@ static void say(const char *s)
 {
     for (; *s != '\0'; ++s)
     {
-        for (uint32_t n = 0U; (LL_USART_IsActiveFlag_TXE(USART1) == 0U) && (n < WAIT_LOOPS); ++n) { }
-        LL_USART_TransmitData8(USART1, (uint8_t)*s);
+        for (uint32_t n = 0U; (LL_LPUART_IsActiveFlag_TXE_TXFNF(LPUART1) == 0U) && (n < WAIT_LOOPS); ++n) { }
+        LL_LPUART_TransmitData8(LPUART1, (uint8_t)*s);
     }
 }
 
@@ -85,10 +88,10 @@ static void say_u32(uint32_t v)
 
 int main(void)
 {
-    const int status = clock_72mhz();
+    const int status = clock_170mhz();
     io_init();
     (void)SysTick_Config(SystemCoreClock / 1000U);
-    say("Hello from Blue Pill @ ");
+    say("Hello from NUCLEO-G474RE @ ");
     say_u32(SystemCoreClock / 1000000U);
     say(" MHz (LL)\r\nclock status: ");
     say_u32((uint32_t)status);
@@ -106,11 +109,11 @@ int main(void)
         }
         if ((s_ms % 1000U) < 500U)
         {
-            LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_13);   /* LED on (active-low) */
+            LL_GPIO_SetOutputPin(GPIOA, LL_GPIO_PIN_5);     /* LD2 on (active-high) */
         }
         else
         {
-            LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_13);
+            LL_GPIO_ResetOutputPin(GPIOA, LL_GPIO_PIN_5);
         }
     }
 }

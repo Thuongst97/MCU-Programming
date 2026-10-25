@@ -19,7 +19,7 @@
 #include "debounce.h"
 #include "lampmon.h"
 #include "led.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #include "tl_hw.h"
 #include "tl_msg.h"
 #include "turnlight_sm.h"
@@ -266,7 +266,7 @@ static void start(task_mem_t *m, TaskFunction_t fn, const char *name, UBaseType_
 
 int main(void)
 {
-    const clock_status_t clk = clock_init_72mhz();
+    const clock_status_t clk = clock_init_170mhz();
     uart_log_init(115200U);
     led_init();
     NVIC_SetPriorityGrouping(0U);

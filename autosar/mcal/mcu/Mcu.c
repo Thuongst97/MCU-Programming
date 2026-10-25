@@ -4,7 +4,7 @@
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  */
 #include "Mcu.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #if (MCU_DEV_ERROR_DETECT == STD_ON)
 #include "Det.h"
 #endif

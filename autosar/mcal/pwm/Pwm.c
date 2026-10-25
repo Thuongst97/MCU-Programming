@@ -4,7 +4,7 @@
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  */
 #include "Pwm.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #if (PWM_DEV_ERROR_DETECT == STD_ON)
 #include "Det.h"
 #define PWM_DET(api, err) ((void)Det_ReportError(PWM_MODULE_ID, 0U, (api), (err)))

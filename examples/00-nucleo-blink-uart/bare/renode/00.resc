@@ -1,6 +1,0 @@
-# SPDX-License-Identifier: MIT
-# Run example 00 in Renode:  renode -e '$bin=@build/.../00-bluepill-blink-uart.elf; include @examples/00-bluepill-blink-uart/bare/renode/00.resc'
-# (or: cmake --build --preset bluepill-debug --target renode-00-bluepill-blink-uart)
-$name?="blue-pill-00"
-include $ORIGIN/../../../common/renode/bluepill.resc
-start

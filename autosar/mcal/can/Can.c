@@ -5,7 +5,7 @@
  */
 #include "Can.h"
 #include "CanIf_Cbk.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #if (CAN_DEV_ERROR_DETECT == STD_ON)
 #include "Det.h"
 #define CAN_DET(api, err) ((void)Det_ReportError(CAN_MODULE_ID, 0U, (api), (err)))

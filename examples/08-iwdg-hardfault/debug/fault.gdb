@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
-# GDB helpers for Cortex-M3 faults (PM0056 §4.4; ARM DDI 0403 B1.5.6).
+# GDB helpers for Cortex-M4 faults (PM0214 "Fault handling"; ARM DDI 0403 B1.5.6). With an FPU frame
+# (EXC_RETURN bit 4 = 0) the first eight stacked words are the same, so $frame[0..7] still apply.
 # Load with:  (gdb) source examples/08-iwdg-hardfault/debug/fault.gdb
 # then, stopped at the first instruction of HardFault_Handler (LR still holds EXC_RETURN):  (gdb) fault
 

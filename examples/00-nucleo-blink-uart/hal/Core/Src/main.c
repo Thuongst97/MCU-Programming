@@ -1,37 +1,37 @@
 /* SPDX-License-Identifier: MIT
  * Example 00, HAL path: the same program as ../bare, written against ST's HAL in the structure
- * STM32CubeMX generates (main.c + stm32f1xx_it.c + stm32f1xx_hal_conf.h, startup in assembly).
+ * STM32CubeMX generates (main.c + stm32g4xx_it.c + stm32g4xx_hal_conf.h, startup in assembly).
  * Shown side by side with the register version in setup.html#paths. The rest of the course
  * uses registers (CLAUDE.md rule 20).
  */
-#include "stm32f1xx_hal.h"
+#include "stm32g4xx_hal.h"
 
-static UART_HandleTypeDef huart1;
+static UART_HandleTypeDef hlpuart1;
 
 static void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USART1_UART_Init(void);
+static void MX_LPUART1_UART_Init(void);
 static void say(const char *s);
 static void say_u32(uint32_t v);
 
 // [region:main]
 int main(void)
 {
-    HAL_Init();                 /* SysTick at 1 kHz on HSI, NVIC priority grouping */      // «1»
-    SystemClock_Config();       /* HSE x 9 = 72 MHz, same settings as the bare version */  // «2»
+    HAL_Init();                 /* SysTick at 1 kHz on HSI16, NVIC priority grouping */    // «1»
+    SystemClock_Config();       /* HSI16 -> PLL = 170 MHz, same settings as the bare one */ // «2»
     MX_GPIO_Init();
-    MX_USART1_UART_Init();
+    MX_LPUART1_UART_Init();
 
-    say("Hello from Blue Pill @ ");
+    say("Hello from NUCLEO-G474RE @ ");
     say_u32(HAL_RCC_GetSysClockFreq() / 1000000U);
     say(" MHz (HAL)\r\n");
 
     uint32_t seconds = 0U;
     for (;;)
     {
-        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);   /* LED on (active-low) */ // «3»
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);      /* LD2 on (active-high) */ // «3»
         HAL_Delay(500U);
-        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);     /* LED off */
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);    /* LD2 off */
         HAL_Delay(500U);                                         /* busy-waits on uwTick */ // «4»
         ++seconds;
         say("uptime ");
@@ -47,22 +47,27 @@ static void SystemClock_Config(void)
     RCC_OscInitTypeDef osc = {0};
     RCC_ClkInitTypeDef clk = {0};
 
-    osc.OscillatorType = RCC_OSCILLATORTYPE_HSE;                                   // «5»
-    osc.HSEState = RCC_HSE_ON;
-    osc.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+    (void)HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1_BOOST);      // «5»
+    osc.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+    osc.HSIState = RCC_HSI_ON;
+    osc.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
     osc.PLL.PLLState = RCC_PLL_ON;
-    osc.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-    osc.PLL.PLLMUL = RCC_PLL_MUL9;
+    osc.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+    osc.PLL.PLLM = RCC_PLLM_DIV4;                                                   /* 16 / 4 = 4 MHz */
+    osc.PLL.PLLN = 85U;                                                             /* x 85 = 340 MHz */
+    osc.PLL.PLLP = RCC_PLLP_DIV2;
+    osc.PLL.PLLQ = RCC_PLLQ_DIV2;
+    osc.PLL.PLLR = RCC_PLLR_DIV2;                                                   /* / 2 = 170 MHz */
     if (HAL_RCC_OscConfig(&osc) != HAL_OK)                                         // «6»
     {
         for (;;) { }
     }
     clk.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
     clk.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-    clk.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    clk.APB1CLKDivider = RCC_HCLK_DIV2;                                            // «7»
+    clk.AHBCLKDivider = RCC_SYSCLK_DIV1;                     /* HAL inserts the /2 step itself */
+    clk.APB1CLKDivider = RCC_HCLK_DIV1;                                            // «7»
     clk.APB2CLKDivider = RCC_HCLK_DIV1;
-    if (HAL_RCC_ClockConfig(&clk, FLASH_LATENCY_2) != HAL_OK)   /* HAL's own constant for 2 WS */ // «8»
+    if (HAL_RCC_ClockConfig(&clk, FLASH_LATENCY_4) != HAL_OK)   /* HAL's constant for 4 WS */  // «8»
     {
         for (;;) { }
     }
@@ -72,26 +77,26 @@ static void SystemClock_Config(void)
 static void MX_GPIO_Init(void)
 {
     GPIO_InitTypeDef io = {0};
-    __HAL_RCC_GPIOC_CLK_ENABLE();
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-    io.Pin = GPIO_PIN_13;
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    io.Pin = GPIO_PIN_5;
     io.Mode = GPIO_MODE_OUTPUT_PP;
     io.Pull = GPIO_NOPULL;
-    io.Speed = GPIO_SPEED_FREQ_LOW;   /* 2 MHz: the PC13 limit */
-    HAL_GPIO_Init(GPIOC, &io);
+    io.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &io);
 }
 
-static void MX_USART1_UART_Init(void)
+static void MX_LPUART1_UART_Init(void)
 {
-    huart1.Instance = USART1;
-    huart1.Init.BaudRate = 115200U;
-    huart1.Init.WordLength = UART_WORDLENGTH_8B;
-    huart1.Init.StopBits = UART_STOPBITS_1;
-    huart1.Init.Parity = UART_PARITY_NONE;
-    huart1.Init.Mode = UART_MODE_TX_RX;
-    huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-    if (HAL_UART_Init(&huart1) != HAL_OK)   /* calls HAL_UART_MspInit below for pins + clocks */
+    hlpuart1.Instance = LPUART1;
+    hlpuart1.Init.BaudRate = 115200U;
+    hlpuart1.Init.WordLength = UART_WORDLENGTH_8B;
+    hlpuart1.Init.StopBits = UART_STOPBITS_1;
+    hlpuart1.Init.Parity = UART_PARITY_NONE;
+    hlpuart1.Init.Mode = UART_MODE_TX_RX;
+    hlpuart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    hlpuart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+    if (HAL_UART_Init(&hlpuart1) != HAL_OK)   /* calls HAL_UART_MspInit below for pins + clocks */
     {
         for (;;) { }
     }
@@ -101,17 +106,15 @@ static void MX_USART1_UART_Init(void)
 void HAL_UART_MspInit(UART_HandleTypeDef *huart)
 {
     GPIO_InitTypeDef io = {0};
-    if (huart->Instance == USART1)
+    if (huart->Instance == LPUART1)
     {
-        __HAL_RCC_USART1_CLK_ENABLE();
+        __HAL_RCC_LPUART1_CLK_ENABLE();
         __HAL_RCC_GPIOA_CLK_ENABLE();
-        io.Pin = GPIO_PIN_9;
+        io.Pin = GPIO_PIN_2 | GPIO_PIN_3;
         io.Mode = GPIO_MODE_AF_PP;
-        io.Speed = GPIO_SPEED_FREQ_HIGH;
-        HAL_GPIO_Init(GPIOA, &io);
-        io.Pin = GPIO_PIN_10;
-        io.Mode = GPIO_MODE_INPUT;
         io.Pull = GPIO_NOPULL;
+        io.Speed = GPIO_SPEED_FREQ_LOW;
+        io.Alternate = GPIO_AF12_LPUART1;   /* the AF number the bare version spells out */
         HAL_GPIO_Init(GPIOA, &io);
     }
 }
@@ -123,7 +126,7 @@ static void say(const char *s)
     {
         ++n;
     }
-    (void)HAL_UART_Transmit(&huart1, (const uint8_t *)s, n, 100U);
+    (void)HAL_UART_Transmit(&hlpuart1, (const uint8_t *)s, n, 100U);
 }
 
 static void say_u32(uint32_t v)

@@ -13,7 +13,7 @@
 #include "i2c.h"
 #include "led.h"
 #include "ssd1306.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #include "systick.h"
 #include "tl_msg.h"
 #include "uart_log.h"
@@ -45,7 +45,7 @@ static void draw(const tl_status_t *s, bool have_oled)
 // [region:loop]
 int main(void)
 {
-    (void)clock_init_72mhz();
+    (void)clock_init_170mhz();
     systick_init_1ms();
     uart_log_init(115200U);
     led_init();

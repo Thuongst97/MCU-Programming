@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: MIT
  * Example 02: a SysTick time base and a cooperative scheduler with three periodic tasks.
  *   10 ms  - "sample": stands in for reading inputs
- *   100 ms - "heartbeat": blinks PC13 (5 Hz, 50 % duty)
+ *   100 ms - "heartbeat": blinks LD2 on PA5 (5 Hz, 50 % duty)
  *   1000 ms - "report": prints how often each task ran and how many deadlines were missed
- * PM0056 section 4.5 (SysTick).
+ * PM0214 section 4.5 (SysTick).
  */
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #include "clock.h"
 #include "led.h"
 #include "systick.h"
@@ -54,7 +54,7 @@ static void task_report(void)
 // [region:main]
 int main(void)
 {
-    (void)clock_init_72mhz();
+    (void)clock_init_170mhz();
     systick_init_1ms();                                                            // «2»
     uart_log_init(115200U);
     led_init();

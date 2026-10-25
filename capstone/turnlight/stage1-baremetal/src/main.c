@@ -12,7 +12,7 @@
 #include "lampmon.h"
 #include "led.h"
 #include "scheduler.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #include "systick.h"
 #include "tl_hw.h"
 #include "tl_msg.h"
@@ -172,7 +172,7 @@ static task_t s_jobs[] = {
 
 int main(void)
 {
-    const clock_status_t clk = clock_init_72mhz();
+    const clock_status_t clk = clock_init_170mhz();
     systick_init_1ms();
     uart_log_init(115200U);
     led_init();

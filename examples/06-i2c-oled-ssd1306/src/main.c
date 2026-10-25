@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: MIT
- * Example 06: an SSD1306 OLED on I2C1 (PB6 SCL, PB7 SDA). Shows text and a moving bar, and
+ * Example 06: an SSD1306 OLED on I2C1 (PB8 SCL = D15, PB9 SDA = D14). Shows text and a moving bar, and
  * reports the I2C result codes on the UART so a missing display is obvious.
  */
 #include <stdint.h>
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #include "clock.h"
 #include "gfx.h"
 #include "i2c.h"
@@ -39,11 +39,11 @@ static void u32_to_str(uint32_t v, char *out)
 
 int main(void)
 {
-    (void)clock_init_72mhz();
+    (void)clock_init_170mhz();
     systick_init_1ms();
     uart_log_init(115200U);
-    uart_puts("Example 06: SSD1306 on I2C1 (PB6/PB7, 400 kHz)\n");
-    i2c_init();
+    uart_puts("Example 06: SSD1306 on I2C1 (PB8/PB9 = D15/D14, 400 kHz)\n");
+    put_status("i2c init: ", i2c_init());
 
     // [region:main]
     const i2c_status_t probe = i2c_probe(SSD1306_ADDR);                                      // «7»

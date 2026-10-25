@@ -1,6 +1,6 @@
-Example 05: ADC1 on PA1 (pot), Vrefint, DMA
-single: PA1 raw 2051, 1652 mV (VDDA 3298 mV)
-single: PA1 raw 2049, 1651 mV (VDDA 3298 mV)
-single: PA1 raw 2050, 1651 mV (VDDA 3298 mV)
+Example 05: ADC1 on PA1 (A1, pot), Vrefint, DMA
+single: PA1 raw 2051, 1652 mV (VDDA 3299 mV)
+single: PA1 raw 2049, 1651 mV (VDDA 3299 mV)
+single: PA1 raw 2050, 1651 mV (VDDA 3299 mV)
 dma: PA1 mean 2050 = 1651 mV over 32 samples
 dma: PA1 mean 2050 = 1651 mV over 32 samples

@@ -2,5 +2,5 @@ Example 10: FreeRTOS, 5 tasks, static allocation
 logger: mean of 100 samples = 488
 monitor: free stack words: sensor 163, logger 150, monitor 154
 logger: mean of 100 samples = 508
-button: press 1 (semaphore given from EXTI0 ISR)
+button: press 1 (semaphore given from the EXTI13 ISR)
 logger: mean of 100 samples = 528

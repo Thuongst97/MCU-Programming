@@ -6,7 +6,7 @@
 
 #include "clock.h"
 #include "led.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #include "systick.h"
 #include "uart_log.h"
 
@@ -17,7 +17,7 @@
 // [region:main]
 int main(void)
 {
-    const clock_status_t clk = clock_init_72mhz();   /* the bootloader left the reset clock */   // «1»
+    const clock_status_t clk = clock_init_170mhz();   /* the bootloader left the reset clock */   // «1»
     led_init();
     systick_init_1ms();
     uart_log_init(115200U);
@@ -25,7 +25,7 @@ int main(void)
     uart_put_dec(APP_VERSION);
     uart_puts(", vector table at ");
     uart_put_hex(SCB->VTOR);                                                                    // «2»
-    uart_puts(clk == CLOCK_OK ? ", 72 MHz\n" : ", clock fault, HSI\n");
+    uart_puts(clk == CLOCK_OK ? ", 170 MHz\n" : ", clock fault, HSI16\n");
     uart_puts("app: send r to reboot into the bootloader\n");
     for (;;)
     {
