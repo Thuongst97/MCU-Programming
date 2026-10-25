@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * Clock setup for the Blue Pill (RM0008 §7: RCC). */
+ * Clock setup for the NUCLEO-G474RE (RM0440 "RCC" and "PWR"). */
 #ifndef BSP_CLOCK_H
 #define BSP_CLOCK_H
 
@@ -8,21 +8,23 @@
 typedef enum
 {
     CLOCK_OK = 0,
-    CLOCK_HSE_TIMEOUT,      /* the 8 MHz crystal did not start (missing, broken, or clone board) */
+    CLOCK_VOS_TIMEOUT,      /* the regulator did not settle in range 1 */
+    CLOCK_LATENCY_ERROR,    /* the flash did not take the new wait states */
     CLOCK_PLL_TIMEOUT,      /* the PLL did not lock */
     CLOCK_SWITCH_TIMEOUT    /* SYSCLK did not switch to the PLL */
 } clock_status_t;
 
-/* HSE 8 MHz x 9 = 72 MHz SYSCLK; AHB 72 MHz, APB1 36 MHz (its maximum), APB2 72 MHz,
- * ADC 12 MHz (/6, the maximum is 14 MHz), 2 flash wait states. On failure the clock stays on HSI. */
-clock_status_t clock_init_72mhz(void);
+/* HSI16 / 4 x 85 / 2 = 170 MHz SYSCLK, the G474's maximum. AHB, APB1 and APB2 all at 170 MHz,
+ * regulator range 1 boost mode, 4 flash wait states, prefetch and caches on.
+ * On failure the clock stays on HSI16. */
+clock_status_t clock_init_170mhz(void);
 
-/* Microcontroller clock output on PA8, to measure a clock with a scope or frequency counter. */
+/* Microcontroller clock output on PA8 (Arduino D7), to measure a clock with a scope. */
 typedef enum
 {
     CLOCK_MCO_OFF = 0,
-    CLOCK_MCO_HSE,        /* 8 MHz crystal */
-    CLOCK_MCO_PLL_DIV2    /* 36 MHz at the course setup; SYSCLK itself (72 MHz) is above the 50 MHz pin limit */
+    CLOCK_MCO_HSI16,          /* 16 MHz internal RC */
+    CLOCK_MCO_SYSCLK_DIV16    /* 10.625 MHz at 170 MHz: slow enough for a pin and a cheap scope */
 } clock_mco_t;
 void clock_mco(clock_mco_t src);
 
