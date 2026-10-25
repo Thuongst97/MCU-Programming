@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bare Metal vs RTOS: FreeRTOS on Cortex-M3 — MCU Academy</title>
+  <meta name="description" content="When a super-loop stops scaling, how a context switch really works (PendSV), and tasks, queues, mutexes and priorities in FreeRTOS.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="rtos">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 14</span><span>/</span><span>FreeRTOS</span></nav>
+          <div class="eyebrow">Module 14 · Embedded engineering</div>
+          <h1>Bare Metal vs RTOS: FreeRTOS on Cortex-M3</h1>
+          <p class="lead">A super-loop gets you a long way, until several jobs with different deadlines have to share one CPU. This module shows when an RTOS starts to pay off, how the Cortex-M3 switches between tasks in hardware and software, and how to use FreeRTOS on the Blue Pill without the classic priority and stack traps.</p>
+          <div class="page-meta"><span>⏱ 50 min read</span><span>🎯 Intermediate</span><span>📂 examples/10-freertos-basics</span></div>
+        </header>
+
+        <section class="doc-section" id="why-rtos" data-title="When you need an RTOS">
+          <div class="sec-head"><h2><span class="sec-num">14.1</span>When you need an RTOS</h2></div>
+          <p>A <b>super-loop</b> (<code>for (;;) { a(); b(); c(); }</code>) plus interrupts is the right design for most small programs: you can see the whole schedule in one screen and nothing switches behind your back. It stops scaling when:</p>
+          <ul>
+            <li>jobs have <b>different deadlines</b>: a 10 ms control loop must not wait for a 50 ms display refresh;</li>
+            <li>a job has to <b>wait</b> in the middle (for a reply, a flash erase, a bus) and you end up turning every function into a hand-written state machine;</li>
+            <li>several modules are written by different people and nobody can reason about the total loop time any more.</li>
+          </ul>
+          <p>An RTOS lets each job be written as a plain sequential function, a <b>task</b>, with its own stack. A <b>preemptive scheduler</b> always runs the highest-priority task that is ready; when it blocks (waiting for time, a queue or a semaphore), the next one runs. The price: RAM for every stack, a few microseconds per switch, and a new class of bugs (races, deadlocks, priority inversion) that this module teaches you to avoid.</p>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>An RTOS is air-traffic control for planes sharing one runway. Each pilot (task) flies their own route; the controller (scheduler) decides who may use the runway now, by priority. A plane circling in a holding pattern (blocked task) costs no runway time.</p></div></div>
+          <p>The timeline below is what example 10's tasks do in the first 30 ms. Each row is high while that task owns the CPU; the idle task runs whenever nothing else is ready.</p>
+          <div id="wv-sched"></div>
+        </section>
+
+        <section class="doc-section" id="context-switch" data-title="A context switch, step by step">
+          <div class="sec-head"><h2><span class="sec-num">14.2</span>A context switch, step by step</h2></div>
+          <p>The Cortex-M3 was designed with an RTOS in mind (PM0056 §2.3, ARMv7-M ARM B1.5). Three features do the heavy lifting:</p>
+          <ul>
+            <li><b>Two stack pointers</b>: tasks run in Thread mode on the process stack (PSP); exceptions and the kernel use the main stack (MSP).</li>
+            <li><b>Hardware stacking</b>: on exception entry the core pushes eight registers (R0–R3, R12, LR, PC, xPSR) onto the active stack by itself.</li>
+            <li><b>PendSV</b>: an exception software can make pending, set to the lowest priority, so the switch happens only after every other interrupt has finished.</li>
+          </ul>
+          <div id="seq-switch"></div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">Why not switch inside SysTick?</span><p>If the tick interrupted another ISR, switching tasks there would return to a <i>different</i> task with the first ISR only half done. Deferring the switch to the lowest-priority PendSV guarantees that no ISR is in progress when the stacks are exchanged.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="task-states" data-title="Task states (interactive)">
+          <div class="sec-head"><h2><span class="sec-num">14.3</span>Task states (interactive)</h2></div>
+          <p>Every FreeRTOS task is in one of four states. Drive the machine with the event buttons; the descriptions name the API calls that cause each transition.</p>
+          <div id="sm-task"></div>
+          <p>Only one task is <b>Running</b> at a time on a single core. A task that waits for something is <b>Blocked</b>, usually with a timeout, and uses no CPU at all. That is the main difference to a super-loop's busy polling.</p>
+        </section>
+
+        <section class="doc-section" id="port" data-title="Porting FreeRTOS to the Blue Pill">
+          <div class="sec-head"><h2><span class="sec-num">14.4</span>Porting FreeRTOS to the Blue Pill</h2></div>
+          <p>FreeRTOS needs three things from the chip: a tick (SysTick), the PendSV and SVC exceptions, and a way to mask interrupts. The Cortex-M3 port in <code>third_party/freertos_kernel/portable/GCC/ARM_CM3</code> provides all of them; we only write <code>FreeRTOSConfig.h</code> and map the handler names onto our vector table.</p>
+          <script type="text/plain" id="src-10-config" data-src="examples/10-freertos-basics/src/FreeRTOSConfig.h" data-region="config" data-lang="c" data-file="examples/10-freertos-basics/src/FreeRTOSConfig.h" data-start="12" data-end="48" data-sha="625fd98118b3">
+#define configCPU_CLOCK_HZ                      (SystemCoreClock)   /* SysTick runs from HCLK */  // «1»
+#define configTICK_RATE_HZ                      1000U               /* 1 ms tick */
+#define configUSE_PREEMPTION                    1                   /* higher priority runs at once */ // «2»
+#define configUSE_TIME_SLICING                  1
+#define configMAX_PRIORITIES                    5
+#define configMINIMAL_STACK_SIZE                128U                /* words, not bytes */         // «3»
+#define configMAX_TASK_NAME_LEN                 12
+#define configUSE_16_BIT_TICKS                  0
+#define configIDLE_SHOULD_YIELD                 1
+
+#define configSUPPORT_STATIC_ALLOCATION         1                   /* every object in our own arrays */ // «4»
+#define configSUPPORT_DYNAMIC_ALLOCATION        0                   /* no heap at all */
+
+#define configUSE_MUTEXES                       1
+#define configUSE_COUNTING_SEMAPHORES           1
+#define configQUEUE_REGISTRY_SIZE               0
+#define configUSE_TIMERS                        1
+#define configTIMER_TASK_PRIORITY               (configMAX_PRIORITIES - 1)
+#define configTIMER_QUEUE_LENGTH                4
+#define configTIMER_TASK_STACK_DEPTH            configMINIMAL_STACK_SIZE
+
+#define configCHECK_FOR_STACK_OVERFLOW          2                   /* check a pattern at every switch */ // «5»
+#define configUSE_IDLE_HOOK                     0
+#define configUSE_TICK_HOOK                     0
+#define configUSE_MALLOC_FAILED_HOOK            0
+
+/* Cortex-M interrupt priorities: the F103 implements 4 priority bits (stm32f103xb.h). */
+#define configPRIO_BITS                         4
+#define configKERNEL_INTERRUPT_PRIORITY         (15U << (8U - configPRIO_BITS))   /* lowest */     // «6»
+#define configMAX_SYSCALL_INTERRUPT_PRIORITY    (5U << (8U - configPRIO_BITS))    /* 0..4: never masked, no FreeRTOS API */ // «7»
+
+#define configASSERT(x) do { if ((x) == 0) { rtos_assert_failed(__FILE__, __LINE__); } } while (0)
+
+/* The port's handlers get the CMSIS names, so they fill the vector table directly. */
+#define vPortSVCHandler     SVC_Handler                                                             // «8»
+#define xPortPendSVHandler  PendSV_Handler
+#define xPortSysTickHandler SysTick_Handler
+</script>
+          <div id="ex-config"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Priority numbers run in opposite directions</span><p>On the NVIC, <b>lower numbers are more urgent</b> (0 is the highest). In FreeRTOS task priorities, <b>higher numbers are more urgent</b>. And the STM32F1 implements only the top 4 bits of each 8-bit NVIC priority, so priority 5 is written as <code>5 &lt;&lt; 4</code> = <code>0x50</code>. CMSIS <code>NVIC_SetPriority()</code> does the shift for you; the <code>config…PRIORITY</code> macros in FreeRTOSConfig.h must contain the shifted value.</p></div></div>
+          <p>The kernel masks interrupts with <code>BASEPRI</code>, not by disabling them all. With our setting, NVIC priorities 0–4 are never masked by the kernel (lowest latency), but they must not call any FreeRTOS function. Priorities 5–15 may call <code>…FromISR</code> functions.</p>
+          <div id="prio-bar" class="prio-host glass"></div>
+        </section>
+
+        <section class="doc-section" id="ipc" data-title="Queues, semaphores, mutexes">
+          <div class="sec-head"><h2><span class="sec-num">14.5</span>Queues, semaphores, mutexes</h2></div>
+          <p>Tasks must not share variables casually. FreeRTOS gives you three tools, all used in example 10:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Object</th><th>Use it for</th><th>Example 10</th></tr></thead>
+            <tbody>
+              <tr><td>Queue</td><td>Passing data by copy, producer → consumer</td><td><code>sensor</code> → <code>logger</code>, 16 samples deep</td></tr>
+              <tr><td>Binary semaphore</td><td>Signalling an event, typically from an ISR</td><td>EXTI0 → <code>button</code> task</td></tr>
+              <tr><td>Mutex</td><td>Exclusive access to a shared resource; has priority inheritance</td><td>the UART: one line at a time</td></tr>
+            </tbody>
+          </table></div>
+          <script type="text/plain" id="src-10-tasks" data-src="examples/10-freertos-basics/src/main.c" data-region="tasks" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="52" data-end="126" data-sha="a8ff462eb740">
+static void sensor_task(void *arg)
+{
+    (void)arg;
+    TickType_t wake = xTaskGetTickCount();
+    uint16_t sample = 0U;
+    for (;;)
+    {
+        vTaskDelayUntil(&wake, pdMS_TO_TICKS(10));          /* exactly every 10 ms, no drift */    // «2»
+        sample = (uint16_t)((sample + 37U) % 1000U);        /* stand-in for an ADC reading */
+        (void)xQueueSend(s_samples, &sample, 0);            /* never block a periodic task */      // «3»
+    }
+}
+
+static void logger_task(void *arg)
+{
+    (void)arg;
+    uint32_t sum = 0U, n = 0U;
+    for (;;)
+    {
+        uint16_t s;
+        if (xQueueReceive(s_samples, &s, portMAX_DELAY) == pdTRUE)   /* sleeps until data */      // «4»
+        {
+            sum += s;
+            if (++n == 100U)
+            {
+                log_line("logger: mean of 100 samples = ", sum / n, "\n");
+                sum = 0U;
+                n = 0U;
+            }
+        }
+    }
+}
+
+static void blink_task(void *arg)
+{
+    (void)arg;
+    for (;;)
+    {
+        led_toggle();
+        vTaskDelay(pdMS_TO_TICKS(500));                                                             // «5»
+    }
+}
+
+static void button_task(void *arg)
+{
+    (void)arg;
+    uint32_t presses = 0U;
+    for (;;)
+    {
+        if (xSemaphoreTake(s_button_sem, portMAX_DELAY) == pdTRUE)   /* woken by the ISR */        // «6»
+        {
+            log_line("button: press ", ++presses, " (semaphore given from EXTI0 ISR)\n");
+        }
+    }
+}
+
+static void monitor_task(void *arg)
+{
+    (void)arg;
+    for (;;)
+    {
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        if (xSemaphoreTake(s_uart_mutex, pdMS_TO_TICKS(100)) == pdTRUE)   /* one line, one lock */
+        {
+            uart_puts("monitor: free stack words: sensor ");
+            uart_put_dec((uint32_t)uxTaskGetStackHighWaterMark(s_sensor.handle));                  // «7»
+            uart_puts(", logger ");
+            uart_put_dec((uint32_t)uxTaskGetStackHighWaterMark(s_logger.handle));
+            uart_puts(", monitor ");
+            uart_put_dec((uint32_t)uxTaskGetStackHighWaterMark(NULL));
+            uart_puts("\n");
+            xSemaphoreGive(s_uart_mutex);
+        }
+    }
+}
+</script>
+          <div id="ex-tasks"></div>
+          <script type="text/plain" id="src-10-print" data-src="examples/10-freertos-basics/src/main.c" data-region="print" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="37" data-end="48" data-sha="a8ff462eb740">
+/* Several tasks print. The mutex makes each line atomic; without it, lines interleave
+ * character by character when a higher-priority task preempts a lower one mid-line. */
+static void log_line(const char *a, uint32_t v, const char *b)
+{
+    if (xSemaphoreTake(s_uart_mutex, pdMS_TO_TICKS(100)) == pdTRUE)                               // «1»
+    {
+        uart_puts(a);
+        uart_put_dec(v);
+        uart_puts(b);
+        xSemaphoreGive(s_uart_mutex);
+    }
+}
+</script>
+          <div id="ex-print"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Priority inversion</span><p>A low-priority task holds the UART; a high-priority task wants it and blocks; a medium-priority task that needs neither now runs for as long as it likes, so the high-priority task waits for the medium one. A FreeRTOS <b>mutex</b> fixes this by temporarily raising the holder to the waiter's priority (priority inheritance). A binary semaphore used as a lock does not, which is why locks are always mutexes.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="isr-rules" data-title="ISR rules: FromISR APIs">
+          <div class="sec-head"><h2><span class="sec-num">14.6</span>ISR rules: FromISR APIs</h2></div>
+          <p>An interrupt handler is not a task: it cannot block. FreeRTOS therefore has a separate <code>…FromISR</code> variant of every function an ISR may need. They never wait, and they tell you whether a higher-priority task became ready so you can switch on the way out.</p>
+          <script type="text/plain" id="src-10-isr" data-src="examples/10-freertos-basics/src/main.c" data-region="isr" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="130" data-end="137" data-sha="a8ff462eb740">
+void EXTI0_IRQHandler(void);
+void EXTI0_IRQHandler(void)
+{
+    EXTI->PR = EXTI_PR_PR0;
+    BaseType_t woken = pdFALSE;
+    xSemaphoreGiveFromISR(s_button_sem, &woken);            /* only FromISR APIs in an ISR */     // «8»
+    portYIELD_FROM_ISR(woken);                              /* switch now if a task got ready */   // «9»
+}
+</script>
+          <div id="ex-isr"></div>
+          <script type="text/plain" id="src-10-main" data-src="examples/10-freertos-basics/src/main.c" data-region="main" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="159" data-end="181" data-sha="a8ff462eb740">
+int main(void)
+{
+    (void)clock_init_72mhz();
+    uart_log_init(115200U);
+    led_init();
+    NVIC_SetPriorityGrouping(0U);                           /* all 4 bits = preemption priority */ // «11»
+    uart_puts("Example 10: FreeRTOS, 5 tasks, static allocation\n");
+
+    s_samples = xQueueCreateStatic(16U, sizeof(uint16_t), (uint8_t *)s_queue_storage, &s_queue_cb);
+    s_uart_mutex = xSemaphoreCreateMutexStatic(&s_uart_mutex_cb);
+    s_button_sem = xSemaphoreCreateBinaryStatic(&s_button_sem_cb);
+    start(&s_sensor, sensor_task, "sensor", 3U);            /* highest: hard 10 ms period */       // «12»
+    start(&s_button, button_task, "button", 2U);
+    start(&s_logger, logger_task, "logger", 1U);
+    start(&s_blink, blink_task, "blink", 1U);
+    start(&s_monitor, monitor_task, "monitor", 1U);
+    button_init();
+
+    vTaskStartScheduler();                                  /* never returns */                   // «13»
+    for (;;)
+    {
+    }
+}
+</script>
+          <div id="ex-main"></div>
+          <ul>
+            <li>Only <code>…FromISR</code> functions in an ISR, and only from an interrupt whose NVIC priority is at or below <code>configMAX_SYSCALL_INTERRUPT_PRIORITY</code> (numerically ≥ 5 here). With <code>configASSERT</code> defined, the port checks this and stops at the assertion instead of corrupting the kernel's lists.</li>
+            <li>Keep ISRs short: acknowledge the hardware, hand the work to a task, leave.</li>
+            <li>Set every interrupt's priority explicitly. After reset all NVIC priorities are 0, the most urgent level, which is <i>above</i> the syscall limit.</li>
+          </ul>
+        </section>
+
+        <section class="doc-section" id="stack" data-title="Stack sizing and overflow detection">
+          <div class="sec-head"><h2><span class="sec-num">14.7</span>Stack sizing and overflow detection</h2></div>
+          <p>Each task's stack is an array you size. Too small and the task silently overwrites whatever lies next to it in RAM; too large and you run out of the 20 KB. Measure instead of guessing:</p>
+          <ul>
+            <li><code>uxTaskGetStackHighWaterMark()</code> returns the smallest amount of free stack a task has ever had, in words. Example 10's <code>monitor</code> task prints it every 2 s. Keep a margin of at least 25 % after exercising every code path.</li>
+            <li><code>configCHECK_FOR_STACK_OVERFLOW = 2</code> fills each stack with a known pattern and checks its end at every context switch; on a hit it calls the hook below. It catches most overflows, not all (a large local array can jump past the checked bytes).</li>
+          </ul>
+          <script type="text/plain" id="src-10-hooks" data-src="examples/10-freertos-basics/src/main.c" data-region="hooks" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="203" data-end="226" data-sha="a8ff462eb740">
+void vApplicationStackOverflowHook(TaskHandle_t task, char *name)
+{
+    (void)task;
+    taskDISABLE_INTERRUPTS();
+    uart_puts("\n*** stack overflow in task ");                                                    // «14»
+    uart_puts(name);
+    uart_puts("\n");
+    for (;;)
+    {
+    }
+}
+
+void rtos_assert_failed(const char *file, int line)
+{
+    taskDISABLE_INTERRUPTS();
+    uart_puts("\n*** configASSERT failed: ");
+    uart_puts(file);
+    uart_puts(":");
+    uart_put_dec((uint32_t)line);
+    uart_puts("\n");
+    for (;;)
+    {
+    }
+}
+</script>
+          <div id="ex-hooks"></div>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">printf is a stack hog</span><p>A full <code>printf</code> can need several hundred bytes of stack per call. That is one reason the course prints with its own small <code>uart_puts</code> / <code>uart_put_dec</code> functions.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 10)</span><p>✅ Scheduling, SysTick and PendSV switches, queue, mutex, the ISR → task semaphore and the LED timing run in Renode, in virtual time. ⚠️ CPU load, real interrupt latency and the exact cycle cost of a context switch are not meaningful in simulation. ❌ Not tested on a Blue Pill yet.</p></div></div>
+          <div id="ck-rtos"></div>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/rtos.js?v=__BUILD__"></script>
+</body>
+</html>

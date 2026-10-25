@@ -167,7 +167,7 @@
 
   function render(spec) {
     const { len, hscale } = layout(spec);
-    const NAME_W = 64, ROW = 44, AMP = 22, TOP = spec.bands ? 30 : 10;
+    const NAME_W = Math.max(64, 18 + 7.4 * Math.max(...spec.signals.map((x) => String(x.name).length))), ROW = 44, AMP = 22, TOP = spec.bands ? 30 : 10;
     const W = NAME_W + len * hscale + (spec.signals.some((x) => x.refText) ? 52 : 16);
     const H = TOP + spec.signals.length * ROW + 10;
     const X = (t) => NAME_W + t * hscale;

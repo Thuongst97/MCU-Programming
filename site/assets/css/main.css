@@ -1013,3 +1013,16 @@ table.t.arb tr.arb-bus td { font-weight: 700; color: var(--copper); border-top: 
   * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .hero-art :is(.hv-pulse, .hv-packet) { display: none; }
 }
+
+/* NVIC priority explorer (rtos.html) */
+.prio-host { padding: 14px; margin: 14px 0; }
+.prio-head label { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.prio-row { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 3px; margin: 12px 0 8px; }
+.prio-cell { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; border-radius: 6px; font: 12px var(--mono); border: 1px solid var(--border); }
+.prio-legend .prio-cell { min-height: 14px; width: 18px; vertical-align: -2px; margin: 0 4px 0 12px; }
+.prio-cell.never { background: color-mix(in srgb, var(--red) 22%, transparent); border-color: var(--red); }
+.prio-cell.api { background: color-mix(in srgb, var(--green) 20%, transparent); border-color: var(--green); }
+.prio-cell.kernel { background: color-mix(in srgb, var(--blue) 22%, transparent); border-color: var(--blue); }
+.prio-legend { font-size: 13px; color: var(--text-2); line-height: 2; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.btn.sm.on { border-color: var(--accent, var(--blue)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 35%, transparent); }

@@ -190,7 +190,7 @@
       ] },
   
     /* ───────────── Group: Embedded engineering ───────────── */
-    { id: "rtos", status: "planned", phase: 5, file: "rtos.html", num: "14", group: "Embedded engineering",
+    { id: "rtos", status: "ready", phase: 5, file: "rtos.html", num: "14", group: "Embedded engineering",
       title: "Bare Metal vs RTOS: FreeRTOS on Cortex-M3", short: "FreeRTOS", icon: "🧵", accent: "#60a5fa",
       desc: "When a super-loop stops scaling, how a context switch really works (PendSV), and tasks, queues, mutexes and priorities in FreeRTOS.",
       sections: [
@@ -202,7 +202,7 @@
         ["isr-rules", "ISR rules: FromISR APIs", "fromisr portyield_from_isr priority"],
         ["stack", "Stack sizing and overflow detection", "stack high water mark configcheck_for_stack_overflow"],
       ] },
-    { id: "faults-debug", status: "planned", phase: 5, file: "faults-debug.html", num: "15", group: "Embedded engineering",
+    { id: "faults-debug", status: "ready", phase: 5, file: "faults-debug.html", num: "15", group: "Embedded engineering",
       title: "Fault Handling and Debugging", short: "Faults & Debugging", icon: "🐞", accent: "#f87171",
       desc: "HardFault anatomy, decoding CFSR/HFSR/MMFAR/BFAR, a fault handler that logs and survives, and a debugging toolbox.",
       sections: [
@@ -441,9 +441,23 @@
     tiSn65: { t: "SN65HVD230 3.3 V CAN transceiver datasheet (TI)", url: "https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf", doc: "SLOS346", kind: "datasheet" },
     winbondW25q: { t: "Winbond W25Q serial NOR flash (product family and datasheets)", url: "https://www.winbond.com/hq/product/code-storage-flash-memory/serial-nor-flash/", kind: "datasheet" },
     ssd1306: { t: "SSD1306 OLED controller datasheet (Solomon Systech, copy hosted by Adafruit)", url: "https://cdn-shop.adafruit.com/datasheets/SSD1306.pdf", kind: "community" },
+    freertosCm3: { t: "FreeRTOS — running the RTOS on ARM Cortex-M (interrupt priorities)", url: "https://www.freertos.org/RTOS-Cortex-M3-M4.html", kind: "tool" },
+    freertosConfig: { t: "FreeRTOS — FreeRTOSConfig.h customisation", url: "https://www.freertos.org/a00110.html", kind: "tool" },
+    freertosStack: { t: "FreeRTOS — stack usage and stack overflow checking", url: "https://www.freertos.org/Stacks-and-stack-overflow-checking.html", kind: "tool" },
+    freertosMutex: { t: "FreeRTOS — mutexes and priority inheritance", url: "https://www.freertos.org/Real-time-embedded-RTOS-mutexes.html", kind: "tool" },
+    freertosKernel: { t: "FreeRTOS-Kernel source (Cortex-M3 port: portable/GCC/ARM_CM3/port.c)", url: "https://github.com/FreeRTOS/FreeRTOS-Kernel", kind: "tool" },
+    pm0056Exc: { t: "PM0056 — Cortex-M3 processor: stacks, exception model, PendSV and SVCall", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", sec: "2.1.2, 2.3", kind: "st" },
+    ddi0403Stack: { t: "ARMv7-M ARM — exception entry stacking and EXC_RETURN", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", sec: "B1.5.6–B1.5.8", kind: "arm" },
+    pm0056Fault: { t: "PM0056 — fault handling, SHCSR, CFSR, HFSR, MMFAR, BFAR", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", sec: "2.4, 4.4.9–4.4.17", kind: "st" },
+    ddi0403Fault: { t: "ARMv7-M ARM — fault handling, escalation and lockup", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", sec: "B1.5.6, B1.5.15", kind: "arm" },
+    ddi0337Debug: { t: "Cortex-M3 TRM — ACTLR, FPB, DWT and ITM", url: "https://developer.arm.com/documentation/ddi0337/latest/", doc: "ARM DDI 0337", sec: "4.3, 8, 11", kind: "arm" },
+    gdbManual: { t: "Debugging with GDB — breakpoints, watchpoints, examining memory", url: "https://sourceware.org/gdb/current/onlinedocs/gdb.html/", kind: "tool" },
+    armSemihosting: { t: "Arm semihosting specification", url: "https://github.com/ARM-software/abi-aa/blob/main/semihosting/semihosting.rst", kind: "arm" },
     stm32Base: { t: "STM32-base — Blue Pill board page and schematic notes", url: "https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html", kind: "community" },
   };
   const REFS = {
+            "faults-debug": ["pm0056Fault", "ddi0403Fault", "ddi0403Stack", "ddi0337Debug", "rm0008Debug", "gdbManual", "armSemihosting", "um1075"],
+    "rtos": ["pm0056Exc", "ddi0403Stack", "pm0056Nvic", "freertosCm3", "freertosConfig", "freertosStack", "freertosMutex", "freertosKernel"],
     "power-wdg": ["rm0008Pwr", "rm0008Iwdg", "rm0008Wwdg", "rm0008Rcc", "rm0008Debug", "ds5319Elec", "pm0056"],
     "can": ["rm0008Can", "iso11898", "iso11898p2", "iso17987", "rm0008Gpio", "tiSn65"],
     "spi": ["rm0008Spi", "rm0008Dma", "ds5319Elec", "winbondW25q"],

@@ -420,7 +420,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 </script>
           <div id="ex-toolchain"></div>
           <h3>2. Flags for the Cortex-M3</h3>
-          <script type="text/plain" id="src-cmake-flags" data-src="examples/common/cmake/bluepill.cmake" data-region="flags" data-lang="cmake" data-file="examples/common/cmake/bluepill.cmake" data-start="21" data-end="24" data-sha="66ea6b9e6eb3">
+          <script type="text/plain" id="src-cmake-flags" data-src="examples/common/cmake/bluepill.cmake" data-region="flags" data-lang="cmake" data-file="examples/common/cmake/bluepill.cmake" data-start="21" data-end="24" data-sha="fbfe8878b0fa">
 set(MCU_CPU_FLAGS -mcpu=cortex-m3 -mthumb)                                       # «5»
 set(MCU_C_FLAGS
   ${MCU_CPU_FLAGS} -std=c11 -ffunction-sections -fdata-sections -fno-common -ffreestanding
@@ -428,8 +428,8 @@ set(MCU_C_FLAGS
 </script>
           <div id="ex-flags"></div>
           <h3>3. Linking, image files and a flash target</h3>
-          <script type="text/plain" id="src-cmake-link" data-src="examples/common/cmake/bluepill.cmake" data-region="link" data-lang="cmake" data-file="examples/common/cmake/bluepill.cmake" data-start="75" data-end="88" data-sha="66ea6b9e6eb3">
-target_link_options(${name} PRIVATE ${MCU_CPU_FLAGS}
+          <script type="text/plain" id="src-cmake-link" data-src="examples/common/cmake/bluepill.cmake" data-region="link" data-lang="cmake" data-file="examples/common/cmake/bluepill.cmake" data-start="75" data-end="88" data-sha="fbfe8878b0fa">
+target_link_options(${name} PRIVATE ${MCU_CPU_FLAGS} -L "${MCU_COMMON}/ld"
   -T "${BP_LINKER_SCRIPT}" --specs=nano.specs --specs=nosys.specs                # «7»
   -Wl,--gc-sections -Wl,-Map=$<TARGET_FILE_DIR:${name}>/${name}.map -Wl,--print-memory-usage)   # «8»
 add_custom_command(TARGET ${name} POST_BUILD
