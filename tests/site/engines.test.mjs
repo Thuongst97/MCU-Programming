@@ -67,3 +67,81 @@ test("pinout data and wiring are consistent", () => {
   }
   assert.throws(() => Pinout.render(board, { mode: "wiring", wiring: [{ pin: "Z9", to: "stlink.GND" }] }), /unknown pin/);
 });
+
+const { Wave } = require("../../site/assets/js/engines/waveform.js");
+const Calc = require("../../site/assets/js/engines/calc.js");
+const Clock = require("../../site/assets/js/engines/clocktree.js");
+
+test("UART frame: idle, start, LSB-first data, stop", () => {
+  assert.equal(Wave.uart({ byte: 0x48 }).signals[0].wave, "11" + "0" + "00010010" + "1" + "1");
+  const even = Wave.uart({ byte: 0x07, parity: "even" }).signals[0].wave;   // three 1s → parity bit 1
+  assert.equal(even[2 + 1 + 8], "1");
+});
+
+test("SPI waveforms have equal length and the right idle clock level", () => {
+  for (const mode of [0, 1, 2, 3]) {
+    const s = Wave.spi({ mode, mosi: [0x9f], miso: [0xef] });
+    const lens = new Set(s.signals.map((x) => x.wave.length));
+    assert.equal(lens.size, 1, `mode ${mode}`);
+    assert.equal(s.signals[1].wave[0], String(mode >> 1), `CPOL of mode ${mode}`);
+  }
+});
+
+test("I2C: SDA only changes while SCL is low, except START and STOP", () => {
+  const { signals } = Wave.i2c({ addr: 0x3c, bytes: [0x00, 0xaf] });
+  const scl = signals[0].wave, sda = signals[1].wave;
+  const changesWhileHigh = [];
+  for (let i = 1; i < sda.length; i++) if (sda[i] !== sda[i - 1] && scl[i] === "1" && scl[i - 1] === "1") changesWhileHigh.push(i);
+  assert.equal(changesWhileHigh.length, 2, "only START (falling) and STOP (rising)");
+  assert.equal(sda[changesWhileHigh[0]], "0");
+  assert.equal(sda[changesWhileHigh[1]], "1");
+});
+
+test("CAN: CRC-15 residue is zero and no run of 6 equal bits before the CRC delimiter", () => {
+  for (const [id, data] of [[0x3a0, [0x05, 0x00]], [0x000, [0, 0, 0, 0]], [0x7ff, [0xff, 0xff]], [0x123, [0x11, 0x22, 0x33]]]) {
+    const f = Wave.can({ id, data });
+    const bits = [...f.crcInput, ...Array.from({ length: 15 }, (_, k) => (f.crc >> (14 - k)) & 1)];
+    assert.equal(Wave.crc15(bits), 0, `CRC residue for id ${id}`);
+    const stuffedPart = f.signals[0].wave.slice(0, f.bitCount - 10);   // up to the end of the CRC field
+    assert.ok(!/000000|111111/.test(stuffedPart), `no six equal bits for id ${id}`);
+  }
+});
+
+test("BRR for 115200 baud at 72 MHz is 0x271", () => {
+  const r = Calc.brr(72e6, 115200);
+  assert.equal(r.brr, 0x271);
+  assert.ok(Math.abs(r.errorPct) < 0.01);
+  assert.equal(Calc.brr(36e6, 9600).brr, 0xea6);   // 234.375 → 234 + 6/16
+});
+
+test("timer solver hits 1 kHz exactly from 72 MHz with the largest ARR", () => {
+  const best = Calc.timer({ clk: 72e6, freq: 1000 })[0];
+  assert.equal((best.psc + 1) * (best.arr + 1), 72000);
+  assert.equal(best.errorPct, 0);
+  assert.equal(best.arr, 35999);
+});
+
+test("CAN bit timing: 500 kbit/s from 36 MHz, exact rate, legal fields", () => {
+  const list = Calc.canTiming({ pclk: 36e6, bitrate: 500000, sp: 0.875 });
+  assert.ok(list.length > 0);
+  for (const r of list) {
+    assert.equal(r.brp * r.tq * 500000, 36e6);
+    assert.ok(r.ts1 >= 1 && r.ts1 <= 16 && r.ts2 >= 1 && r.ts2 <= 8);
+    assert.equal(r.btr & 0x3ff, r.brp - 1);
+  }
+  assert.ok(Math.abs(list[0].errorPct) <= Math.abs(list[list.length - 1].errorPct));
+});
+
+test("clock tree: course setup is legal and needs 2 wait states", () => {
+  const r = Clock.compute(Clock.DEFAULT);
+  assert.equal(r.sysclk, 72e6);
+  assert.equal(r.pclk1, 36e6);
+  assert.equal(r.tim1, 72e6, "APB1 timers run at 2 × PCLK1");
+  assert.equal(r.adc, 12e6);
+  assert.equal(r.latency, 2);
+  assert.ok(r.ok);
+  assert.equal(r.cfgr, 0x001d840a);   // PLLMUL9 | PLLSRC | ADCPRE_DIV6 | PPRE1_DIV2 | SW_PLL (+ SWS = PLL)
+  const bad = Clock.compute({ ...Clock.DEFAULT, ppre1: 1, adcpre: 2 });
+  assert.deepEqual(bad.violations.map((v) => v.key).sort(), ["adc", "pclk1"]);
+  assert.equal(Clock.compute(Clock.RESET).sysclk, 8e6);
+});

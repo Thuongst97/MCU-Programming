@@ -1,0 +1,3 @@
+Example 02: cooperative scheduler, 3 tasks
+t=1000 ms  sample=100 heartbeat=10 report=1 overruns=0
+t=2000 ms  sample=200 heartbeat=20 report=2 overruns=0

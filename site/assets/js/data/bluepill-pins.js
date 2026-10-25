@@ -85,6 +85,7 @@
       usbuart: { title: "USB-UART (3.3 V)", pins: ["RX", "TX", "GND"] },
       button: { title: "Push button", pins: ["1", "2"] },
       led: { title: "LED + 330 Ω", pins: ["A", "K"] },
+      jumper: { title: "Jumper wire", pins: ["1", "2"] },
       pot: { title: "10 kΩ pot", pins: ["1", "W", "3"] },
       oled: { title: "SSD1306 (I2C)", pins: ["GND", "VCC", "SCL", "SDA"] },
       w25q: { title: "W25Qxx (SPI)", pins: ["CS", "DO", "GND", "VCC", "CLK", "DI"] },

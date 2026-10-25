@@ -36,6 +36,13 @@ GPIOC->BSRR = GPIO_BSRR_BS13; // «2»
     <div id="reg-demo"></div>
     <div id="mm-demo"></div>
     <div id="ck-demo"></div>
+    <div id="wv-demo"></div>
+    <div id="clk-demo"></div>
+    <div id="calc-demo"></div>
+    <div id="sm-demo"></div>
+    <script type="text/plain" id="src-bad" data-lang="c" data-file="bad.c">uint8_t x = a + b; // «1»</script>
+    <script type="text/plain" id="src-good" data-lang="c" data-file="good.c">uint8_t x = (uint8_t)(a + b);</script>
+    <div id="cmp-demo"></div>
   </main>
   <div id="site-footer"></div>
   <script src="../../../site/assets/js/strings.js"></script>
@@ -51,6 +58,11 @@ GPIOC->BSRR = GPIO_BSRR_BS13; // «2»
   <script src="../../../site/assets/js/engines/register.js"></script>
   <script src="../../../site/assets/js/engines/memorymap.js"></script>
   <script src="../../../site/assets/js/engines/checklist.js"></script>
+  <script src="../../../site/assets/js/engines/waveform.js"></script>
+  <script src="../../../site/assets/js/engines/clocktree.js"></script>
+  <script src="../../../site/assets/js/engines/calc.js"></script>
+  <script src="../../../site/assets/js/engines/statemachine.js"></script>
+  <script src="../../../site/assets/js/engines/compare.js"></script>
   <script src="fixture.js"></script>
 </body>
 </html>

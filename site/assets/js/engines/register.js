@@ -122,7 +122,7 @@
       host.querySelector(".reg-bin").textContent = (value >>> 0).toString(2).padStart(32, "0").replace(/(.{4})(?=.)/g, "$1 ");
       host.querySelector(".reg-cexpr").textContent = `${r.addrOf ? port : r.periph.replace("FLASH_R", "FLASH")}->${r.reg}${r.regIndex !== undefined ? `[${r.regIndex}]` : ""} = ${cExpr(r, value)};`;
       shown.forEach((f) => {
-        const el = document.getElementById(`${uid}-${f.name}`);
+        const el = host.querySelector(`#${uid}-${f.name}`);
         const v = fieldValue(value, f);
         if (el.tagName === "OUTPUT") el.textContent = f.values && f.values[v] !== undefined ? `${v} · ${f.values[v]}` : String(v);
         else if (el.tagName === "SELECT") {

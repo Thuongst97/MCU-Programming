@@ -27,5 +27,8 @@
     "01": { title: "Example 01: button on PA0 to GND", highlight: ["PA0", "PA9", "PA10", "PC13"],
       wiring: [...SWD, ...UART, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
     "02": { title: "Example 02: ST-Link + USB-UART only", highlight: ["PA9", "PA10", "PC13"], wiring: [...SWD, ...UART] },
+    "04": { title: "Example 04: ST-Link + USB-UART (type into the shell)", highlight: ["PA9", "PA10", "PC13"], wiring: [...SWD, ...UART] },
+    "03": { title: "Example 03: LED on PA6 (TIM3 CH1), jumper PA6 → PA0 (TIM2 CH1)", highlight: ["PA6", "PA0", "PA9", "PA10"],
+      wiring: [...SWD, ...UART, { pin: "A6", to: "led.A" }, { pin: "right:GND", to: "led.K", kind: "ground" }, { pin: "A6", to: "jumper.1" }, { pin: "A0", to: "jumper.2" }] },
   };
 });

@@ -167,6 +167,20 @@ test("engines render and respond (fixture page)", async ({ browser }) => {
   // checklist: ticking persists the count
   await page.check("#ck-demo input[data-i='1']");
   await expect(page.locator("#ck-demo .ck-count")).toHaveText("1 / 2");
+  // waveform: CAN frame with field bands; clock tree flags an illegal APB1 and shows the latency
+  await expect(page.locator("#wv-demo .wv-band").first()).toBeAttached();
+  await expect(page.locator("#clk-demo .clk-okmsg")).toBeVisible();
+  await page.selectOption('#clk-demo select[data-k="ppre1"]', "1");
+  await expect(page.locator("#clk-demo .clk-viol li")).toHaveCount(1);
+  // calculator: best CAN timing row is highlighted and reacts to input
+  await expect(page.locator("#calc-demo .calc-best")).toHaveCount(1);
+  await page.fill('#calc-demo input[data-k="bitrate"]', "250000");
+  await expect(page.locator("#calc-demo .calc-best")).toHaveCount(1);
+  // state machine: firing an event moves the current state
+  await page.click('#sm-demo [data-fire="0"]');
+  await expect(page.locator('#sm-demo .sm-s.cur')).toHaveAttribute("data-s", "on");
+  // compare: two columns
+  await expect(page.locator("#cmp-demo .cmp-col")).toHaveCount(2);
   expect(problems).toEqual([]);
   await context.close();
 });

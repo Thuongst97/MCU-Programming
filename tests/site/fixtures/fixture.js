@@ -29,4 +29,14 @@
   window.MCU.Register($("#reg-demo"), { reg: "RCC_CFGR", value: 0x001d0402 });
   window.MCU.MemoryMap($("#mm-demo"), { map: "00-bluepill-blink-uart" });
   window.MCU.Checklist($("#ck-demo"), ["one", "two"], { key: "fixture" });
+  window.MCU.Waveform($("#wv-demo"), window.MCU.Wave.can({ id: 0x3a0, data: [5, 0] }));
+  const reg = window.MCU.Register(document.createElement("div"), { reg: "RCC_CFGR" });
+  window.fixtureClock = window.MCU.ClockTree($("#clk-demo"), { register: reg });
+  window.MCU.Calc.widget($("#calc-demo"), "can");
+  window.MCU.StateMachine($("#sm-demo"), {
+    initial: "off",
+    states: [{ id: "off", label: "Off", x: 100, y: 100, desc: "Lamp off." }, { id: "on", label: "On", x: 500, y: 100, desc: "Lamp on." }],
+    transitions: [{ from: "off", to: "on", label: "press" }, { from: "on", to: "off", label: "release" }],
+  });
+  window.MCU.Compare($("#cmp-demo"), { bad: "src-bad", good: "src-good", rule: "MISRA C:2012 Rule 10.3", why: "Narrowing made explicit." });
 })();

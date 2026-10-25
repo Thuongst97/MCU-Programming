@@ -88,5 +88,58 @@ window.MCU_DATA.examples = [
   "sim": "full",
   "tested_on": [],
   "folder": "02-systick-scheduler"
+ },
+ {
+  "id": "03",
+  "title": "PWM dimming on TIM3 and input capture on TIM2",
+  "modules": [
+   "timers"
+  ],
+  "peripherals": [
+   "TIM3",
+   "TIM2",
+   "GPIOA",
+   "USART1"
+  ],
+  "flavor": "bare metal + host unit tests",
+  "pins": [
+   "PA6",
+   "PA0",
+   "PA9",
+   "PA10"
+  ],
+  "hw": [
+   "LED + 330 Ω resistor",
+   "jumper wire PA6–PA0",
+   "USB-UART adapter"
+  ],
+  "sim": "partial",
+  "tested_on": [],
+  "folder": "03-tim-pwm-dimming"
+ },
+ {
+  "id": "04",
+  "title": "Interrupt-driven UART with ring buffers and a command shell",
+  "modules": [
+   "uart",
+   "interrupts"
+  ],
+  "peripherals": [
+   "USART1",
+   "NVIC",
+   "GPIOC"
+  ],
+  "flavor": "bare metal + host unit tests",
+  "pins": [
+   "PA9",
+   "PA10",
+   "PC13"
+  ],
+  "hw": [
+   "USB-UART adapter"
+  ],
+  "sim": "full",
+  "tested_on": [],
+  "folder": "04-uart-shell-ringbuffer"
  }
 ];

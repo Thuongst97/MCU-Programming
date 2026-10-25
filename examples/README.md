@@ -9,3 +9,5 @@ Every example targets the STM32F103C8T6 Blue Pill + ST-Link V2 and builds with
 | [00](00-bluepill-blink-uart/) | Blink, 72 MHz and "Hello from Blue Pill" | RCC, FLASH, GPIOC, GPIOA, USART1, SysTick | bare metal (registers) + ST HAL + ST LL | USB-UART adapter (3.3 V logic) | ⚠️ partial | not yet |
 | [01](01-exti-button-debounce/) | Button on EXTI with debouncing | GPIOA, AFIO, EXTI, NVIC, SysTick, USART1 | bare metal + host unit tests | push button from PA0 to GND, USB-UART adapter | ⚠️ partial | not yet |
 | [02](02-systick-scheduler/) | SysTick time base and a cooperative scheduler | SysTick, GPIOC, USART1 | bare metal + host unit tests | USB-UART adapter | ✅ full | not yet |
+| [03](03-tim-pwm-dimming/) | PWM dimming on TIM3 and input capture on TIM2 | TIM3, TIM2, GPIOA, USART1 | bare metal + host unit tests | LED + 330 Ω resistor, jumper wire PA6–PA0, USB-UART adapter | ⚠️ partial | not yet |
+| [04](04-uart-shell-ringbuffer/) | Interrupt-driven UART with ring buffers and a command shell | USART1, NVIC, GPIOC | bare metal + host unit tests | USB-UART adapter | ✅ full | not yet |
