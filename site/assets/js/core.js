@@ -213,7 +213,7 @@
         ["gdb", "GDB and Cortex-Debug techniques", "gdb watchpoint backtrace x/ registers"],
         ["semihosting-swo", "printf: UART, semihosting, SWO", "semihosting swo itm st-link clone limitation"],
       ] },
-    { id: "bootloader", status: "planned", phase: 5, file: "bootloader.html", num: "16", group: "Embedded engineering",
+    { id: "bootloader", status: "ready", phase: 5, file: "bootloader.html", num: "16", group: "Embedded engineering",
       title: "Bootloaders and Flash Programming", short: "Bootloaders", icon: "🧰", accent: "#e8a36b",
       desc: "ST's system bootloader, writing your own UART bootloader, splitting flash, VTOR relocation and safe jump to application.",
       sections: [
@@ -453,10 +453,14 @@
     ddi0337Debug: { t: "Cortex-M3 TRM — ACTLR, FPB, DWT and ITM", url: "https://developer.arm.com/documentation/ddi0337/latest/", doc: "ARM DDI 0337", sec: "4.3, 8, 11", kind: "arm" },
     gdbManual: { t: "Debugging with GDB — breakpoints, watchpoints, examining memory", url: "https://sourceware.org/gdb/current/onlinedocs/gdb.html/", kind: "tool" },
     armSemihosting: { t: "Arm semihosting specification", url: "https://github.com/ARM-software/abi-aa/blob/main/semihosting/semihosting.rst", kind: "arm" },
+    pm0075Prog: { t: "PM0075 — flash program/erase controller: unlock, page erase, programming, option bytes", url: ST + "programming_manual/pm0075-stm32f10xxx-flash-memory-microcontrollers-stmicroelectronics.pdf", doc: "PM0075", kind: "st" },
+    pm0056Vtor: { t: "PM0056 — vector table offset register (VTOR)", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", sec: "4.4.4", kind: "st" },
+    ds5319Flash: { t: "STM32F103x8/xB datasheet — flash memory characteristics (erase/program time, endurance)", url: ST + "datasheet/stm32f103c8.pdf", doc: "DS5319", kind: "st" },
     stm32Base: { t: "STM32-base — Blue Pill board page and schematic notes", url: "https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html", kind: "community" },
   };
   const REFS = {
-            "faults-debug": ["pm0056Fault", "ddi0403Fault", "ddi0403Stack", "ddi0337Debug", "rm0008Debug", "gdbManual", "armSemihosting", "um1075"],
+                "bootloader": ["an2606", "an3155", "pm0075Prog", "pm0056Vtor", "ddi0403Reset", "ds5319Flash", "rm0008Boot", "ldManual"],
+    "faults-debug": ["pm0056Fault", "ddi0403Fault", "ddi0403Stack", "ddi0337Debug", "rm0008Debug", "gdbManual", "armSemihosting", "um1075"],
     "rtos": ["pm0056Exc", "ddi0403Stack", "pm0056Nvic", "freertosCm3", "freertosConfig", "freertosStack", "freertosMutex", "freertosKernel"],
     "power-wdg": ["rm0008Pwr", "rm0008Iwdg", "rm0008Wwdg", "rm0008Rcc", "rm0008Debug", "ds5319Elec", "pm0056"],
     "can": ["rm0008Can", "iso11898", "iso11898p2", "iso17987", "rm0008Gpio", "tiSn65"],

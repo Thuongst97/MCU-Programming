@@ -132,6 +132,32 @@
           values: { 0: "0 WS (≤ 24 MHz)", 1: "1 WS (≤ 48 MHz)", 2: "2 WS (≤ 72 MHz)" } },
       ],
     },
+    FLASH_SR: {
+      periph: "FLASH_R", typedef: "FLASH", reg: "SR", addr: 0x4002200C, reset: 0x00000000, ref: "PM0075 §3.4; RM0008 §3.3.3",
+      title: "Flash status register", desc: "Progress and errors of the last erase or program operation. Error and EOP flags are cleared by writing 1.",
+      fields: [
+        { name: "EOP", bits: [5, 5], access: "rc_w1", desc: "End of operation: the erase or program step finished." },
+        { name: "WRPRTERR", bits: [4, 4], access: "rc_w1", desc: "Tried to program or erase a write-protected page." },
+        { name: "PGERR", bits: [2, 2], access: "rc_w1", desc: "Programming error: the half-word was not erased (not 0xFFFF) before programming a non-zero value." },
+        { name: "BSY", bits: [0, 0], access: "r", desc: "An operation is running. While it is set, any read from flash stalls the CPU." },
+      ],
+    },
+    FLASH_CR: {
+      periph: "FLASH_R", typedef: "FLASH", reg: "CR", addr: 0x40022010, reset: 0x00000080, ref: "PM0075 §3.5; RM0008 §3.3.3",
+      title: "Flash control register", desc: "Selects the operation (program, page erase, mass erase) and starts it. Locked after reset until the two-key sequence is written to FLASH_KEYR.",
+      fields: [
+        { name: "EOPIE", bits: [12, 12], access: "rw", desc: "Interrupt when an operation ends." },
+        { name: "ERRIE", bits: [10, 10], access: "rw", desc: "Interrupt on a programming or protection error." },
+        { name: "OPTWRE", bits: [9, 9], access: "rc_w0", desc: "Option bytes may be written (set by the option-key sequence)." },
+        { name: "LOCK", bits: [7, 7], access: "rw", desc: "1 = the register is locked. Write 1 to lock again; only the key sequence clears it." },
+        { name: "STRT", bits: [6, 6], access: "rw", desc: "Start the selected erase. Cleared by hardware." },
+        { name: "OPTER", bits: [5, 5], access: "rw", desc: "Option byte erase." },
+        { name: "OPTPG", bits: [4, 4], access: "rw", desc: "Option byte programming." },
+        { name: "MER", bits: [2, 2], access: "rw", desc: "Mass erase: all user pages." },
+        { name: "PER", bits: [1, 1], access: "rw", desc: "Page erase: the page that contains FLASH_AR." },
+        { name: "PG", bits: [0, 0], access: "rw", desc: "Programming: the next half-word write to flash programs it." },
+      ],
+    },
     GPIOx_CRL: {
       periph: "GPIOA", typedef: "GPIO", reg: "CRL", macro: "GPIO_CRL", addr: 0x40010800, reset: 0x44444444, ref: "RM0008 §9.2.1",
       addrOf: { GPIOA: 0x40010800, GPIOB: 0x40010C00, GPIOC: 0x40011000 },

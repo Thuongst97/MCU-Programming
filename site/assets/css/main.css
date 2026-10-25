@@ -1026,3 +1026,22 @@ table.t.arb tr.arb-bus td { font-weight: 700; color: var(--copper); border-top: 
 .prio-legend { font-size: 13px; color: var(--text-2); line-height: 2; }
 .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .btn.sm.on { border-color: var(--accent, var(--blue)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 35%, transparent); }
+.code-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .code-pair { grid-template-columns: 1fr; } }
+
+/* flash partition bar + frame builder (bootloader.html) */
+.part-host { padding: 14px; margin: 14px 0; }
+.part-host svg { width: 100%; height: auto; display: block; }
+.part-slot { stroke-width: 1.5; }
+.part-slot.bl { fill: color-mix(in srgb, var(--copper) 18%, transparent); stroke: var(--copper); }
+.part-slot.rec { fill: color-mix(in srgb, var(--red) 22%, transparent); stroke: var(--red); }
+.part-slot.app { fill: color-mix(in srgb, var(--blue) 16%, transparent); stroke: var(--blue); }
+.part-used { opacity: 0.55; }
+.part-used.bl { fill: var(--copper); } .part-used.app { fill: var(--blue); }
+.part-t { fill: var(--dg-title); font-weight: 600; font-size: 13px; }
+.part-s { fill: var(--dg-muted); font: 11px var(--mono); }
+.fb-bytes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; font: 12px var(--mono); }
+.fb-bytes span { padding: 3px 6px; border-radius: 5px; border: 1px solid var(--border); }
+.fb-bytes .sof { border-color: var(--copper); } .fb-bytes .cmd { border-color: var(--green); }
+.fb-bytes .len { border-color: var(--text-3, var(--border-hi)); } .fb-bytes .pay { border-color: var(--blue); }
+.fb-bytes .crc { border-color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
