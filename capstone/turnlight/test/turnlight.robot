@@ -66,6 +66,7 @@ Hazard Overrides The Stalk
     Hold    btnH    0.1
     Wait For Line On Uart    tl: hazard off    testerId=${t}
 
+# [region:comfort]
 A Tap Gives Exactly Three Flashes
     [Arguments]    ${elf}
     Reset Emulation
@@ -76,6 +77,7 @@ A Tap Gives Exactly Three Flashes
     Wait For Line On Uart    lamp L 1    testerId=${t}
     Wait For Line On Uart    lamp L 0    testerId=${t}
     Should Not Be On Uart    lamp L 1    testerId=${t}    timeout=2
+# [endregion]
 
 A Lamp Without Current Is Reported
     [Arguments]    ${elf}
@@ -132,11 +134,13 @@ TL-REQ-003 Hazard
     ${STAGE2}
     ${STAGE3}
 
+# [region:comfort-case]
 TL-REQ-004 Comfort Blink
     [Template]    A Tap Gives Exactly Three Flashes
     ${STAGE1}
     ${STAGE2}
     ${STAGE3}
+# [endregion]
 
 TL-REQ-005 Lamp Out
     [Template]    A Lamp Without Current Is Reported

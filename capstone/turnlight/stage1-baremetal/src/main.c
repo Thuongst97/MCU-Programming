@@ -46,10 +46,10 @@ static void job_input(void)            /* 10 ms: debounce the three buttons (TL-
     const uint32_t now = millis();
     for (uint32_t b = 0U; b < (uint32_t)TL_BTN_COUNT; ++b)
     {
-        const debounce_event_t ev = debounce_update(&s_btn[b], tl_hw_button_pressed((tl_button_t)b), now);
+        const debounce_event_t ev = debounce_update(&s_btn[b], tl_hw_button_pressed((tl_button_t)b), now);   // «1»
         if (b == (uint32_t)TL_BTN_HAZARD)
         {
-            s_in.hazard_pressed = s_in.hazard_pressed || (ev == DEBOUNCE_PRESSED);   /* latched edge */
+            s_in.hazard_pressed = s_in.hazard_pressed || (ev == DEBOUNCE_PRESSED);   /* latched edge */   // «2»
         }
         else
         {
@@ -64,7 +64,7 @@ static void job_input(void)            /* 10 ms: debounce the three buttons (TL-
 static void job_logic(void)            /* 10 ms: the state machine */
 {
     const tl_outputs_t before = s_out;
-    if (tl_step(&s_tl, &s_in, 10U, &s_out))
+    if (tl_step(&s_tl, &s_in, 10U, &s_out))   // «3»
     {
         s_status_changed = true;       /* TL-REQ-006: send on change */
         for (uint32_t i = 0U; i < (uint32_t)TL_SIDES; ++i)
@@ -79,7 +79,7 @@ static void job_logic(void)            /* 10 ms: the state machine */
             uart_puts(s_out.hazard ? "tl: hazard on\n" : "tl: hazard off\n");
         }
     }
-    s_in.hazard_pressed = false;       /* the edge has been consumed */
+    s_in.hazard_pressed = false;       /* the edge has been consumed */   // «4»
     s_alive |= ALIVE_LOGIC;
 }
 // [endregion]
@@ -117,13 +117,13 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
     {
         ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.dlc >= 1U));
     }
-    if (tl_comm_step(&s_comm, ack, 10U))                                  /* TL-REQ-007 */
+    if (tl_comm_step(&s_comm, ack, 10U))                                  /* TL-REQ-007 */   // «5»
     {
         s_status_changed = true;
         uart_puts(s_comm.lost ? "dem: TL_E_CLUSTER_LOST failed\n" : "dem: TL_E_CLUSTER_LOST passed\n");
     }
     since_tx_ms += 10U;
-    if (s_status_changed || (since_tx_ms >= TL_STATUS_CYCLE_MS))         /* TL-REQ-006 */
+    if (s_status_changed || (since_tx_ms >= TL_STATUS_CYCLE_MS))         /* TL-REQ-006 */   // «6»
     {
         s_status.lamp_left = s_out.lamp[TL_LEFT];
         s_status.lamp_right = s_out.lamp[TL_RIGHT];
@@ -135,7 +135,7 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
         s_status.cluster_lost = s_comm.lost;
         s_status.alive++;
         can_frame_t tx = {.id = TL_CAN_ID_STATUS, .dlc = TL_STATUS_DLC, .data = {0}};
-        tl_status_pack(&s_status, tx.data);
+        tl_status_pack(&s_status, tx.data);   // «7»
         (void)can_send(&tx);           /* a full mailbox drops this frame; the next cycle repeats it */
         s_status_changed = false;
         since_tx_ms = 0U;
@@ -147,7 +147,7 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
 // [region:supervisor]
 static void job_supervisor(void)       /* 50 ms: feed the watchdog only if every job ran (TL-REQ-009) */
 {
-    if (s_alive == ALIVE_ALL)
+    if (s_alive == ALIVE_ALL)   // «8»
     {
         tl_hw_wdg_feed();
     }

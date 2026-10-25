@@ -82,7 +82,7 @@ bool tl_hw_button_pressed(tl_button_t b)
 // [region:ramp]
 void tl_hw_lamp_ramp(const bool on[TL_SIDES], uint32_t dt_ms)
 {
-    const uint32_t step = (TL_PWM_TOP * dt_ms) / TL_RAMP_MS;               /* full scale in 20 ms */
+    const uint32_t step = (TL_PWM_TOP * dt_ms) / TL_RAMP_MS;               /* full scale in 20 ms */   // «1»
     for (uint32_t i = 0U; i < (uint32_t)TL_SIDES; ++i)
     {
         const uint32_t target = on[i] ? TL_PWM_TOP : 0U;
@@ -97,7 +97,7 @@ void tl_hw_lamp_ramp(const bool on[TL_SIDES], uint32_t dt_ms)
         }
         s_duty[i] = (uint16_t)d;
     }
-    TIM3->CCR1 = s_duty[TL_LEFT];                                          /* taken at the next update */
+    TIM3->CCR1 = s_duty[TL_LEFT];                                          /* taken at the next update */   // «2»
     TIM3->CCR2 = s_duty[TL_RIGHT];
 }
 // [endregion]

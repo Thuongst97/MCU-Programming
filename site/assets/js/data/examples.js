@@ -374,5 +374,37 @@ window.MCU_DATA.examples = [
   "sim": "partial",
   "tested_on": [],
   "folder": "12-uart-bootloader"
+ },
+ {
+  "id": "13",
+  "title": "LIN between two Blue Pills (UART level)",
+  "modules": [
+   "uart",
+   "can"
+  ],
+  "peripherals": [
+   "USART2 (LIN mode)",
+   "USART1",
+   "GPIOA",
+   "GPIOC"
+  ],
+  "flavor": "bare-metal (CMSIS registers)",
+  "pins": [
+   "PA2",
+   "PA3",
+   "PA0",
+   "PC13",
+   "PA9",
+   "PA10"
+  ],
+  "hw": [
+   "second Blue Pill",
+   "2 small-signal diodes (1N4148)",
+   "1 kΩ resistor",
+   "push button from PA0 to GND on the slave"
+  ],
+  "sim": "none",
+  "tested_on": [],
+  "folder": "13-lin-two-nodes"
  }
 ];

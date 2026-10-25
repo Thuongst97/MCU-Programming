@@ -1060,3 +1060,17 @@ code, pre, kbd, .code-block, .code-block * { font-variant-ligatures: none; font-
 .dtcb-list li { padding: 3px 0; }
 .dtcb-list li.on { color: var(--text); }
 .ref-item { min-width: 0; overflow-wrap: anywhere; }
+
+/* TurnLight simulator (capstone-baremetal.html) */
+.tlsim-host { padding: 14px; margin: 14px 0; }
+.tlsim-top { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.tlsim-lamps { display: flex; gap: 10px; }
+.tlsim-lamp { width: 54px; height: 40px; display: grid; place-items: center; border-radius: 10px; font-size: 22px; color: var(--muted); border: 1px solid var(--border); background: var(--surface); transition: background 0.05s; }
+.tlsim-lamp.on { color: #1a1206; background: #fbbf24; border-color: #f59e0b; box-shadow: 0 0 18px rgba(251, 191, 36, 0.6); }
+.tlsim-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1 1 300px; }
+.tlsim-btns .btn.on { border-color: var(--copper); background: var(--copper-dim); }
+.tlsim-chk { font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.tlsim-wave { width: 100%; height: 90px; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.tlsim-wave polyline { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.tlsim-l { stroke: #fbbf24; } .tlsim-r { stroke: var(--blue); }
+@media (prefers-reduced-motion: reduce) { .tlsim-lamp { transition: none; } }

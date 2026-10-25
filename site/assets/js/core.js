@@ -306,7 +306,7 @@
       ] },
   
     /* ───────────── Group: Capstone ───────────── */
-    { id: "capstone-baremetal", status: "planned", phase: 7, file: "capstone-baremetal.html", num: "24", group: "Capstone",
+    { id: "capstone-baremetal", status: "ready", phase: 7, file: "capstone-baremetal.html", num: "24", group: "Capstone",
       title: "Capstone 1: Turn-Signal ECU, Bare Metal", short: "Capstone: Bare Metal", icon: "🚦", accent: "#fbbf24",
       desc: "Requirements, state machine and a bare-metal implementation of a turn-signal / hazard ECU talking CAN to a cluster node.",
       sections: [
@@ -316,7 +316,7 @@
         ["implementation", "Implementation walkthrough", "super loop scheduler"],
         ["acceptance", "Acceptance tests", "acceptance test robot renode"],
       ] },
-    { id: "capstone-rtos", status: "planned", phase: 7, file: "capstone-rtos.html", num: "25", group: "Capstone",
+    { id: "capstone-rtos", status: "ready", phase: 7, file: "capstone-rtos.html", num: "25", group: "Capstone",
       title: "Capstone 2: The Same ECU on FreeRTOS", short: "Capstone: FreeRTOS", icon: "🚦", accent: "#60a5fa",
       desc: "Splitting the ECU into tasks and queues, timing analysis and what changed vs bare metal.",
       sections: [
@@ -325,7 +325,7 @@
         ["timing", "Timing and watchdog supervision", "deadline watchdog supervision"],
         ["diff", "What changed", "comparison"],
       ] },
-    { id: "capstone-autosar", status: "planned", phase: 7, file: "capstone-autosar.html", num: "26", group: "Capstone",
+    { id: "capstone-autosar", status: "ready", phase: 7, file: "capstone-autosar.html", num: "26", group: "Capstone",
       title: "Capstone 3: Refactoring into AUTOSAR Layers", short: "Capstone: AUTOSAR", icon: "🚦", accent: "#a78bfa",
       desc: "Turning the ECU into an application SWC with runnables over a hand-written RTE, BSW-lite and MCAL on the STM32F103.",
       sections: [
@@ -395,6 +395,7 @@
     pm0056: { t: "STM32F10xxx Cortex-M3 programming manual", url: ST + "programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf", doc: "PM0056", kind: "st" },
     ddi0403: { t: "ARMv7-M Architecture Reference Manual", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", kind: "arm" },
     ddi0337: { t: "Cortex-M3 Technical Reference Manual", url: "https://developer.arm.com/documentation/ddi0337/latest/", doc: "ARM DDI 0337", kind: "arm" },
+    uneceR48: { t: "UN Regulation No. 48 — installation of lighting and light-signalling devices (UNECE)", url: "https://unece.org/transport/vehicle-regulations-wp29/standards/addenda-1958-agreement-regulations-41-60", doc: "UN R48", kind: "spec" },
     autosarRelease: { t: "AUTOSAR Classic Platform R25-11 — Release Overview", url: "https://www.autosar.org/fileadmin/standards/R25-11/CP/AUTOSAR_CP_TR_ReleaseOverview.pdf", doc: "AUTOSAR_CP_TR_ReleaseOverview", rev: "R25-11", kind: "autosar" },
     cmsisDeviceF1: { t: "cmsis-device-f1 — STM32F1 CMSIS device headers", url: "https://github.com/STMicroelectronics/cmsis-device-f1", kind: "tool" },
     renodeDocs: { t: "Renode documentation", url: "https://renode.readthedocs.io/en/latest/", kind: "tool" },
@@ -499,7 +500,10 @@
     stm32Base: { t: "STM32-base — Blue Pill board page and schematic notes", url: "https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html", kind: "community" },
   };
   const REFS = {
-                                            "autosar-review": ["arSrsBswGeneral", "arLayered", "misraC", "misraCompliance", "iso26262", "arMcu"],
+                                                        "capstone-autosar": ["arLayered", "arRte", "arCom", "arWdgM", "arDem", "arEcuM", "arOs", "arModuleList"],
+    "capstone-rtos": ["freertosCm3", "freertosConfig", "freertosStack", "freertosKernel", "rm0008Iwdg", "pm0056Exc"],
+    "capstone-baremetal": ["uneceR48", "rm0008Tim", "rm0008Can", "rm0008Adc", "rm0008Iwdg", "iso11898", "renodeDocs"],
+    "autosar-review": ["arSrsBswGeneral", "arLayered", "misraC", "misraCompliance", "iso26262", "arMcu"],
     "autosar-diag-nvm": ["iso14229", "iso15765", "arDem", "arDcm", "arCanTp", "arNvM", "arFee", "ds5319Flash"],
     "autosar-os-com": ["arOs", "iso17356", "arRte", "arCom", "arPduR", "arCanIf", "arCan", "arEcuM", "iso11898"],
     "autosar-mcal": ["arSrsBswGeneral", "arModuleList", "arStdTypes", "arPlatformTypes", "arCompilerAbs", "arMemMap", "arDet", "arPort", "arDio", "arPwm", "arAdc", "arCan", "arWdg", "rm0008Gpio"],

@@ -90,6 +90,12 @@
       oled: { title: "SSD1306 (I2C)", pins: ["GND", "VCC", "SCL", "SDA"] },
       w25q: { title: "W25Qxx (SPI)", pins: ["CS", "DO", "GND", "VCC", "CLK", "DI"] },
       sn65: { title: "SN65HVD230", pins: ["3V3", "GND", "D", "R", "CANH", "CANL"] },
+      // capstone: several buttons and lamps at once
+      stalkL: { title: "Left stalk (button)", pins: ["1", "2"] },
+      stalkR: { title: "Right stalk (button)", pins: ["1", "2"] },
+      hazard: { title: "Hazard (button)", pins: ["1", "2"] },
+      lampL: { title: "Left lamp: LED + 330 Ω", pins: ["A", "K"] },
+      lampR: { title: "Right lamp: LED + 330 Ω", pins: ["A", "K"] },
     },
   };
 });

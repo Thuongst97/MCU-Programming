@@ -102,7 +102,7 @@ static void input_task(void *arg)      /* 10 ms, priority 3: debounce, send edge
             if (ev != DEBOUNCE_NONE)
             {
                 const input_event_t e = {(uint8_t)b, ev == DEBOUNCE_PRESSED};
-                (void)xQueueSend(s_events, &e, 0);         /* never block the sampling loop */
+                (void)xQueueSend(s_events, &e, 0);         /* never block the sampling loop */   // «1»
             }
         }
         (void)xEventGroupSetBits(s_alive, ALIVE_INPUT);
@@ -125,7 +125,7 @@ static void logic_task(void *arg)      /* 10 ms, priority 3: lamp monitor + stat
     {
         vTaskDelayUntil(&wake, pdMS_TO_TICKS(10));
         input_event_t e;
-        while (xQueueReceive(s_events, &e, 0) == pdTRUE)  /* drain every edge since last time */
+        while (xQueueReceive(s_events, &e, 0) == pdTRUE)  /* drain every edge since last time */   // «2»
         {
             if (e.button == (uint8_t)TL_BTN_HAZARD)
             {
@@ -166,10 +166,10 @@ static void logic_task(void *arg)      /* 10 ms, priority 3: lamp monitor + stat
             }
         }
         in.hazard_pressed = false;
-        (void)xQueueOverwrite(s_mailbox, &snap);           /* the newest outputs replace the old */
+        (void)xQueueOverwrite(s_mailbox, &snap);           /* the newest outputs replace the old */   // «3»
         if (changed)
         {
-            (void)xEventGroupSetBits(s_flags, EV_STATUS_CHANGED);
+            (void)xEventGroupSetBits(s_flags, EV_STATUS_CHANGED);   // «4»
         }
         (void)xEventGroupSetBits(s_alive, ALIVE_LOGIC);
     }
@@ -203,7 +203,7 @@ static void can_task(void *arg)        /* priority 2: on change, or every 10 ms 
     uint32_t since_tx_ms = 0U;
     for (;;)
     {
-        const EventBits_t ev = xEventGroupWaitBits(s_flags, EV_STATUS_CHANGED, pdTRUE, pdFALSE, pdMS_TO_TICKS(10));
+        const EventBits_t ev = xEventGroupWaitBits(s_flags, EV_STATUS_CHANGED, pdTRUE, pdFALSE, pdMS_TO_TICKS(10));   // «5»
         const TickType_t now = xTaskGetTickCount();
         const uint32_t dt = (uint32_t)(now - last_tick);
         last_tick = now;
@@ -248,7 +248,7 @@ static void supervisor_task(void *arg) /* priority 1 (lowest): feeds IWDG only w
     (void)arg;
     for (;;)
     {
-        const EventBits_t got = xEventGroupWaitBits(s_alive, ALIVE_ALL, pdTRUE, pdTRUE, pdMS_TO_TICKS(50));
+        const EventBits_t got = xEventGroupWaitBits(s_alive, ALIVE_ALL, pdTRUE, pdTRUE, pdMS_TO_TICKS(50));   // «6»
         if ((got & ALIVE_ALL) == ALIVE_ALL)
         {
             tl_hw_wdg_feed();

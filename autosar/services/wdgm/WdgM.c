@@ -74,11 +74,11 @@ FUNC(void, WDGM_CODE) WdgM_MainFunction(void)
     {
         P2CONST(WdgM_SupervisedEntityConfigType, AUTOMATIC, WDGM_APPL_CONST) c = &WdgM_ConfigPtr->entities[i];
         SchM_Enter_WdgM_WDGM_EXCLUSIVE_AREA_0();
-        const uint16 n = WdgM_Alive[i];
+        const uint16 n = WdgM_Alive[i];   // «1»
         WdgM_Alive[i] = 0U;
         SchM_Exit_WdgM_WDGM_EXCLUSIVE_AREA_0();
         const boolean inRange = (((n + c->minMargin) >= c->expectedAlive) && (n <= (c->expectedAlive + c->maxMargin))) ? TRUE : FALSE;
-        if (inRange == FALSE)
+        if (inRange == FALSE)   // «2»
         {
             WdgM_Local[i] = WDGM_LOCAL_STATUS_EXPIRED;       /* lite: no failed-tolerance, expire at once */
         }
@@ -86,12 +86,12 @@ FUNC(void, WDGM_CODE) WdgM_MainFunction(void)
     }
     if (allOk == TRUE)
     {
-        WdgIf_SetTriggerCondition(0U, WdgM_ConfigPtr->triggerTimeoutMs);   /* keep the watchdog happy */
+        WdgIf_SetTriggerCondition(0U, WdgM_ConfigPtr->triggerTimeoutMs);   /* keep the watchdog happy */   // «3»
     }
     else
     {
         WdgM_Global = WDGM_GLOBAL_STATUS_STOPPED;
-        WdgIf_SetTriggerCondition(0U, 0U);                   /* stop triggering: the IWDG resets the ECU */
+        WdgIf_SetTriggerCondition(0U, 0U);                   /* stop triggering: the IWDG resets the ECU */   // «4»
     }
 }
 // [endregion]

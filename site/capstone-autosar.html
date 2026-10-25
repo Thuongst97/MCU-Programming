@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Capstone 3: Refactoring into AUTOSAR Layers — MCU Academy</title>
+  <meta name="description" content="Turning the ECU into an application SWC with runnables over a hand-written RTE, BSW-lite and MCAL on the STM32F103.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="assets/css/main.css?v=__BUILD__">
+  <script>try{var t=localStorage.getItem("mcu-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body data-page="capstone-autosar">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="site-header"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content" id="main">
+      <div class="content-inner">
+
+        <header class="page-hero">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 26</span><span>/</span><span>Capstone: AUTOSAR</span></nav>
+          <div class="eyebrow">Module 26 · Capstone</div>
+          <h1>Capstone 3: Refactoring into AUTOSAR Layers</h1>
+          <p class="lead">The last stage refactors TurnLight into AUTOSAR layers: two application SWCs with runnables, a hand-written RTE that mirrors generated code, the course's BSW-lite and MCAL, and the OS shim. The black-box behaviour does not change, and the acceptance suite proves it. What changes is where every line lives, and why.</p>
+          <div class="page-meta"><span>⏱ 60 min read</span><span>🎯 Advanced</span><span>📂 capstone/turnlight/stage3-autosar, autosar/</span></div>
+        </header>
+
+        <section class="doc-section" id="target-arch" data-title="Target architecture">
+          <div class="sec-head"><h2><span class="sec-num">26.1</span>Target architecture</h2></div>
+          <div class="callout warn"><div class="ci">🔎</div><div><span class="ct">Verification status</span><p>Every API, type and rule on this page names its AUTOSAR R25-11 document. The requirement IDs and exact values are still being checked against the R25-11 PDFs; until then they come from the R4.x-era specifications, and no requirement ID is quoted, because the course never makes one up. Progress is tracked in <a href="https://github.com/Thuongst97/MCU-Programming/blob/main/docs/autosar-self-review.md">the self-review log</a>.</p></div></div>
+          <p>Every box is a file you can open in <code>stage3-autosar/</code> or <code>autosar/</code>:</p>
+          <div id="lg-tl3" class="lg-host"></div>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Folder</th><th>Role</th><th>In production</th></tr></thead>
+            <tbody>
+              <tr><td><code>asw/TurnLight</code>, <code>asw/LampMonitor</code></td><td>application SWCs</td><td>hand-written</td></tr>
+              <tr><td><code>rte/</code></td><td>RTE, task bodies, VFB hooks</td><td>generated</td></tr>
+              <tr><td><code>cfg/</code></td><td>every module's configuration, MemMap, <code>Os_Cfg</code>, <code>SchM_*</code></td><td>generated</td></tr>
+              <tr><td><code>integration/</code></td><td><code>main()</code>, EcuM callouts, hooks, Com callout, Dem callback</td><td>hand-written by the integrator</td></tr>
+              <tr><td><code>autosar/</code></td><td>BSW, MCAL, OS shim</td><td>vendor-supplied</td></tr>
+            </tbody>
+          </table></div>
+          <p>Flash and RAM grow again (about 28 KB / 8.7 KB in the debug build): the price of standard interfaces and run-time checks. On an automotive microcontroller with 1–4 MB of flash this is noise; on the 64 KB Blue Pill it is a third of the chip.</p>
+        </section>
+
+        <section class="doc-section" id="swc" data-title="The TurnLight SWC">
+          <div class="sec-head"><h2><span class="sec-num">26.2</span>The TurnLight SWC</h2></div>
+          <p>Each refactoring step is shown as before (stage 1), after (stage 3) and why.</p>
+          <div class="cmp-host" id="cmp-in"></div>
+          <script type="text/plain" id="src-c-in-before" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="input" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="44" data-end="60" data-sha="6868106ee151">
+static void job_input(void)            /* 10 ms: debounce the three buttons (TL-REQ-001) */
+{
+    const uint32_t now = millis();
+    for (uint32_t b = 0U; b < (uint32_t)TL_BTN_COUNT; ++b)
+    {
+        const debounce_event_t ev = debounce_update(&s_btn[b], tl_hw_button_pressed((tl_button_t)b), now);   // «1»
+        if (b == (uint32_t)TL_BTN_HAZARD)
+        {
+            s_in.hazard_pressed = s_in.hazard_pressed || (ev == DEBOUNCE_PRESSED);   /* latched edge */   // «2»
+        }
+        else
+        {
+            s_in.stalk[b] = s_btn[b].stable_pressed;
+        }
+    }
+    s_alive |= ALIVE_INPUT;
+}
+</script>
+          <script type="text/plain" id="src-c-in-after" data-src="capstone/turnlight/stage3-autosar/asw/TurnLight/TurnLight.c" data-region="runnable" data-lang="c" data-file="asw/TurnLight/TurnLight.c" data-start="38" data-end="80" data-sha="a6d13e30ed98">
+FUNC(void, TURNLIGHT_CODE) RE_TurnLight_10ms(void)
+{
+    boolean left = FALSE;
+    boolean right = FALSE;
+    boolean hazard = FALSE;
+    boolean failedL = FALSE;
+    boolean failedR = FALSE;
+    (void)Rte_Call_StalkLeft_Get(&left);                                      /* client-server to IoHwAb */   // «1»
+    (void)Rte_Call_StalkRight_Get(&right);
+    (void)Rte_Call_HazardSwitch_Get(&hazard);
+    (void)Rte_Read_LampFailed_Left(&failedL);                                 /* sender-receiver from LampMonitor */   // «2»
+    (void)Rte_Read_LampFailed_Right(&failedR);
+
+    tl_inputs_t in;
+    in.stalk[TL_LEFT] = (left == TRUE);
+    in.stalk[TL_RIGHT] = (right == TRUE);
+    in.hazard_pressed = (hazard == TRUE) && (TurnLight_PrevHazard == FALSE);   /* edge */
+    in.lamp_failed[TL_LEFT] = (failedL == TRUE);
+    in.lamp_failed[TL_RIGHT] = (failedR == TRUE);
+    TurnLight_PrevHazard = hazard;
+    (void)tl_step(&TurnLight_Sm, &in, 10U, &TurnLight_Out);   // «3»
+
+    const boolean lampL = TurnLight_Out.lamp[TL_LEFT] ? TRUE : FALSE;
+    const boolean lampR = TurnLight_Out.lamp[TL_RIGHT] ? TRUE : FALSE;
+    (void)Rte_Call_LampLeft_Set(lampL);                                       /* to IoHwAb -> Pwm */   // «4»
+    (void)Rte_Call_LampRight_Set(lampR);
+    (void)Rte_Write_LampState_Left(lampL);                                    /* to LampMonitor (and Com) */   // «5»
+    (void)Rte_Write_LampState_Right(lampR);
+    (void)Rte_Write_TurnStatus_IndLeft(TurnLight_Out.indicating[TL_LEFT] ? TRUE : FALSE);
+    (void)Rte_Write_TurnStatus_IndRight(TurnLight_Out.indicating[TL_RIGHT] ? TRUE : FALSE);
+    (void)Rte_Write_TurnStatus_Hazard(TurnLight_Out.hazard ? TRUE : FALSE);
+
+    uint8 alive = 0U;
+    const Std_ReturnType ack = Rte_Read_ClusterAck_Alive(&alive);              /* TL-REQ-007 */   // «6»
+    const boolean lost = ((ack & RTE_E_MAX_AGE_EXCEEDED) != 0U) ? TRUE : FALSE;
+    if (lost != TurnLight_ClusterLost)
+    {
+        TurnLight_ClusterLost = lost;
+        (void)Rte_Write_TurnStatus_ClusterLost(lost);
+        (void)Rte_Call_EvClusterLost_SetEventStatus((lost == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);   // «7»
+    }
+    (void)Rte_Call_Alive_CheckpointReached(0U);                               /* WdgM alive supervision */   // «8»
+}
+</script>
+          <script type="text/plain" id="src-c-lm" data-src="capstone/turnlight/stage3-autosar/asw/LampMonitor/LampMonitor.c" data-region="runnable" data-lang="c" data-file="capstone/turnlight/stage3-autosar/asw/LampMonitor/LampMonitor.c" data-start="28" data-end="51" data-sha="e64d076a09bc">
+FUNC(void, LAMPMONITOR_CODE) RE_LampMonitor_10ms(void)
+{
+    boolean onL = FALSE;
+    boolean onR = FALSE;
+    uint16 raw = 0U;
+    (void)Rte_Read_LampState_Left(&onL);   // «1»
+    (void)Rte_Read_LampState_Right(&onR);
+    (void)Rte_Call_LampCurrent_Get(&raw);   // «2»
+    const bool on[TL_SIDES] = {onL == TRUE, onR == TRUE};
+    lampmon_event_t ev[TL_SIDES];
+    lampmon_step(&LampMonitor_State, on, raw, 10U, ev);   // «3»
+    if (ev[TL_LEFT] != LAMPMON_NO_CHANGE)
+    {
+        const boolean f = LampMonitor_State.failed[TL_LEFT] ? TRUE : FALSE;
+        (void)Rte_Write_LampFailed_Left(f);                                    /* to TurnLight and Com */   // «4»
+        (void)Rte_Call_EvLampOutLeft_SetEventStatus((f == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);   // «5»
+    }
+    if (ev[TL_RIGHT] != LAMPMON_NO_CHANGE)
+    {
+        const boolean f = LampMonitor_State.failed[TL_RIGHT] ? TRUE : FALSE;
+        (void)Rte_Write_LampFailed_Right(f);
+        (void)Rte_Call_EvLampOutRight_SetEventStatus((f == TRUE) ? DEM_EVENT_STATUS_FAILED : DEM_EVENT_STATUS_PASSED);
+    }
+}
+</script>
+          <div id="ex-c-lm"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>Refactoring into AUTOSAR is moving a home kitchen into a franchise: the recipe stays, but every tool gets a labelled place, every order goes on a standard form, and the inspector can check the kitchen against a checklist without knowing the recipe.</p></div></div>
+        </section>
+
+        <section class="doc-section" id="rte" data-title="The RTE layer">
+          <div class="sec-head"><h2><span class="sec-num">26.3</span>The RTE layer</h2></div>
+          <p>The RTE replaces the global variables and direct calls of stage 1. Lamp output is the clearest case:</p>
+          <div class="cmp-host" id="cmp-lamp"></div>
+          <script type="text/plain" id="src-c-lamp-before" data-src="capstone/turnlight/hw/tl_hw.c" data-region="ramp" data-lang="c" data-file="hw/tl_hw.c" data-start="83" data-end="102" data-sha="dca21b9eddab">
+void tl_hw_lamp_ramp(const bool on[TL_SIDES], uint32_t dt_ms)
+{
+    const uint32_t step = (TL_PWM_TOP * dt_ms) / TL_RAMP_MS;               /* full scale in 20 ms */   // «1»
+    for (uint32_t i = 0U; i < (uint32_t)TL_SIDES; ++i)
+    {
+        const uint32_t target = on[i] ? TL_PWM_TOP : 0U;
+        uint32_t d = s_duty[i];
+        if (d < target)
+        {
+            d = ((target - d) > step) ? (d + step) : target;
+        }
+        else
+        {
+            d = ((d - target) > step) ? (d - step) : target;
+        }
+        s_duty[i] = (uint16_t)d;
+    }
+    TIM3->CCR1 = s_duty[TL_LEFT];                                          /* taken at the next update */   // «2»
+    TIM3->CCR2 = s_duty[TL_RIGHT];
+}
+</script>
+          <script type="text/plain" id="src-c-lamp-after" data-src="autosar/ecual/iohwab/IoHwAb.c" data-region="ramp" data-lang="c" data-file="autosar/ecual/iohwab/IoHwAb.c" data-start="84" data-end="107" data-sha="c16a5125f1f1">
+FUNC(void, IOHWAB_CODE) IoHwAb_MainFunction_Fast(void)
+{
+    if (IoHwAb_ConfigPtr == NULL_PTR)
+    {
+        return;
+    }
+    for (uint8 i = 0U; i < IoHwAb_ConfigPtr->numLamps; ++i)
+    {
+        P2CONST(IoHwAb_LampConfigType, AUTOMATIC, IOHWAB_APPL_CONST) c = &IoHwAb_ConfigPtr->lamps[i];
+        const uint16 step = (uint16)((IOHWAB_FULL * IOHWAB_FAST_PERIOD_MS) / c->rampMs);
+        const uint16 target = (IoHwAb_LampTarget[i] == TRUE) ? IOHWAB_FULL : 0U;
+        uint16 d = IoHwAb_LampDuty[i];
+        if (d < target)
+        {
+            d = ((uint16)(target - d) > step) ? (uint16)(d + step) : target;
+        }
+        else
+        {
+            d = ((uint16)(d - target) > step) ? (uint16)(d - step) : target;
+        }
+        IoHwAb_LampDuty[i] = d;
+        Pwm_SetDutyCycle(c->channel, d);                                   /* MCAL: TIM3 CCRx */
+    }
+}
+</script>
+          <script type="text/plain" id="src-c-rte-tasks" data-src="capstone/turnlight/stage3-autosar/rte/Rte.c" data-region="tasks" data-lang="c" data-file="capstone/turnlight/stage3-autosar/rte/Rte.c" data-start="222" data-end="252" data-sha="4044a3b95628">
+TASK(Task5ms)
+{
+    IoHwAb_MainFunction_Fast();                                           /* lamp ramps */
+    (void)WdgM_CheckpointReached(WdgMConf_WdgMSupervisedEntity_Lamps, 0U);
+    (void)TerminateTask();
+}
+
+TASK(Task10ms)
+{
+    Can_MainFunction_Read();                                              /* bus -> Com, in task context */   // «9»
+    Com_MainFunctionRx();
+    IoHwAb_MainFunction();                                                /* debounce, lamp current */
+    RE_TurnLight_10ms();                                                  /* the application */   // «8»
+    RE_LampMonitor_10ms();
+    Com_MainFunctionTx();                                                 /* Com -> bus */
+    Can_MainFunction_Write();
+    Dem_MainFunction();
+    (void)WdgM_CheckpointReached(WdgMConf_WdgMSupervisedEntity_Com, 0U);
+    (void)TerminateTask();
+}
+
+TASK(Task50ms)
+{
+    WdgM_MainFunction();                                                  /* triggers the watchdog only if all is well */   // «10»
+    if (++Rte_HeartbeatDiv >= 10U)
+    {
+        Rte_HeartbeatDiv = 0U;
+        (void)Dio_FlipChannel(DioConf_DioChannel_Heartbeat);              /* 1 Hz heartbeat */
+    }
+    (void)TerminateTask();
+}
+</script>
+          <div id="ex-c-rte-tasks"></div>
+        </section>
+
+        <section class="doc-section" id="bsw" data-title="BSW-lite and MCAL">
+          <div class="sec-head"><h2><span class="sec-num">26.4</span>BSW-lite and MCAL</h2></div>
+          <p>Communication moves from a hand-written job to configuration. Stage 1 packs and sends the frame itself; stage 3 writes signals and lets Com, PduR, CanIf and Can do the rest according to <code>Com_PBcfg.c</code>:</p>
+          <div class="cmp-host" id="cmp-can"></div>
+          <script type="text/plain" id="src-c-can-before" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="can" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="111" data-end="144" data-sha="6868106ee151">
+static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLightStatus TX */
+{
+    static uint32_t since_tx_ms;
+    bool ack = false;
+    can_frame_t rx;
+    while (can_receive(&rx))
+    {
+        ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.dlc >= 1U));
+    }
+    if (tl_comm_step(&s_comm, ack, 10U))                                  /* TL-REQ-007 */   // «5»
+    {
+        s_status_changed = true;
+        uart_puts(s_comm.lost ? "dem: TL_E_CLUSTER_LOST failed\n" : "dem: TL_E_CLUSTER_LOST passed\n");
+    }
+    since_tx_ms += 10U;
+    if (s_status_changed || (since_tx_ms >= TL_STATUS_CYCLE_MS))         /* TL-REQ-006 */   // «6»
+    {
+        s_status.lamp_left = s_out.lamp[TL_LEFT];
+        s_status.lamp_right = s_out.lamp[TL_RIGHT];
+        s_status.ind_left = s_out.indicating[TL_LEFT];
+        s_status.ind_right = s_out.indicating[TL_RIGHT];
+        s_status.hazard = s_out.hazard;
+        s_status.out_left = s_mon.failed[TL_LEFT];
+        s_status.out_right = s_mon.failed[TL_RIGHT];
+        s_status.cluster_lost = s_comm.lost;
+        s_status.alive++;
+        can_frame_t tx = {.id = TL_CAN_ID_STATUS, .dlc = TL_STATUS_DLC, .data = {0}};
+        tl_status_pack(&s_status, tx.data);   // «7»
+        (void)can_send(&tx);           /* a full mailbox drops this frame; the next cycle repeats it */
+        s_status_changed = false;
+        since_tx_ms = 0U;
+    }
+    s_alive |= ALIVE_CAN;
+}
+</script>
+          <script type="text/plain" id="src-c-can-after" data-src="capstone/turnlight/stage3-autosar/cfg/Com_PBcfg.c" data-lines="11-30" data-lang="c" data-file="cfg/Com_PBcfg.c" data-start="11" data-end="30" data-sha="cf5507393ff1">
+#define COM_START_SEC_CONFIG_DATA_UNSPECIFIED
+#include "Com_MemMap.h"
+/* TurnLightStatus, docs/can-matrix.md: byte 0 flags, byte 1 reset cause, byte 2 alive counter (callout) */
+static CONST(Com_SignalConfigType, COM_CONST) Com_Signals[10] = {
+    {ComConf_ComIPdu_TurnLightStatus, 0U, 1U, TRUE},   /* LampLeft */
+    {ComConf_ComIPdu_TurnLightStatus, 1U, 1U, TRUE},   /* LampRight */
+    {ComConf_ComIPdu_TurnLightStatus, 2U, 1U, TRUE},   /* IndLeft */
+    {ComConf_ComIPdu_TurnLightStatus, 3U, 1U, TRUE},   /* IndRight */
+    {ComConf_ComIPdu_TurnLightStatus, 4U, 1U, TRUE},   /* Hazard */
+    {ComConf_ComIPdu_TurnLightStatus, 5U, 1U, TRUE},   /* LampOutLeft */
+    {ComConf_ComIPdu_TurnLightStatus, 6U, 1U, TRUE},   /* LampOutRight */
+    {ComConf_ComIPdu_TurnLightStatus, 7U, 1U, TRUE},   /* ClusterLost */
+    {ComConf_ComIPdu_TurnLightStatus, 8U, 8U, FALSE},  /* ResetCause */
+    {ComConf_ComIPdu_ClusterAck, 0U, 8U, FALSE},       /* AckAlive */
+};
+static CONST(Com_IPduConfigType, COM_CONST) Com_IPdus[COM_MAX_IPDUS] = {
+    {COM_TX, 4U, PduRConf_PduRSrcPdu_TurnLightStatus, 100U, 0U, NULL_PTR, NULL_PTR, Integration_TurnLightStatusTxCallout},
+    {COM_RX, 1U, 0U, 0U, 500U, Rte_COMCbkTOut_ClusterAck, Rte_COMCbk_ClusterAck, NULL_PTR},   /* 500 ms deadline */
+};
+CONST(Com_ConfigType, COM_CONST) Com_Config = {Com_Signals, 10U, Com_IPdus, COM_MAX_IPDUS, 10U};
+</script>
+          <p>The watchdog moves from a bit mask to WdgM's alive supervision; lamp-out and cluster-lost become Dem events with DTC numbers; start-up moves into EcuM's init lists:</p>
+          <script type="text/plain" id="src-c-wdgm" data-src="autosar/services/wdgm/WdgM.c" data-region="main" data-lang="c" data-file="autosar/services/wdgm/WdgM.c" data-start="66" data-end="96" data-sha="01f0d68484f3">
+FUNC(void, WDGM_CODE) WdgM_MainFunction(void)
+{
+    if (WdgM_ConfigPtr == NULL_PTR)
+    {
+        return;
+    }
+    boolean allOk = TRUE;
+    for (uint16 i = 0U; i < WdgM_ConfigPtr->numEntities; ++i)
+    {
+        P2CONST(WdgM_SupervisedEntityConfigType, AUTOMATIC, WDGM_APPL_CONST) c = &WdgM_ConfigPtr->entities[i];
+        SchM_Enter_WdgM_WDGM_EXCLUSIVE_AREA_0();
+        const uint16 n = WdgM_Alive[i];   // «1»
+        WdgM_Alive[i] = 0U;
+        SchM_Exit_WdgM_WDGM_EXCLUSIVE_AREA_0();
+        const boolean inRange = (((n + c->minMargin) >= c->expectedAlive) && (n <= (c->expectedAlive + c->maxMargin))) ? TRUE : FALSE;
+        if (inRange == FALSE)   // «2»
+        {
+            WdgM_Local[i] = WDGM_LOCAL_STATUS_EXPIRED;       /* lite: no failed-tolerance, expire at once */
+        }
+        allOk = ((allOk == TRUE) && (WdgM_Local[i] == WDGM_LOCAL_STATUS_OK)) ? TRUE : FALSE;
+    }
+    if (allOk == TRUE)
+    {
+        WdgIf_SetTriggerCondition(0U, WdgM_ConfigPtr->triggerTimeoutMs);   /* keep the watchdog happy */   // «3»
+    }
+    else
+    {
+        WdgM_Global = WDGM_GLOBAL_STATUS_STOPPED;
+        WdgIf_SetTriggerCondition(0U, 0U);                   /* stop triggering: the IWDG resets the ECU */   // «4»
+    }
+}
+</script>
+          <div id="ex-c-wdgm"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The OS underneath is not AUTOSAR</span><p>Stage 3 runs on <code>autosar/os_shim</code>, an OSEK-like API over FreeRTOS. Task mapping, alarms and the code structure match an AUTOSAR ECU; timing protection, memory protection and the OS's certification do not exist here (module 21 lists the differences).</p></div></div>
+        </section>
+
+        <section class="doc-section" id="review" data-title="Self-review against the checklist">
+          <div class="sec-head"><h2><span class="sec-num">26.5</span>Self-review against the checklist</h2></div>
+          <p>The self-review checklist from <code>CLAUDE.md</code>, applied to stage 3. Machine-checked items run in CI on every push:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Item</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>Banners: spec reference and GENERATED / VENDOR-SUPPLIED / HAND-WRITTEN</td><td>✅ <code>check-autosar.py</code></td></tr>
+              <tr><td>Naming, version macros, symbolic names, RTE API names</td><td>✅ <code>check-autosar.py</code></td></tr>
+              <tr><td>MemMap pairs balanced</td><td>✅ <code>check-autosar.py</code> and <code>MemMap_Check.h</code> at compile time</td></tr>
+              <tr><td>DET only under <code>&lt;MA&gt;_DEV_ERROR_DETECT</code>; production errors to Dem</td><td>✅ machine + review</td></tr>
+              <tr><td>SWCs include only their RTE header</td><td>✅ <code>check-autosar.py</code></td></tr>
+              <tr><td>MISRA: no finding without a recorded deviation</td><td>✅ <code>run-misra.py</code>, DEV-001..005</td></tr>
+              <tr><td>Same acceptance tests as stages 1 and 2</td><td>✅ Renode, 7 tests × 3 stages</td></tr>
+              <tr><td>Every API, type and value traced to an R25-11 requirement ID</td><td>⏳ pending: see <code>docs/autosar-self-review.md</code></td></tr>
+              <tr><td>Simplifications listed in each module header</td><td>✅</td></tr>
+            </tbody>
+          </table></div>
+          <div id="ck-cap3"></div>
+        </section>
+
+        <section class="doc-section" id="next" data-title="Where to go next">
+          <div class="sec-head"><h2><span class="sec-num">26.6</span>Where to go next</h2></div>
+          <p>Where to go from the Blue Pill:</p>
+          <ul>
+            <li><b>Real tools.</b> Vector DaVinci Configurator and Developer, Elektrobit tresos, ETAS ISOLAR, and the silicon vendors' MCAL configurators generate exactly the files <code>cfg/</code> and <code>rte/</code> imitate. Student and evaluation licences exist for some of them.</li>
+            <li><b>Real automotive microcontrollers.</b> NXP S32K1/S32K3, Infineon AURIX TC3xx and Renesas RH850 come with AUTOSAR MCALs from their vendors and evaluation boards in the price range of a good multimeter. <a href="automotive-mcus.html">Appendix C</a> maps each course module onto them.</li>
+            <li><b>Open source.</b> Trampoline is an open OSEK/AUTOSAR OS that can replace the shim; the capstone's API is close enough to port.</li>
+            <li><b>The specifications.</b> The AUTOSAR documents are free to download; start with the layered architecture and the SWS of a driver you know.</li>
+          </ul>
+        </section>
+
+        <div id="pager"></div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+
+  <script src="assets/js/strings.js?v=__BUILD__"></script>
+  <script src="assets/js/lib/code.js?v=__BUILD__"></script>
+  <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
+  <script src="assets/js/core.js?v=__BUILD__"></script>
+  <script src="assets/js/diagrams.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/compare.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
+  <script src="assets/js/pages/capstone-autosar.js?v=__BUILD__"></script>
+</body>
+</html>

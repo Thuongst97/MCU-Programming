@@ -38,5 +38,8 @@
  },
  "examples/12-uart-bootloader/src/proto.c": {
   "misra-c2012-10.6": 1
+ },
+ "examples/13-lin-two-nodes/src/lin.c": {
+  "misra-c2012-8.7": 1
  }
 }
