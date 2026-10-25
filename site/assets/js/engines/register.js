@@ -28,13 +28,14 @@
     const m = (mask(f) << f.bits[1]) >>> 0;
     return (((value >>> 0) & ~m) | (((v >>> 0) << f.bits[1]) & m)) >>> 0;
   }
-  /** The C expression a programmer would write for this value, using CMSIS macro names. */
+  /** The C expression a programmer would write for this value, using CMSIS macro names.
+      Read-only fields (status reported by hardware, such as RCC_CFGR.SWS) are left out: writing them has no effect. */
   function cExpr(r, value) {
     const prefix = r.macro || `${(r.typedef || r.periph.replace(/\d+$/, "")).replace("FLASH_R", "FLASH")}_${r.reg}`;
     const parts = [];
     r.fields.forEach((f) => {
       const v = fieldValue(value, f);
-      if (!v) return;
+      if (!v || f.access === "r") return;
       const name = f.cmsis || f.name;
       if (f.macros && f.macros[v]) parts.push(f.macros[v]);
       else if (f.bits[0] === f.bits[1]) parts.push(`${prefix}_${name}`);

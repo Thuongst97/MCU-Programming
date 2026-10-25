@@ -35,7 +35,7 @@
         ["toolchain", "From C to flash", "compiler assembler linker elf hex bin objcopy arm-none-eabi-gcc"],
         ["takeaways", "Key takeaways", "summary"],
       ] },
-    { id: "setup", status: "planned", phase: 2, file: "setup.html", num: "02", group: "Start here",
+    { id: "setup", status: "ready", phase: 2, file: "setup.html", num: "02", group: "Start here",
       title: "Setting Up and Running a Program on STM32F103C8T6 Blue Pill", short: "Setup & First Program", icon: "🔌", accent: "#3fb68b",
       desc: "Wire an ST-Link, install the toolchain on Windows/Linux/macOS, build two ways, blink PC13, switch to 72 MHz, print over UART, debug, and run it in Renode.",
       sections: [
@@ -338,7 +338,7 @@
       ] },
   
     /* ───────────── Group: Reference ───────────── */
-    { id: "board", status: "planned", phase: 2, file: "board.html", num: "A", group: "Reference",
+    { id: "board", status: "ready", phase: 2, file: "board.html", num: "A", group: "Reference",
       title: "Blue Pill Board Reference", short: "Board Reference", icon: "🗺️", accent: "#94a3b8",
       desc: "Interactive pinout, alternate functions, 5 V tolerance, on-board parts and known hardware quirks.",
       sections: [
@@ -347,7 +347,7 @@
         ["quirks", "Known quirks", "clone cks32 gd32 r10 usb 64k 128k"],
         ["modules", "Common modules", "sn65hvd230 ssd1306 w25q usb uart"],
       ] },
-    { id: "troubleshooting", status: "planned", phase: 2, file: "troubleshooting.html", num: "B", group: "Reference",
+    { id: "troubleshooting", status: "ready", phase: 2, file: "troubleshooting.html", num: "B", group: "Reference",
       title: "Troubleshooting", short: "Troubleshooting", icon: "🧯", accent: "#94a3b8",
       desc: "Symptom-first fixes: no ST-Link, wrong IDCODE, cannot halt, inverted LED, garbage UART, flash size mismatch and more.",
       sections: [
@@ -399,8 +399,33 @@
     cmsisDeviceF1: { t: "cmsis-device-f1 — STM32F1 CMSIS device headers", url: "https://github.com/STMicroelectronics/cmsis-device-f1", kind: "tool" },
     renodeDocs: { t: "Renode documentation", url: "https://renode.readthedocs.io/en/latest/", kind: "tool" },
     openocdManual: { t: "OpenOCD User's Guide", url: "https://openocd.org/doc/html/index.html", kind: "tool" },
+    ds5319Pins: { t: "STM32F103x8/xB datasheet — pin definitions and I/O levels", url: ST + "datasheet/stm32f103c8.pdf", doc: "DS5319", sec: "3, Table 5", kind: "st" },
+    ds5319Elec: { t: "STM32F103x8/xB datasheet — electrical characteristics", url: ST + "datasheet/stm32f103c8.pdf", doc: "DS5319", sec: "5", kind: "st" },
+    rm0008Boot: { t: "RM0008 — memory map and boot configuration", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "3.3–3.4", kind: "st" },
+    rm0008Rcc: { t: "RM0008 — reset and clock control (RCC)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "7", kind: "st" },
+    rm0008Gpio: { t: "RM0008 — GPIO and AFIO", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "9", kind: "st" },
+    rm0008Usart: { t: "RM0008 — USART", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "27", kind: "st" },
+    rm0008Sig: { t: "RM0008 — device electronic signature (flash size, unique ID)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "30", kind: "st" },
+    rm0008Debug: { t: "RM0008 — debug support (SWJ-DP, DBGMCU)", url: ST + "reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf", doc: "RM0008", sec: "31", kind: "st" },
+    pm0075: { t: "STM32F10xxx Flash memory programming manual", url: ST + "programming_manual/pm0075-stm32f10xxx-flash-memory-microcontrollers-stmicroelectronics.pdf", doc: "PM0075", kind: "st" },
+    es096: { t: "STM32F101x8/B, F102x8/B, F103x8/B errata sheet", url: "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c8.html#documentation", doc: "ES096", kind: "st" },
+    an2606: { t: "AN2606 — STM32 microcontroller system memory boot mode", url: ST + "application_note/an2606-stm32-microcontroller-system-memory-boot-mode-stmicroelectronics.pdf", doc: "AN2606", kind: "st" },
+    an3155: { t: "AN3155 — USART protocol used in the STM32 bootloader", url: ST + "application_note/an3155-usart-protocol-used-in-the-stm32-bootloader-stmicroelectronics.pdf", doc: "AN3155", kind: "st" },
+    um1075: { t: "UM1075 — ST-LINK/V2 in-circuit debugger/programmer user manual", url: ST + "user_manual/um1075-stlinkv2-incircuit-debuggerprogrammer-for-stm8-and-stm32-stmicroelectronics.pdf", doc: "UM1075", kind: "st" },
+    um2237: { t: "UM2237 — STM32CubeProgrammer software description", url: ST + "user_manual/um2237-stm32cubeprogrammer-software-description-stmicroelectronics.pdf", doc: "UM2237", kind: "st" },
+    ddi0403Reset: { t: "ARMv7-M ARM — reset behaviour and the vector table", url: "https://developer.arm.com/documentation/ddi0403/latest/", doc: "ARM DDI 0403", sec: "B1.5", kind: "arm" },
+    cmakeToolchains: { t: "cmake-toolchains(7) — cross compiling", url: "https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html", kind: "tool" },
+    cmakePresets: { t: "cmake-presets(7)", url: "https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html", kind: "tool" },
+    gccArm: { t: "GCC manual — ARM options", url: "https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html", kind: "tool" },
+    ldManual: { t: "GNU ld manual — linker scripts", url: "https://sourceware.org/binutils/docs/ld/Scripts.html", kind: "tool" },
+    cortexDebug: { t: "Cortex-Debug for VS Code — wiki", url: "https://github.com/Marus/cortex-debug/wiki", kind: "tool" },
+    armGnu: { t: "Arm GNU Toolchain downloads", url: "https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads", kind: "tool" },
+    stm32Base: { t: "STM32-base — Blue Pill board page and schematic notes", url: "https://stm32-base.org/boards/STM32F103C8T6-Blue-Pill.html", kind: "community" },
   };
   const REFS = {
+    "troubleshooting": ["openocdManual", "rm0008Debug", "rm0008Gpio", "rm0008Sig", "ds5319Pins", "es096", "an2606", "um1075", "stm32Base"],
+    "board": ["ds5319Pins", "ds5319Elec", "rm0008Gpio", "rm0008Boot", "rm0008Sig", "es096", "stm32Base"],
+    "setup": ["ds5319", "ds5319Pins", "rm0008Boot", "rm0008Rcc", "rm0008Gpio", "rm0008Usart", "pm0075", "pm0056", "ddi0403Reset", "an3155", "um1075", "um2237", "openocdManual", "cmakeToolchains", "cmakePresets", "gccArm", "ldManual", "cortexDebug", "armGnu", "renodeDocs"],
     glossary: ["f103Docs", "ds5319", "rm0008", "pm0056", "ddi0403", "autosarRelease", "openocdManual", "renodeDocs"],
   };
 
@@ -1068,6 +1093,33 @@
       .observe(document.body, { childList: true, subtree: true });
   }
 
+  /* ------------------------------------------------- Tool versions
+     <span data-version="cmake"></span> → "4.4.4"; <span data-version="renode" data-version-field="name"></span>.
+     <div data-versions-table="arm-gnu-toolchain cmake …"></div> → a table. Data: data/versions.js,
+     generated from tools/versions.json, the only place a version is written (CLAUDE.md rule 4). */
+  function renderVersions(root = document) {
+    const els = $$("[data-version], [data-versions-table]", root);
+    if (!els.length) return;
+    const V = window.MCU_DATA && window.MCU_DATA.versions;
+    if (!V) throw new Error("This page uses data-version but does not load assets/js/data/versions.js");
+    const get = (k) => {
+      const t = V.tools[k] || V.third_party[k];
+      if (!t) throw new Error(`Unknown tool "${k}" in data-version (tools/versions.json)`);
+      return t;
+    };
+    els.forEach((el) => {
+      if (el.dataset.versionsTable !== undefined) {
+        const keys = el.dataset.versionsTable.split(/\s+/).filter(Boolean);
+        el.innerHTML = `<div class="table-wrap"><table class="t"><thead><tr><th>${esc(S.versions.tool)}</th><th>${esc(S.versions.version)}</th><th>${esc(S.versions.notes)}</th></tr></thead><tbody>${keys.map((k) => {
+          const t = get(k);
+          return `<tr><td><a href="${t.url}" target="_blank" rel="noopener">${esc(t.name)}</a></td><td><code>${esc(t.version)}</code></td><td class="small">${t.alt ? esc(S.versions.alt(t.alt)) : ""}${t.min ? esc(S.versions.min(t.min)) : ""}</td></tr>`;
+        }).join("")}</tbody></table></div><p class="small muted">${esc(S.versions.checked(V.checked))}</p>`;
+      } else {
+        el.textContent = get(el.dataset.version)[el.dataset.versionField || "version"] || "";
+      }
+    });
+  }
+
   /* --------------------------------------------------------- Boot */
   function boot() {
     initTooltips();
@@ -1082,6 +1134,7 @@
     initScrollspy();
     initTabs();
     renderStaticCode();
+    renderVersions();
     initLangSwitch();
     initSoftBreaks();
     if (location.hash) {
@@ -1096,7 +1149,7 @@
 
   window.MCU = Object.assign(window.MCU || {}, {
     CONFIG, SITE, R, REFS, STRINGS: S, $, $$, esc, norm, slug, store, isReady, byId,
-    initTabs, codeBlockHTML, embedded, renderCodeExplorer, renderStaticCode, wireCopy, SequenceDiagram,
+    initTabs, codeBlockHTML, embedded, renderVersions, renderCodeExplorer, renderStaticCode, wireCopy, SequenceDiagram,
     tokenize: CODE.tokenize, toLines: CODE.toLines, parseMarks: CODE.parseMarks,
   });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

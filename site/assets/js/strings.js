@@ -127,6 +127,12 @@ window.MCU_STRINGS = {
     details: "Sections and symbols",
     section: "Section", size: "Size", symbol: "Symbol", value: "Value", largest: "Largest functions",
   },
+  versions: {
+    tool: "Tool", version: "Pinned version", notes: "Notes",
+    alt: (a) => `or ${a}. `,
+    min: (m) => `minimum ${m}. `,
+    checked: (d) => `Versions pinned in tools/versions.json, last checked ${d}. Newer versions usually work; these are the ones CI uses.`,
+  },
   checklist: {
     title: "You are done when…",
     reset: "Reset",

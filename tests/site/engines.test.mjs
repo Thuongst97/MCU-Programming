@@ -28,6 +28,7 @@ test("register C expression uses CMSIS macros", () => {
   assert.equal(Register.cExpr(regs.FLASH_ACR, 0x12), "FLASH_ACR_PRFTBE | (2U << FLASH_ACR_LATENCY_Pos)");
   assert.equal(Register.cExpr(regs.AFIO_MAPR, 0x02000000), "AFIO_MAPR_SWJ_CFG_JTAGDISABLE");
   assert.equal(Register.cExpr(regs.RCC_CFGR, 0), "0U");
+  assert.equal(Register.cExpr(regs.RCC_CFGR, 0x0000000a), "RCC_CFGR_SW_PLL", "read-only SWS is not written");
 });
 
 test("every register field fits in 32 bits and fields do not overlap", () => {

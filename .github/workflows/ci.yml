@@ -40,6 +40,8 @@ jobs:
         run: node --test tests/site/*.test.mjs
       - name: Example wiring diagrams match the pin data
         run: node tools/export-wiring.mjs --check
+      - name: Example catalog and tool-version data are up to date
+        run: python3 tools/gen-catalog.py --check
 
   browser-smoke:
     name: Browser smoke test (Playwright)
@@ -87,8 +89,6 @@ jobs:
         run: cmake --preset bluepill-release && cmake --build --preset bluepill-release
       - name: Memory maps on the site match the built ELFs
         run: python3 tools/elf2memmap.py --all --check
-      - name: Example catalog is up to date
-        run: python3 tools/gen-catalog.py --check
       - name: Upload firmware
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

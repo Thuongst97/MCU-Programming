@@ -27,27 +27,29 @@ void SystemInit(void);
 void Reset_Handler(void);
 void Default_Handler(void);
 
+// [region:reset]
 void Reset_Handler(void)
 {
     /* 1. Copy initial values of .data from flash to RAM. */
-    const uint32_t *src = _sidata;
+    const uint32_t *src = _sidata;                         // «1»
     for (uint32_t *dst = _sdata; dst < _edata; ++dst, ++src)
     {
         *dst = *src;
     }
     /* 2. Zero .bss. */
-    for (uint32_t *dst = _sbss; dst < _ebss; ++dst)
+    for (uint32_t *dst = _sbss; dst < _ebss; ++dst)        // «2»
     {
         *dst = 0U;
     }
     /* 3. Minimal system setup (vector table location, SystemCoreClock). */
-    SystemInit();
+    SystemInit();                                          // «3»
     /* 4. Run the application. main() is not expected to return. */
-    (void)main();
+    (void)main();                                          // «4»
     for (;;)
     {
     }
 }
+// [endregion]
 
 /* Any interrupt without its own handler ends up here. Stopping (instead of returning) makes a
  * missing handler visible in the debugger: the PC sits in Default_Handler. */
@@ -60,7 +62,8 @@ void Default_Handler(void)
 
 /* Every handler is a weak alias of Default_Handler: define a function with the same name
  * anywhere in your program and the linker uses yours instead. */
-#define WEAK_ALIAS __attribute__((weak, alias("Default_Handler")))
+// [region:weak]
+#define WEAK_ALIAS __attribute__((weak, alias("Default_Handler")))   // «5»
 void NMI_Handler(void) WEAK_ALIAS;
 void HardFault_Handler(void) WEAK_ALIAS;
 void MemManage_Handler(void) WEAK_ALIAS;
@@ -70,6 +73,7 @@ void SVC_Handler(void) WEAK_ALIAS;
 void DebugMon_Handler(void) WEAK_ALIAS;
 void PendSV_Handler(void) WEAK_ALIAS;
 void SysTick_Handler(void) WEAK_ALIAS;
+// [endregion]
 void WWDG_IRQHandler(void) WEAK_ALIAS;
 void PVD_IRQHandler(void) WEAK_ALIAS;
 void TAMPER_IRQHandler(void) WEAK_ALIAS;
@@ -118,10 +122,11 @@ typedef void (*vector_t)(void);
 
 /* The vector table: 16 Cortex-M3 system entries, then the 43 STM32F103 interrupts (IRQ 0..42),
  * in the order of IRQn_Type in stm32f103xb.h. Reserved slots are 0. */
-__attribute__((section(".isr_vector"), used))
+// [region:vectors]
+__attribute__((section(".isr_vector"), used))                 // «6»
 const vector_t g_vector_table[16 + 43] = {
-    (vector_t)(uintptr_t)_estack,   /* 0: initial main stack pointer (MSP) */
-    Reset_Handler,                  /* 1: reset */
+    (vector_t)(uintptr_t)_estack,   /* 0: initial main stack pointer (MSP) */   // «7»
+    Reset_Handler,                  /* 1: reset */                               // «8»
     NMI_Handler,                    /* 2 */
     HardFault_Handler,              /* 3 */
     MemManage_Handler,              /* 4 */
@@ -133,6 +138,7 @@ const vector_t g_vector_table[16 + 43] = {
     0,                              /* 13: reserved */
     PendSV_Handler,                 /* 14 */
     SysTick_Handler,                /* 15 */
+// [endregion]
     WWDG_IRQHandler,                /* IRQ 0 */
     PVD_IRQHandler,
     TAMPER_IRQHandler,
@@ -179,5 +185,7 @@ const vector_t g_vector_table[16 + 43] = {
 };
 
 /* Compile-time guard: if the table ever gets out of step with the header, the build fails. */
+// [region:guard]
 _Static_assert(sizeof(g_vector_table) / sizeof(g_vector_table[0]) == 16U + (uint32_t)USBWakeUp_IRQn + 1U,
-               "vector table size must match IRQn_Type in stm32f103xb.h");
+               "vector table size must match IRQn_Type in stm32f103xb.h");   // «10»
+// [endregion]

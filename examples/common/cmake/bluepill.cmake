@@ -17,10 +17,12 @@ include_guard(GLOBAL)
 get_filename_component(MCU_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 set(MCU_COMMON "${MCU_ROOT}/examples/common")
 
-set(MCU_CPU_FLAGS -mcpu=cortex-m3 -mthumb)
+# [region:flags]
+set(MCU_CPU_FLAGS -mcpu=cortex-m3 -mthumb)                                       # «5»
 set(MCU_C_FLAGS
   ${MCU_CPU_FLAGS} -std=c11 -ffunction-sections -fdata-sections -fno-common -ffreestanding
-  -Wall -Wextra -Werror -Wshadow -Wundef -Wstrict-prototypes -Wmissing-prototypes -Wconversion -g3)
+  -Wall -Wextra -Werror -Wshadow -Wundef -Wstrict-prototypes -Wmissing-prototypes -Wconversion -g3)   # «6»
+# [endregion]
 
 # CMSIS: core + device headers, used as SYSTEM includes so vendor headers never trip -Werror.
 if(NOT TARGET bluepill_cmsis)
@@ -69,20 +71,22 @@ function(bluepill_add_executable name)
   if(NOT BP_STARTFILES)
     target_link_options(${name} PRIVATE -nostartfiles)
   endif()
+  # [region:link]
   target_link_options(${name} PRIVATE ${MCU_CPU_FLAGS}
-    -T "${BP_LINKER_SCRIPT}" --specs=nano.specs --specs=nosys.specs
-    -Wl,--gc-sections -Wl,-Map=$<TARGET_FILE_DIR:${name}>/${name}.map -Wl,--print-memory-usage)
+    -T "${BP_LINKER_SCRIPT}" --specs=nano.specs --specs=nosys.specs                # «7»
+    -Wl,--gc-sections -Wl,-Map=$<TARGET_FILE_DIR:${name}>/${name}.map -Wl,--print-memory-usage)   # «8»
   add_custom_command(TARGET ${name} POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${name}> $<TARGET_FILE_DIR:${name}>/${name}.hex
+    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${name}> $<TARGET_FILE_DIR:${name}>/${name}.hex   # «9»
     COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${name}> $<TARGET_FILE_DIR:${name}>/${name}.bin
     COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${name}>
     VERBATIM)
   if(OPENOCD)
-    add_custom_target(flash-${name}
+    add_custom_target(flash-${name}                                                  # «10»
       COMMAND ${OPENOCD} -f "${MCU_COMMON}/openocd/bluepill.cfg"
               -c "program $<TARGET_FILE:${name}> verify reset exit"
       DEPENDS ${name} USES_TERMINAL VERBATIM)
   endif()
+  # [endregion]
   if(RENODE AND BP_RENODE_SCRIPT)
     add_custom_target(renode-${name}
       COMMAND ${RENODE} -e "$$bin=@$<TARGET_FILE:${name}>; include @${BP_RENODE_SCRIPT}"
