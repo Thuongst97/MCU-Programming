@@ -200,7 +200,7 @@ static void can_task(void *arg)        /* priority 2: on change, or every 10 ms 
 }
 </script>
           <div id="ex-s2-can"></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The UART is shared too</span><p>Four tasks print to one UART. Without the mutex in <code>log3()</code>, a higher-priority task could interrupt a line halfway and mix two log messages, and the Renode tests, which read whole lines, would fail at random. Any resource used by more than one task needs a lock or a single owner.</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The UART is shared too</span><p>Four tasks print to one UART. Without the mutex in <code>log3()</code>, a higher-priority task could interrupt a line halfway and mix two log messages, and anyone reading the log, a person at a terminal or a script, would see garbled lines at random. Any resource used by more than one task needs a lock or a single owner.</p></div></div>
         </section>
 
         <section class="doc-section" id="timing" data-title="Timing and watchdog supervision">
@@ -267,7 +267,7 @@ static void supervisor_task(void *arg) /* priority 1 (lowest): feeds IWDG only w
           <div class="table-wrap"><table class="t">
             <thead><tr><th><span class="sr-only">Aspect</span></th><th>Stage 1: bare metal</th><th>Stage 2: FreeRTOS</th></tr></thead>
             <tbody>
-              <tr><td>Flash / RAM (debug build)</td><td>about 7.6 KB / 1.4 KB</td><td>about 21 KB / 8.6 KB (kernel + 5 stacks)</td></tr>
+              <tr><td>Flash / RAM (debug build)</td><td>about 9.8 KB / 2.6 KB</td><td>about 23 KB / 9.6 KB (kernel + 5 stacks)</td></tr>
               <tr><td>A slow job</td><td>delays every other job</td><td>only delays lower-priority tasks</td></tr>
               <tr><td>Waiting in the middle of a job</td><td>impossible; split into states</td><td>natural: block on a queue or event</td></tr>
               <tr><td>Shared data</td><td>plain globals, one context</td><td>queues, mailbox, mutex</td></tr>

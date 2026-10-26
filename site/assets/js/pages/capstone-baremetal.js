@@ -5,7 +5,7 @@
   const { $, renderCodeExplorer, embedded, Pinout, StateMachine, Checklist } = window.MCU;
   const explore = (host, id, notes) => renderCodeExplorer($(host), { ...embedded(id), notes });
 
-  Pinout($("#po-tl"), { board: "bluepill", mode: "wiring", ...window.MCU_DATA.wiring["tl-ecu"] });
+  Pinout($("#po-tl"), { board: "nucleo", mode: "wiring", ...window.MCU_DATA.wiring["tl-ecu"] });
 
   /* ---- flasher simulator: the rules of logic/turnlight_sm.c, ported line by line ---- */
   const P = 670, ON = 330, FP = 340, FON = 170, TAP = 500, CYC = 3;
@@ -122,9 +122,12 @@
     2: ["Preloaded compare", "The new duty takes effect at the next timer update, so no output glitch."],
   });
 
+  explore("#ex-tl-tap", "src-tl-tap", {
+    1: ["Simulated time", "<code>run(ms)</code> calls the state machine once per millisecond with the current inputs and counts rising lamp edges. 5 s of ECU time take microseconds on the PC."],
+  });
   Checklist($("#ck-cap1"), [
     "<code>ctest --preset host-tests</code> passes the TurnLight state-machine and lamp-monitor tests.",
-    "The acceptance suite passes for stage 1 in Renode: <code>python3 tools/run-renode-tests.py capstone/turnlight/test/turnlight.robot</code>.",
+    "The TurnLight host tests pass (<code>ctest --preset host-tests</code>), and you worked through the stage 1 hardware checklist in <code>docs/acceptance.md</code> on two NUCLEO boards.",
     "On hardware, the left lamp flashes at 1.5 Hz with the stalk held, and a tap gives exactly three flashes.",
     "Turning the pot to GND while a side flashes doubles its rate and logs <code>dem: TL_E_LAMP_OUT_…</code>.",
     "With the cluster node connected, the OLED telltales follow the lamps; holding PA0 on the cluster logs <code>TL_E_CLUSTER_LOST</code>.",

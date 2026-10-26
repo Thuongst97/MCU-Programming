@@ -32,8 +32,8 @@
       { id: "pwm", band: "mcal", title: "Pwm.c, Adc.c", sub: "TIM3, ADC1" },
       { id: "can", band: "mcal", title: "Can.c", sub: "polling" },
       { id: "wdg", band: "mcal", title: "Wdg.c, Mcu.c", sub: "IWDG, PLL" },
-      { id: "canfd", band: "mcal", title: "Can (CAN FD)", sub: "production MCU only", soft: true,
-        tip: "Not on the Blue Pill: bxCAN is classic CAN only. See 26.5 for what changes per layer." },
+      { id: "canfd", band: "mcal", title: "Can (CAN FD mode)", sub: "not configured", soft: true,
+        tip: "FDCAN1 can do it (example 11), but stage 3 runs classic frames. See 26.5 for what changes per layer." },
     ],
     edges: [
       { from: "tl", to: "rte", kind: "rte" }, { from: "lm", to: "rte", kind: "rte" },
@@ -94,7 +94,7 @@
   });
 
   Checklist($("#ck-cap3"), [
-    "The acceptance suite passes for all three stages in Renode.",
+    "The TurnLight host tests pass, and the hardware checklist in <code>docs/acceptance.md</code> passes for stage 3 on two NUCLEO boards.",
     "<code>python3 tools/check-autosar.py</code> and <code>python3 tools/run-misra.py</code> pass.",
     "You can point to the file where each requirement TL-REQ-001…010 is implemented in stage 3.",
     "You changed a signal's bit position in <code>Com_PBcfg.c</code> and the cluster in <code>cluster/</code> to match, and the tests still pass.",

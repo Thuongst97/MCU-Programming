@@ -25,8 +25,8 @@
           <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 24</span><span>/</span><span>Capstone: Bare Metal</span></nav>
           <div class="eyebrow">Module 24 · Capstone</div>
           <h1>Capstone 1: Turn-Signal ECU, Bare Metal</h1>
-          <p class="lead">Time to build something that behaves like a product: a turn-signal and hazard ECU that flashes two lamps, detects a blown bulb, talks to an instrument cluster over CAN and recovers from a software hang. Stage 1 builds it bare metal from drivers you already wrote. Stages 2 and 3 rebuild the same ECU on FreeRTOS and in AUTOSAR layers, and the same acceptance tests must pass every time.</p>
-          <div class="page-meta"><span>⏱ 60 min read</span><span>🎯 Advanced</span><span>📂 capstone/turnlight (logic, hw, stage1-baremetal, cluster)</span><span>🔧 2 Blue Pills, 3 buttons, 2 LEDs, pot, 2 × SN65HVD230, SSD1306</span></div>
+          <p class="lead">Time to build something that behaves like a product: a turn-signal and hazard ECU that flashes two lamps, detects a blown bulb, talks to an instrument cluster over CAN and recovers from a software hang. Stage 1 builds it bare metal from drivers you already wrote. Stages 2 and 3 rebuild the same ECU on FreeRTOS and in AUTOSAR layers, and the same host tests and hardware checklist must pass every time.</p>
+          <div class="page-meta"><span>⏱ 60 min read</span><span>🎯 Advanced</span><span>📂 capstone/turnlight (logic, hw, stage1-baremetal, cluster)</span><span>🔧 2 NUCLEO-G474RE, 3 buttons, 2 LEDs, pot, 2 × 3.3 V CAN (FD) transceivers, SSD1306</span></div>
         </header>
 
         <section class="doc-section" id="requirements" data-title="Requirements">
@@ -35,16 +35,16 @@
           <div class="table-wrap"><table class="t">
             <thead><tr><th>ID</th><th>Requirement (short)</th><th>Verified</th></tr></thead>
             <tbody>
-              <tr><td>TL-REQ-001</td><td>Stalk buttons PB12/PB13, active-low, debounced 20 ms, request that side</td><td>host, Renode</td></tr>
+              <tr><td>TL-REQ-001</td><td>Stalk buttons PB12/PB13, active-low, debounced 20 ms, request that side</td><td>host, hardware</td></tr>
               <tr><td>TL-REQ-002</td><td>1.5 Hz ± 2 %, 50 % ± 10 % duty</td><td>host, hardware</td></tr>
-              <tr><td>TL-REQ-003</td><td>Hazard button PB14 toggles hazard, overrides turn, both in phase</td><td>host, Renode</td></tr>
-              <tr><td>TL-REQ-004</td><td>Tap &lt; 500 ms gives exactly 3 flashes</td><td>host, Renode</td></tr>
-              <tr><td>TL-REQ-005</td><td>Lamp current too low while on: double rate, DEM event</td><td>host, Renode</td></tr>
-              <tr><td>TL-REQ-006</td><td><code>TurnLightStatus</code> 0x3A0 every 100 ms and on change (hypothetical ID)</td><td>host, Renode</td></tr>
-              <tr><td>TL-REQ-007</td><td><code>ClusterAck</code> missing &gt; 500 ms: DEM event, lamps keep working</td><td>host, Renode</td></tr>
+              <tr><td>TL-REQ-003</td><td>Hazard button PB14 toggles hazard, overrides turn, both in phase</td><td>host, hardware</td></tr>
+              <tr><td>TL-REQ-004</td><td>Tap &lt; 500 ms gives exactly 3 flashes</td><td>host, hardware</td></tr>
+              <tr><td>TL-REQ-005</td><td>Lamp current too low while on: double rate, DEM event</td><td>host, hardware</td></tr>
+              <tr><td>TL-REQ-006</td><td><code>TurnLightStatus</code> 0x3A0 every 100 ms and on change (hypothetical ID)</td><td>host, hardware (2 boards)</td></tr>
+              <tr><td>TL-REQ-007</td><td><code>ClusterAck</code> missing &gt; 500 ms: DEM event, lamps keep working</td><td>host, hardware (2 boards)</td></tr>
               <tr><td>TL-REQ-008</td><td>PWM lamps on TIM3, 20 ms soft ramp</td><td>hardware</td></tr>
               <tr><td>TL-REQ-009</td><td>IWDG 100 ms, fed only when all activities checked in</td><td>hardware</td></tr>
-              <tr><td>TL-REQ-010</td><td>Reset cause logged and sent</td><td>Renode, hardware</td></tr>
+              <tr><td>TL-REQ-010</td><td>Reset cause logged and sent</td><td>hardware</td></tr>
             </tbody>
           </table></div>
           <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">Hypothetical data</span><p>CAN IDs, signal layouts and DTC numbers in the capstone are made up for the course. The flash-rate range follows the direction-indicator rules of UN ECE Regulation No. 48 (90 ± 30 flashes per minute); the project target is tighter.</p></div></div>
@@ -167,7 +167,7 @@ bool tl_step(turnlight_t *t, const tl_inputs_t *in, uint32_t dt_ms, tl_outputs_t
               <tr><td>supervisor</td><td>50 ms</td><td>feed the IWDG only if every other job ran</td></tr>
             </tbody>
           </table></div>
-          <script type="text/plain" id="src-s1-input" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="input" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="44" data-end="60" data-sha="6868106ee151">
+          <script type="text/plain" id="src-s1-input" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="input" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="53" data-end="69" data-sha="69a94f80a4e5">
 static void job_input(void)            /* 10 ms: debounce the three buttons (TL-REQ-001) */
 {
     const uint32_t now = millis();
@@ -187,7 +187,7 @@ static void job_input(void)            /* 10 ms: debounce the three buttons (TL-
 }
 </script>
           <div id="ex-s1-input"></div>
-          <script type="text/plain" id="src-s1-logic" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="logic" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="64" data-end="84" data-sha="6868106ee151">
+          <script type="text/plain" id="src-s1-logic" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="logic" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="73" data-end="93" data-sha="69a94f80a4e5">
 static void job_logic(void)            /* 10 ms: the state machine */
 {
     const tl_outputs_t before = s_out;
@@ -211,7 +211,7 @@ static void job_logic(void)            /* 10 ms: the state machine */
 }
 </script>
           <div id="ex-s1-logic"></div>
-          <script type="text/plain" id="src-s1-can" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="can" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="111" data-end="144" data-sha="6868106ee151">
+          <script type="text/plain" id="src-s1-can" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="can" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="120" data-end="153" data-sha="69a94f80a4e5">
 static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLightStatus TX */
 {
     static uint32_t since_tx_ms;
@@ -219,7 +219,7 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
     can_frame_t rx;
     while (can_receive(&rx))
     {
-        ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.dlc >= 1U));
+        ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.len >= 1U));
     }
     if (tl_comm_step(&s_comm, ack, 10U))                                  /* TL-REQ-007 */   // «5»
     {
@@ -238,9 +238,9 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
         s_status.out_right = s_mon.failed[TL_RIGHT];
         s_status.cluster_lost = s_comm.lost;
         s_status.alive++;
-        can_frame_t tx = {.id = TL_CAN_ID_STATUS, .dlc = TL_STATUS_DLC, .data = {0}};
+        can_frame_t tx = {.id = TL_CAN_ID_STATUS, .len = TL_STATUS_DLC, .data = {0}};
         tl_status_pack(&s_status, tx.data);   // «7»
-        (void)can_send(&tx);           /* a full mailbox drops this frame; the next cycle repeats it */
+        (void)can_send(&tx);           /* a full TX FIFO drops this frame; the next cycle repeats it */
         s_status_changed = false;
         since_tx_ms = 0U;
     }
@@ -248,7 +248,7 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
 }
 </script>
           <div id="ex-s1-can"></div>
-          <script type="text/plain" id="src-s1-sup" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="supervisor" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="148" data-end="155" data-sha="6868106ee151">
+          <script type="text/plain" id="src-s1-sup" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="supervisor" data-lang="c" data-file="capstone/turnlight/stage1-baremetal/src/main.c" data-start="157" data-end="164" data-sha="69a94f80a4e5">
 static void job_supervisor(void)       /* 50 ms: feed the watchdog only if every job ran (TL-REQ-009) */
 {
     if (s_alive == ALIVE_ALL)   // «8»
@@ -259,7 +259,7 @@ static void job_supervisor(void)       /* 50 ms: feed the watchdog only if every
 }
 </script>
           <div id="ex-s1-sup"></div>
-          <script type="text/plain" id="src-hw-ramp" data-src="capstone/turnlight/hw/tl_hw.c" data-region="ramp" data-lang="c" data-file="capstone/turnlight/hw/tl_hw.c" data-start="83" data-end="102" data-sha="dca21b9eddab">
+          <script type="text/plain" id="src-hw-ramp" data-src="capstone/turnlight/hw/tl_hw.c" data-region="ramp" data-lang="c" data-file="capstone/turnlight/hw/tl_hw.c" data-start="96" data-end="115" data-sha="babacb3823ff">
 void tl_hw_lamp_ramp(const bool on[TL_SIDES], uint32_t dt_ms)
 {
     const uint32_t step = (TL_PWM_TOP * dt_ms) / TL_RAMP_MS;               /* full scale in 20 ms */   // «1»
@@ -286,28 +286,21 @@ void tl_hw_lamp_ramp(const bool on[TL_SIDES], uint32_t dt_ms)
 
         <section class="doc-section" id="acceptance" data-title="Acceptance tests">
           <div class="sec-head"><h2><span class="sec-num">24.5</span>Acceptance tests</h2></div>
-          <p>One Robot Framework suite (<code>capstone/turnlight/test/turnlight.robot</code>) tests the ECU as a black box through its UART log and CAN frames. Every test is a template with one row per stage, so a stage that behaves differently fails CI:</p>
-          <script type="text/plain" data-code data-src="capstone/turnlight/test/turnlight.robot" data-region="comfort" data-lang="robot" data-file="test/turnlight.robot" data-start="70" data-end="79" data-sha="6061d3107111">
-A Tap Gives Exactly Three Flashes
-    [Arguments]    ${elf}
-    Reset Emulation
-    ${t}=    ECU    ${elf}
-    Hold    btnL    0.2
-    Wait For Line On Uart    lamp L 1    testerId=${t}
-    Wait For Line On Uart    lamp L 1    testerId=${t}
-    Wait For Line On Uart    lamp L 1    testerId=${t}
-    Wait For Line On Uart    lamp L 0    testerId=${t}
-    Should Not Be On Uart    lamp L 1    testerId=${t}    timeout=2
+          <p>Acceptance runs in two places, and both are the same for stage 1, 2 and 3 (<code>capstone/turnlight/docs/acceptance.md</code>). On the host, the Unity tests in <code>logic/test/</code> drive the shared state machine, lamp monitor and message packing millisecond by millisecond, so the logic of TL-REQ-001 to 007 is checked on every push. One of them:</p>
+          <script type="text/plain" id="src-tl-tap" data-src="capstone/turnlight/logic/test/test_turnlight_sm.c" data-region="tap" data-lang="c" data-file="capstone/turnlight/logic/test/test_turnlight_sm.c" data-start="85" data-end="93" data-sha="0b9fc8177aed">
+static void test_tap_gives_exactly_three_flashes(void)        /* TL-REQ-004 */  // «1»
+{
+    in.stalk[TL_LEFT] = true;
+    run(200U);
+    in.stalk[TL_LEFT] = false;
+    run(5000U);
+    TEST_ASSERT_EQUAL_UINT32(3U, edges[TL_LEFT]);
+    TEST_ASSERT_FALSE(out.indicating[TL_LEFT]);
+}
 </script>
-          <script type="text/plain" data-code data-src="capstone/turnlight/test/turnlight.robot" data-region="comfort-case" data-lang="robot" data-file="test/turnlight.robot" data-start="138" data-end="142" data-sha="6061d3107111">
-TL-REQ-004 Comfort Blink
-    [Template]    A Tap Gives Exactly Three Flashes
-    ${STAGE1}
-    ${STAGE2}
-    ${STAGE3}
-</script>
-          <p>What Renode cannot check is on the hardware checklist in <code>docs/acceptance.md</code>: flash rate with a logic analyser, the 20 ms ramp on a scope, real lamp current, and the watchdog reset.</p>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (capstone)</span><p>✅ State machine timing in virtual time, buttons, lamp-out via the ADC test input, CAN frames between two machines, the reset-cause line. ⚠️ No PWM waveform (lamp states are checked from the log), no analog current, no CAN bit timing or error frames, reset cause is always power-on. ❌ Not tested on Blue Pills yet.</p></div></div>
+          <div id="ex-tl-tap"></div>
+          <p>There is no simulator for the STM32G4, so everything that needs the chip is a manual checklist on two NUCLEO boards: flash rate with a logic analyser on PA6, the 20 ms ramp on a scope, lamp-out with the pot, the cluster on a second board, cluster loss by holding B1 on the cluster, the watchdog reset, and the reset cause after pressing B2.</p>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (capstone)</span><p>✅ All three stages and the cluster build in CI; the logic host tests pass. ⚠️ The hardware checklist is written from the requirements and RM0440, not yet run. ❌ Not run on NUCLEO-G474RE boards by the course yet, so no stage is marked <code>tested_on</code>.</p></div></div>
           <div id="ck-cap1"></div>
         </section>
 
@@ -322,7 +315,7 @@ TL-REQ-004 Comfort Blink
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/nucleo-pins.js?v=__BUILD__"></script>
   <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
   <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
   <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
