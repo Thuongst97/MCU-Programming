@@ -6,7 +6,7 @@
   const explore = (host, id, notes) => renderCodeExplorer($(host), { ...embedded(id), notes });
 
   StateMachine($("#sm-escalate"), {
-    ariaLabel: "How a Cortex-M3 fault escalates",
+    ariaLabel: "How a Cortex-M4 fault escalates",
     initial: "fault", height: 300, boxW: 180,
     states: [
       { id: "fault", label: "Fault detected", sub: "e.g. divide by zero", x: 20, y: 120, tone: "hw", desc: "<p>The core detects a problem while executing an instruction, fetching one, or stacking registers. It records the reason in <code>CFSR</code> before choosing a handler.</p>" },
@@ -26,13 +26,14 @@
   });
   Register($("#reg-shcsr"), { reg: "SCB_SHCSR", value: 0x00000000 });
 
-  const cfsr = Register($("#reg-cfsr"), { reg: "SCB_CFSR", value: 0x02000000, show: ["DIVBYZERO", "UNALIGNED", "INVSTATE", "UNDEFINSTR", "BFARVALID", "STKERR", "IMPRECISERR", "PRECISERR"] });
+  const cfsr = Register($("#reg-cfsr"), { reg: "SCB_CFSR", value: 0x02000000, show: ["DIVBYZERO", "UNALIGNED", "NOCP", "INVSTATE", "UNDEFINSTR", "BFARVALID", "LSPERR", "STKERR", "IMPRECISERR", "PRECISERR"] });
   const hfsr = Register($("#reg-hfsr"), { reg: "SCB_HFSR", value: 0x40000000 });
   const PRESETS = [
     ["d: divide by zero", 0x02000000, 0x40000000, "<code>DIVBYZERO</code>, escalated (<code>FORCED</code>). The stacked PC is the <code>UDIV</code> instruction."],
     ["u: undefined instruction", 0x00010000, 0x40000000, "<code>UNDEFINSTR</code>: the core fetched a bit pattern that is not an instruction. In real bugs: a jump into data or erased flash (<code>0xFFFF</code>)."],
-    ["i: invalid state", 0x00020000, 0x40000000, "<code>INVSTATE</code>: a branch to an address with bit 0 clear asks for ARM state, which the Cortex-M3 does not have. Typical cause: a corrupted function pointer."],
-    ["b: bus fault", 0x00008200, 0x40000000, "<code>PRECISERR</code> + <code>BFARVALID</code>: <code>BFAR</code> = <code>0x60000000</code>, the address that has no memory behind it on this chip."],
+    ["i: invalid state", 0x00020000, 0x40000000, "<code>INVSTATE</code>: a branch to an address with bit 0 clear asks for ARM state, which the Cortex-M4 does not have. Typical cause: a corrupted function pointer."],
+    ["b: bus fault", 0x00008200, 0x40000000, "<code>PRECISERR</code> + <code>BFARVALID</code>: <code>BFAR</code> = <code>0x10008000</code>, the first address after the 32 KB CCM SRAM, where nothing answers."],
+    ["FPU still off", 0x00080000, 0x40000000, "<code>NOCP</code>: a floating-point instruction ran before CP10/CP11 were enabled in <code>SCB-&gt;CPACR</code>. The course's startup code enables them before <code>main</code>; a custom startup that forgets it faults on the first <code>float</code>."],
     ["vector table", 0x00000000, 0x00000002, "<code>VECTTBL</code> with an empty <code>CFSR</code>: the vector fetch itself failed, for example after setting <code>VTOR</code> to a wrong address."],
   ];
   const btns = $("#fault-presets");
@@ -52,7 +53,7 @@
     2: ["HardFault reasons", "Only three bits matter in <code>HFSR</code>."],
     6: ["Which stack?", "<code>EXC_RETURN</code> bit 2: 0 = the frame is on MSP, 1 = on PSP. The naked function has no prologue, so no register or stack has changed yet."],
     7: ["Copy the evidence first", "Status registers, then the fault address registers. Printing could cause another fault and change them."],
-    8: ["The faulting PC", "Word 6 of the frame. For precise faults it points at the instruction that failed."],
+    8: ["The faulting PC", "Word 6 of the frame, with or without an FPU extension behind it. For precise faults it points at the instruction that failed."],
     9: ["Reset", "<code>NVIC_SystemReset()</code> sets <code>SYSRESETREQ</code> in <code>AIRCR</code>. The record survives in <code>.noinit</code>."],
   };
   explore("#ex-tables", "src-08-tables", N08);
@@ -64,10 +65,10 @@
     14: ["Reset cause first", "Then the stored fault, printed once and invalidated so it is not reported again on the next boot."],
   });
   explore("#ex-faults", "src-08-faults", {
-    10: ["Trap divide by zero", "By default the Cortex-M3 returns 0 for a division by zero. <code>CCR.DIV_0_TRP</code> turns it into a UsageFault, which is what you want while developing."],
+    10: ["Trap divide by zero", "By default the Cortex-M4 returns 0 for an integer division by zero. <code>CCR.DIV_0_TRP</code> turns it into a UsageFault, which is what you want while developing."],
     11: ["UDF", "An instruction encoding that is guaranteed to be undefined."],
     12: ["Thumb bit cleared", "Branching to an even address requests ARM state: INVSTATE."],
-    13: ["Nothing at 0x60000000", "That address range is for external memory on larger STM32F1s. On the C8 nothing answers, so the bus reports an error."],
+    13: ["Nothing at 0x10008000", "CCM SRAM ends at <code>0x10007FFF</code> on the G474 and the next range is reserved (RM0440 memory map), so the bus reports an error."],
   });
   const NG = {
     1: ["EXC_RETURN", "Same test as in the handler, done in GDB."],
