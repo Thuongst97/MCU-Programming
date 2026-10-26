@@ -181,8 +181,8 @@ window.MCU_STRINGS = {
     },
   },
   footer: {
-    about: "A learning handbook that takes software engineers from first principles to AUTOSAR-structured automotive firmware on an STM32F103C8T6 Blue Pill.",
-    disclaimer: "Educational content. Register names follow ST's RM0008; AUTOSAR material cites Classic Platform R25-11 and is teaching code, not a conformant implementation. CAN IDs, DIDs and DTCs in examples are hypothetical. Not affiliated with STMicroelectronics, Arm, AUTOSAR or MISRA.",
+    about: "A learning handbook that takes software engineers from first principles to AUTOSAR-structured automotive firmware on an STM32G474 NUCLEO-G474RE board.",
+    disclaimer: "Educational content. Register names follow ST's RM0440; AUTOSAR material cites Classic Platform R25-11 and is teaching code, not a conformant implementation. CAN IDs, DIDs and DTCs in examples are hypothetical. Not affiliated with STMicroelectronics, Arm, AUTOSAR or MISRA.",
     licence: "Code: MIT · Content: CC BY 4.0",
     repo: "Source on GitHub",
   },

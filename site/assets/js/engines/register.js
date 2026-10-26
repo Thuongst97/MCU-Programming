@@ -2,7 +2,7 @@
    =========================================================================
    MCU Academy — register / bit-field viewer (PLAN.md §9.3).
    MCU.Register(host, { reg: "RCC_CFGR", value, editable, show, port, onChange })
-     reg       key in window.MCU_DATA.regs (data/regs-stm32f103.js)
+     reg       key in window.MCU_DATA.regs (data/regs-stm32g474.js)
      value     initial value (default: the reset value)
      show      field names listed in the editor (default: all)
      port      for GPIOx_* registers: "GPIOA" | "GPIOB" | "GPIOC"
