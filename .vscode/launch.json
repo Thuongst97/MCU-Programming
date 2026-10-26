@@ -2,38 +2,26 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Blue Pill · example 00 (ST-Link + OpenOCD)",
+      "name": "NUCLEO-G474RE · example 00 (ST-LINK + OpenOCD)",
       "type": "cortex-debug",
       "request": "launch",
       "servertype": "openocd",
       "cwd": "${workspaceFolder}",
-      "executable": "${workspaceFolder}/build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf",
-      "configFiles": ["${workspaceFolder}/examples/common/openocd/bluepill.cfg"],
-      "svdFile": "${workspaceFolder}/.cache/svd/STM32F103.svd",
+      "executable": "${workspaceFolder}/build/nucleo-debug/examples/00-nucleo-blink-uart/bare/00-nucleo-blink-uart.elf",
+      "configFiles": ["${workspaceFolder}/examples/common/openocd/nucleo-g474re.cfg"],
+      "svdFile": "${workspaceFolder}/.cache/svd/STM32G474.svd",
       "runToEntryPoint": "main",
-      "preLaunchTask": "build: bluepill-debug"
+      "preLaunchTask": "build: nucleo-debug"
     },
     {
-      "name": "Blue Pill clone (IDCODE 0x2ba01477) · example 00",
-      "type": "cortex-debug",
-      "request": "launch",
-      "servertype": "openocd",
-      "cwd": "${workspaceFolder}",
-      "executable": "${workspaceFolder}/build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf",
-      "configFiles": ["${workspaceFolder}/examples/common/openocd/bluepill-clone.cfg"],
-      "svdFile": "${workspaceFolder}/.cache/svd/STM32F103.svd",
-      "runToEntryPoint": "main",
-      "preLaunchTask": "build: bluepill-debug"
-    },
-    {
-      "name": "Renode · attach to GDB server on :3333",
+      "name": "NUCLEO-G474RE · attach to the running program (no reset)",
       "type": "cortex-debug",
       "request": "attach",
-      "servertype": "external",
-      "gdbTarget": "localhost:3333",
+      "servertype": "openocd",
       "cwd": "${workspaceFolder}",
-      "executable": "${workspaceFolder}/build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf",
-      "svdFile": "${workspaceFolder}/.cache/svd/STM32F103.svd"
+      "executable": "${workspaceFolder}/build/nucleo-debug/examples/00-nucleo-blink-uart/bare/00-nucleo-blink-uart.elf",
+      "configFiles": ["${workspaceFolder}/examples/common/openocd/nucleo-g474re.cfg"],
+      "svdFile": "${workspaceFolder}/.cache/svd/STM32G474.svd"
     }
   ]
 }

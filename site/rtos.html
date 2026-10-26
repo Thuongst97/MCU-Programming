@@ -65,7 +65,7 @@
         <section class="doc-section" id="port" data-title="Porting FreeRTOS to the Blue Pill">
           <div class="sec-head"><h2><span class="sec-num">14.4</span>Porting FreeRTOS to the Blue Pill</h2></div>
           <p>FreeRTOS needs three things from the chip: a tick (SysTick), the PendSV and SVC exceptions, and a way to mask interrupts. The Cortex-M3 port in <code>third_party/freertos_kernel/portable/GCC/ARM_CM3</code> provides all of them; we only write <code>FreeRTOSConfig.h</code> and map the handler names onto our vector table.</p>
-          <script type="text/plain" id="src-10-config" data-src="examples/10-freertos-basics/src/FreeRTOSConfig.h" data-region="config" data-lang="c" data-file="examples/10-freertos-basics/src/FreeRTOSConfig.h" data-start="12" data-end="48" data-sha="625fd98118b3">
+          <script type="text/plain" id="src-10-config" data-src="examples/10-freertos-basics/src/FreeRTOSConfig.h" data-region="config" data-lang="c" data-file="examples/10-freertos-basics/src/FreeRTOSConfig.h" data-start="12" data-end="48" data-sha="334d7be0b604">
 #define configCPU_CLOCK_HZ                      (SystemCoreClock)   /* SysTick runs from HCLK */  // «1»
 #define configTICK_RATE_HZ                      1000U               /* 1 ms tick */
 #define configUSE_PREEMPTION                    1                   /* higher priority runs at once */ // «2»
@@ -92,7 +92,7 @@
 #define configUSE_TICK_HOOK                     0
 #define configUSE_MALLOC_FAILED_HOOK            0
 
-/* Cortex-M interrupt priorities: the F103 implements 4 priority bits (stm32f103xb.h). */
+/* Cortex-M interrupt priorities: the G474 implements 4 priority bits (__NVIC_PRIO_BITS in stm32g474xx.h). */
 #define configPRIO_BITS                         4
 #define configKERNEL_INTERRUPT_PRIORITY         (15U << (8U - configPRIO_BITS))   /* lowest */     // «6»
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY    (5U << (8U - configPRIO_BITS))    /* 0..4: never masked, no FreeRTOS API */ // «7»
@@ -121,7 +121,7 @@
               <tr><td>Mutex</td><td>Exclusive access to a shared resource; has priority inheritance</td><td>the UART: one line at a time</td></tr>
             </tbody>
           </table></div>
-          <script type="text/plain" id="src-10-tasks" data-src="examples/10-freertos-basics/src/main.c" data-region="tasks" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="52" data-end="126" data-sha="a8ff462eb740">
+          <script type="text/plain" id="src-10-tasks" data-src="examples/10-freertos-basics/src/main.c" data-region="tasks" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="54" data-end="128" data-sha="fd4af6d0134c">
 static void sensor_task(void *arg)
 {
     (void)arg;
@@ -173,7 +173,7 @@ static void button_task(void *arg)
     {
         if (xSemaphoreTake(s_button_sem, portMAX_DELAY) == pdTRUE)   /* woken by the ISR */        // «6»
         {
-            log_line("button: press ", ++presses, " (semaphore given from EXTI0 ISR)\n");
+            log_line("button: press ", ++presses, " (semaphore given from the EXTI13 ISR)\n");
         }
     }
 }
@@ -199,7 +199,7 @@ static void monitor_task(void *arg)
 }
 </script>
           <div id="ex-tasks"></div>
-          <script type="text/plain" id="src-10-print" data-src="examples/10-freertos-basics/src/main.c" data-region="print" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="37" data-end="48" data-sha="a8ff462eb740">
+          <script type="text/plain" id="src-10-print" data-src="examples/10-freertos-basics/src/main.c" data-region="print" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="39" data-end="50" data-sha="fd4af6d0134c">
 /* Several tasks print. The mutex makes each line atomic; without it, lines interleave
  * character by character when a higher-priority task preempts a lower one mid-line. */
 static void log_line(const char *a, uint32_t v, const char *b)
@@ -220,21 +220,21 @@ static void log_line(const char *a, uint32_t v, const char *b)
         <section class="doc-section" id="isr-rules" data-title="ISR rules: FromISR APIs">
           <div class="sec-head"><h2><span class="sec-num">14.6</span>ISR rules: FromISR APIs</h2></div>
           <p>An interrupt handler is not a task: it cannot block. FreeRTOS therefore has a separate <code>…FromISR</code> variant of every function an ISR may need. They never wait, and they tell you whether a higher-priority task became ready so you can switch on the way out.</p>
-          <script type="text/plain" id="src-10-isr" data-src="examples/10-freertos-basics/src/main.c" data-region="isr" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="130" data-end="137" data-sha="a8ff462eb740">
-void EXTI0_IRQHandler(void);
-void EXTI0_IRQHandler(void)
+          <script type="text/plain" id="src-10-isr" data-src="examples/10-freertos-basics/src/main.c" data-region="isr" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="132" data-end="139" data-sha="fd4af6d0134c">
+void EXTI15_10_IRQHandler(void);
+void EXTI15_10_IRQHandler(void)
 {
-    EXTI->PR = EXTI_PR_PR0;
+    EXTI->PR1 = EXTI_PR1_PIF13;                             /* B1 on PC13: EXTI line 13 */
     BaseType_t woken = pdFALSE;
     xSemaphoreGiveFromISR(s_button_sem, &woken);            /* only FromISR APIs in an ISR */     // «8»
     portYIELD_FROM_ISR(woken);                              /* switch now if a task got ready */   // «9»
 }
 </script>
           <div id="ex-isr"></div>
-          <script type="text/plain" id="src-10-main" data-src="examples/10-freertos-basics/src/main.c" data-region="main" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="159" data-end="181" data-sha="a8ff462eb740">
+          <script type="text/plain" id="src-10-main" data-src="examples/10-freertos-basics/src/main.c" data-region="main" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="163" data-end="185" data-sha="fd4af6d0134c">
 int main(void)
 {
-    (void)clock_init_72mhz();
+    (void)clock_init_170mhz();
     uart_log_init(115200U);
     led_init();
     NVIC_SetPriorityGrouping(0U);                           /* all 4 bits = preemption priority */ // «11»
@@ -271,7 +271,7 @@ int main(void)
             <li><code>uxTaskGetStackHighWaterMark()</code> returns the smallest amount of free stack a task has ever had, in words. Example 10's <code>monitor</code> task prints it every 2 s. Keep a margin of at least 25 % after exercising every code path.</li>
             <li><code>configCHECK_FOR_STACK_OVERFLOW = 2</code> fills each stack with a known pattern and checks its end at every context switch; on a hit it calls the hook below. It catches most overflows, not all (a large local array can jump past the checked bytes).</li>
           </ul>
-          <script type="text/plain" id="src-10-hooks" data-src="examples/10-freertos-basics/src/main.c" data-region="hooks" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="203" data-end="226" data-sha="a8ff462eb740">
+          <script type="text/plain" id="src-10-hooks" data-src="examples/10-freertos-basics/src/main.c" data-region="hooks" data-lang="c" data-file="examples/10-freertos-basics/src/main.c" data-start="207" data-end="230" data-sha="fd4af6d0134c">
 void vApplicationStackOverflowHook(TaskHandle_t task, char *name)
 {
     (void)task;

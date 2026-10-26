@@ -33,7 +33,7 @@
           <div class="sec-head"><h2><span class="sec-num">13.1</span>Who reset me?</h2></div>
           <p>Every reset sets a flag in <code>RCC_CSR</code> (RM0008 §7.3.10), and the flags stay set until software clears them with <code>RMVF</code>. Reading them at boot is the cheapest diagnostic a device can have: a field unit that keeps rebooting because of the watchdog tells you exactly that.</p>
           <div id="reg-csr"></div>
-          <script type="text/plain" id="src-08-boot" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="boot" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="122" data-end="135" data-sha="5aee32d3acad">
+          <script type="text/plain" id="src-08-boot" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="boot" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="123" data-end="136" data-sha="b8b58166f430">
 uart_puts("\nExample 08 boot, reset cause: ");
 uart_puts(reset_cause(RCC->CSR));                                                              // «14»
 uart_puts("\n");
@@ -50,14 +50,15 @@ if (s_last_fault.magic == FAULT_MAGIC)
 }
 </script>
           <div id="ex-boot"></div>
-          <script type="text/plain" id="src-08-cause" data-src="examples/08-iwdg-hardfault/src/faultdecode.c" data-region="reset-cause" data-lang="c" data-file="examples/08-iwdg-hardfault/src/faultdecode.c" data-start="69" data-end="78" data-sha="224370312755">
+          <script type="text/plain" id="src-08-cause" data-src="examples/08-iwdg-hardfault/src/faultdecode.c" data-region="reset-cause" data-lang="c" data-file="examples/08-iwdg-hardfault/src/faultdecode.c" data-start="71" data-end="81" data-sha="e2560f02385e">
 const char *reset_cause(uint32_t csr)
 {
     if ((csr & (1UL << 29)) != 0U) { return "independent watchdog"; }                          // «3»
     if ((csr & (1UL << 30)) != 0U) { return "window watchdog"; }
     if ((csr & (1UL << 31)) != 0U) { return "low-power management"; }
     if ((csr & (1UL << 28)) != 0U) { return "software (SYSRESETREQ)"; }
-    if ((csr & (1UL << 27)) != 0U) { return "power-on"; }                                      // «4»
+    if ((csr & (1UL << 25)) != 0U) { return "option byte loader"; }
+    if ((csr & (1UL << 27)) != 0U) { return "power-on or brown-out"; }                         // «4»
     if ((csr & (1UL << 26)) != 0U) { return "reset pin"; }
     return "unknown";
 }
@@ -69,19 +70,19 @@ const char *reset_cause(uint32_t csr)
         <section class="doc-section" id="iwdg" data-title="Independent watchdog">
           <div class="sec-head"><h2><span class="sec-num">13.2</span>Independent watchdog</h2></div>
           <p>The <b>independent watchdog</b> (IWDG) is a 12-bit down-counter clocked by the ~40 kHz LSI, independent of the main clock. If software does not reload it in time, it resets the chip. Once started it cannot be stopped, not even by the program that started it (RM0008 §19).</p>
-          <script type="text/plain" id="src-08-iwdg" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="iwdg" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="27" data-end="44" data-sha="5aee32d3acad">
+          <script type="text/plain" id="src-08-iwdg" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="iwdg" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="28" data-end="45" data-sha="b8b58166f430">
 static void iwdg_start_1s(void)
 {
-    DBGMCU->CR |= DBGMCU_CR_DBG_IWDG_STOP;          /* don't reset while halted at a breakpoint */ // «2»
-    IWDG->KR = 0x5555U;                             /* unlock PR and RLR */                        // «3»
-    IWDG->PR = 3U;                                  /* LSI / 32: about 1.25 kHz */
-    IWDG->RLR = 1250U - 1U;                         /* about 1 s; LSI varies 30-60 kHz (DS5319) */
-    for (uint32_t n = 0U; ((IWDG->SR & (IWDG_SR_PVU | IWDG_SR_RVU)) != 0U) && (n < 100000U); ++n)
+    DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_IWDG_STOP;  /* don't reset while halted at a breakpoint */ // «2»
+    IWDG->KR = 0xCCCCU;                             /* start: from now on it cannot be stopped */   // «4»
+    IWDG->KR = 0x5555U;                             /* unlock PR, RLR and WINR */                  // «3»
+    IWDG->PR = 3U;                                  /* LSI / 32: about 1 kHz (LSI ~32 kHz, DS12288) */
+    IWDG->RLR = 1000U - 1U;                         /* about 1 s; LSI varies from chip to chip */
+    for (uint32_t n = 0U; ((IWDG->SR & (IWDG_SR_PVU | IWDG_SR_RVU | IWDG_SR_WVU)) != 0U) && (n < 100000U); ++n)
     {
         /* the new values cross into the LSI clock domain */
     }
-    IWDG->KR = 0xAAAAU;                             /* reload the counter */
-    IWDG->KR = 0xCCCCU;                             /* start: from now on it cannot be stopped */   // «4»
+    IWDG->KR = 0xAAAAU;                             /* reload the counter (no window: WINR is max) */
 }
 
 static void iwdg_feed(void)
@@ -131,7 +132,7 @@ static void iwdg_feed(void)
         <section class="doc-section" id="wakeup" data-title="Wake-up sources">
           <div class="sec-head"><h2><span class="sec-num">13.5</span>Wake-up sources</h2></div>
           <p>Example 09 shows both: Sleep, woken by every SysTick interrupt, and Stop, woken only by the button on EXTI line 0.</p>
-          <script type="text/plain" id="src-09-sleep" data-src="examples/09-lowpower-stop/src/main.c" data-region="sleep" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="37" data-end="48" data-sha="454166a55535">
+          <script type="text/plain" id="src-09-sleep" data-src="examples/09-lowpower-stop/src/main.c" data-region="sleep" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="43" data-end="54" data-sha="9c760ca97dd0">
 static uint32_t sleep_for_one_second(void)
 {
     uint32_t wakes = 0U;
@@ -146,10 +147,10 @@ static uint32_t sleep_for_one_second(void)
 }
 </script>
           <div id="ex-sleep"></div>
-          <script type="text/plain" id="src-09-main" data-src="examples/09-lowpower-stop/src/main.c" data-region="main" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="85" data-end="98" data-sha="454166a55535">
+          <script type="text/plain" id="src-09-main" data-src="examples/09-lowpower-stop/src/main.c" data-region="main" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="91" data-end="104" data-sha="9c760ca97dd0">
 for (uint32_t n = 1U;; ++n)
 {
-    uart_puts("stop mode: press the button on PA0 to wake up\n");
+    uart_puts("stop mode: press the blue USER button (B1) to wake up\n");
     delay_ms(5U);                                                 /* let the last byte leave the UART */  // «8»
     led_off();
     enter_stop();
@@ -169,20 +170,20 @@ for (uint32_t n = 1U;; ++n)
         <section class="doc-section" id="after-stop" data-title="Restoring clocks after Stop">
           <div class="sec-head"><h2><span class="sec-num">13.6</span>Restoring clocks after Stop</h2></div>
           <p>Stop mode switches off the PLL and the HSE. When an interrupt wakes the chip, it continues on the 8 MHz HSI (RM0008 §5.3.5): the UART baud rate, SysTick period and every timer are now wrong by a factor of nine until the clock tree is rebuilt.</p>
-          <script type="text/plain" id="src-09-stop" data-src="examples/09-lowpower-stop/src/main.c" data-region="stop" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="52" data-end="66" data-sha="454166a55535">
+          <script type="text/plain" id="src-09-stop" data-src="examples/09-lowpower-stop/src/main.c" data-region="stop" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="58" data-end="72" data-sha="9c760ca97dd0">
 static void enter_stop(void)
 {
-    RCC->APB1ENR |= RCC_APB1ENR_PWREN;                                /* PWR registers need their clock */      // «3»
-    PWR->CR |= PWR_CR_LPDS;                                           /* regulator in low-power mode */
-    PWR->CR &= ~PWR_CR_PDDS;                                          /* deepsleep = Stop, not Standby */       // «4»
-    PWR->CR |= PWR_CR_CWUF;                                           /* clear the wake-up flag */
+    RCC->APB1ENR1 |= RCC_APB1ENR1_PWREN;                              /* PWR registers need their clock */      // «3»
+    (void)RCC->APB1ENR1;
+    PWR->CR1 = (PWR->CR1 & ~PWR_CR1_LPMS) | PWR_CR1_LPMS_STOP1;       /* deepsleep = Stop 1 (low-power regulator) */ // «4»
+    PWR->SCR = PWR_SCR_CWUF;                                          /* clear the wake-up flags */
     SysTick->CTRL &= ~SysTick_CTRL_ENABLE_Msk;                        /* its interrupt would end Stop at once */ // «5»
     SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
     __DSB();
-    __WFI();                                                          /* clocks stop here until EXTI0 */       // «6»
+    __WFI();                                                          /* clocks stop here until EXTI13 */      // «6»
     SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
-    /* Woken up: the system clock is now HSI 8 MHz and the PLL and HSE are off (RM0008 §5.3.5). */
-    (void)clock_init_72mhz();                                                                                  // «7»
+    /* Woken up: the system clock is now HSI16 and the PLL is off (RM0440 "Stop 1 mode"). */
+    (void)clock_init_170mhz();                                                                                  // «7»
     systick_init_1ms();
 }
 </script>

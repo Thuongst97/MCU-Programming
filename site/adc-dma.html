@@ -40,23 +40,30 @@
         <section class="doc-section" id="config" data-title="Configuring ADC1">
           <div class="sec-head"><h2><span class="sec-num">9.2</span>Configuring ADC1</h2></div>
           <p>Setting up ADC1 takes four things: a clock within limits, an analog pin, a sampling time, and a calibration.</p>
-          <script type="text/plain" id="src-05-init" data-src="examples/05-adc-pot-dma/src/main.c" data-region="init" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="33" data-end="49" data-sha="087e98165953">
+          <script type="text/plain" id="src-05-init" data-src="examples/05-adc-pot-dma/src/main.c" data-region="init" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="39" data-end="62" data-sha="acedf8b27e42">
 static bool adc_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_ADC1EN;          /* ADC clock = PCLK2 / 6 = 12 MHz */ // «1»
-    GPIOA->CRL &= ~(GPIO_CRL_MODE1 | GPIO_CRL_CNF1);                  /* PA1: analog input (0000) */       // «2»
-    ADC1->SMPR2 = 7U << ADC_SMPR2_SMP1_Pos;                           /* 239.5 cycles for PA1 */           // «3»
-    ADC1->SMPR1 = 7U << ADC_SMPR1_SMP17_Pos;                          /* and for Vrefint */
-    ADC1->CR2 = ADC_CR2_ADON | ADC_CR2_TSVREFE                        /* power up, enable Vrefint */      // «4»
-              | (7U << ADC_CR2_EXTSEL_Pos) | ADC_CR2_EXTTRIG;         /* trigger: SWSTART bit */
-    delay_ms(1U);                                                     /* tSTAB, plus 2 ADC clocks before CAL */
-    ADC1->CR2 |= ADC_CR2_RSTCAL;                                                                           // «5»
-    if (!wait_clear(&ADC1->CR2, ADC_CR2_RSTCAL))
+    RCC->AHB2ENR |= RCC_AHB2ENR_ADC12EN;                              /* ADC1 and ADC2 share a clock */   // «1»
+    (void)RCC->AHB2ENR;
+    gpio_clock_on(GPIOA);
+    gpio_mode(GPIOA, 1U, BSP_GPIO_ANALOG);                            /* PA1: analog (also the reset state) */ // «2»
+    ADC12_COMMON->CCR = ADC_CCR_CKMODE_1 | ADC_CCR_CKMODE_0           /* clock = HCLK / 4 = 42.5 MHz */
+                      | ADC_CCR_VREFEN;                               /* switch Vrefint on */
+
+    ADC1->CR &= ~ADC_CR_DEEPPWD;                                      /* 1. leave deep power-down */      // «3»
+    ADC1->CR |= ADC_CR_ADVREGEN;                                      /* 2. start the ADC's regulator */
+    delay_ms(1U);                                                     /*    needs 20 us; 1 ms is plenty */
+    ADC1->CR &= ~ADC_CR_ADCALDIF;                                     /* 3. calibrate, single-ended */     // «4»
+    ADC1->CR |= ADC_CR_ADCAL;
+    if (!wait_flag(&ADC1->CR, ADC_CR_ADCAL, 0U))
     {
         return false;
     }
-    ADC1->CR2 |= ADC_CR2_CAL;                                         /* self-calibration */
-    return wait_clear(&ADC1->CR2, ADC_CR2_CAL);
+    ADC1->SMPR1 = 7U << ADC_SMPR1_SMP2_Pos;                           /* 640.5 cycles for PA1 */           // «5»
+    ADC1->SMPR2 = 7U << ADC_SMPR2_SMP18_Pos;                          /* and for Vrefint */
+    ADC1->ISR = ADC_ISR_ADRDY;                                        /* write 1 to clear */
+    ADC1->CR |= ADC_CR_ADEN;                                          /* 4. enable, wait until ready */
+    return wait_flag(&ADC1->ISR, ADC_ISR_ADRDY, ADC_ISR_ADRDY);
 }
 </script>
           <div id="ex-init"></div>
@@ -75,15 +82,15 @@ static bool adc_init(void)
         <section class="doc-section" id="single" data-title="Single conversion, polling">
           <div class="sec-head"><h2><span class="sec-num">9.3</span>Single conversion, polling</h2></div>
           <p>The simplest use: pick a channel, start, wait for end of conversion, read.</p>
-          <script type="text/plain" id="src-05-single" data-src="examples/05-adc-pot-dma/src/main.c" data-region="single" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="53" data-end="66" data-sha="087e98165953">
+          <script type="text/plain" id="src-05-single" data-src="examples/05-adc-pot-dma/src/main.c" data-region="single" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="66" data-end="79" data-sha="acedf8b27e42">
 static uint32_t adc_read(uint32_t channel)
 {
-    ADC1->SQR1 = 0U;                                                  /* sequence length 1 */
-    ADC1->SQR3 = channel;                                             /* SQ1 = channel */                  // «6»
-    ADC1->CR2 |= ADC_CR2_SWSTART;                                                                          // «7»
+    ADC1->SQR1 = (0U << ADC_SQR1_L_Pos)                               /* L = 0: one conversion */
+               | (channel << ADC_SQR1_SQ1_Pos);                       /* SQ1 = channel */                  // «6»
+    ADC1->CR |= ADC_CR_ADSTART;                                                                            // «7»
     for (uint32_t n = 0U; n < WAIT_LOOPS; ++n)
     {
-        if ((ADC1->SR & ADC_SR_EOC) != 0U)
+        if ((ADC1->ISR & ADC_ISR_EOC) != 0U)
         {
             return ADC1->DR & 0xFFFU;                                 /* reading DR clears EOC */          // «8»
         }
@@ -93,23 +100,26 @@ static uint32_t adc_read(uint32_t channel)
 </script>
           <div id="ex-single"></div>
           <p>The raw number means nothing until it is scaled. Example 05 also measures the internal reference <b>Vrefint</b> (about 1.20 V, channel 17), which lets it compute the real supply voltage instead of assuming exactly 3.3 V:</p>
-          <script type="text/plain" id="src-05-math" data-src="examples/05-adc-pot-dma/src/adcmath.c" data-region="math" data-lang="c" data-file="examples/05-adc-pot-dma/src/adcmath.c" data-start="5" data-end="32" data-sha="3ecaa0a3957c">
-uint32_t adc_vdda_mv(uint32_t vrefint_raw)
+          <script type="text/plain" id="src-05-math" data-src="examples/05-adc-pot-dma/src/adcmath.c" data-region="math" data-lang="c" data-file="examples/05-adc-pot-dma/src/adcmath.c" data-start="5" data-end="35" data-sha="9069a6dcc9f4">
+uint32_t adc_vdda_mv(uint32_t vrefint_raw, uint32_t vrefint_cal)
 {
     if (vrefint_raw == 0U)
     {
         return 0U;
     }
-    return (VREFINT_MV * 4095U + (vrefint_raw / 2U)) / vrefint_raw;     /* rounded */      // «1»
+    return (VREFINT_CAL_VDDA_MV * vrefint_cal + (vrefint_raw / 2U)) / vrefint_raw;   /* rounded */ // «1»
 }
 
-uint32_t adc_pin_mv(uint32_t raw, uint32_t vrefint_raw)
+uint32_t adc_pin_mv(uint32_t raw, uint32_t vrefint_raw, uint32_t vrefint_cal)
 {
     if (vrefint_raw == 0U)
     {
         return 0U;
     }
-    return (raw * VREFINT_MV + (vrefint_raw / 2U)) / vrefint_raw;      /* VDDA cancels out */ // «2»
+    /* raw / 4095 x VDDA, with VDDA = 3000 x cal / vrefint_raw; 64-bit so nothing overflows */
+    const uint64_t num = (uint64_t)raw * VREFINT_CAL_VDDA_MV * vrefint_cal;                          // «2»
+    const uint64_t den = (uint64_t)vrefint_raw * 4095U;
+    return (uint32_t)((num + (den / 2U)) / den);
 }
 
 uint32_t adc_mean(const volatile uint16_t *buf, uint32_t len, uint32_t first, uint32_t stride)
@@ -143,27 +153,30 @@ uint32_t adc_mean(const volatile uint16_t *buf, uint32_t len, uint32_t first, ui
         <section class="doc-section" id="adc-dma" data-title="Scan + DMA circular">
           <div class="sec-head"><h2><span class="sec-num">9.5</span>Scan + DMA circular</h2></div>
           <p>In <b>scan mode</b> the ADC converts a list of channels in sequence (<code>SQR1</code>–<code>SQR3</code>); in <b>continuous mode</b> it starts over by itself; with <code>ADC_CR2.DMA</code> set it asks for a DMA transfer after each conversion. With DMA in <b>circular</b> mode the buffer fills forever, and the CPU just reads it when it wants a value.</p>
-          <script type="text/plain" id="src-05-dma" data-src="examples/05-adc-pot-dma/src/main.c" data-region="dma" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="70" data-end="86" data-sha="087e98165953">
+          <script type="text/plain" id="src-05-dma" data-src="examples/05-adc-pot-dma/src/main.c" data-region="dma" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="83" data-end="102" data-sha="acedf8b27e42">
 static void adc_dma_start(void)
 {
-    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN | RCC_AHB1ENR_DMAMUX1EN;
+    (void)RCC->AHB1ENR;
+    DMAMUX1_Channel0->CCR = DMAMUX_REQ_ADC1 << DMAMUX_CxCR_DMAREQ_ID_Pos; /* DMA1 ch1 <- ADC1 requests */  // «9»
     DMA1_Channel1->CCR = 0U;                                          /* channel off while configuring */
-    DMA1_Channel1->CPAR = (uint32_t)&ADC1->DR;                        /* from: the ADC data register */   // «9»
-    DMA1_Channel1->CMAR = (uint32_t)s_buf;                            /* to: our buffer */
+    DMA1_Channel1->CPAR = (uint32_t)&ADC1->DR;                        /* from: the ADC data register */
+    DMA1_Channel1->CMAR = (uint32_t)s_buf;                            /* to: our buffer (in SRAM1, not CCM) */
     DMA1_Channel1->CNDTR = 2U * SAMPLES;                              /* items before wrapping */
     DMA1_Channel1->CCR = DMA_CCR_MINC | DMA_CCR_CIRC                  /* memory++, circular */            // «10»
                        | DMA_CCR_PSIZE_0 | DMA_CCR_MSIZE_0            /* 16-bit both sides */
                        | DMA_CCR_EN;
 
-    ADC1->CR1 = ADC_CR1_SCAN;                                         /* convert the whole sequence */    // «11»
-    ADC1->SQR1 = 1U << ADC_SQR1_L_Pos;                                /* L = 1: two conversions */
-    ADC1->SQR3 = (1U << ADC_SQR3_SQ1_Pos) | (17U << ADC_SQR3_SQ2_Pos); /* PA1, then Vrefint */
-    ADC1->CR2 |= ADC_CR2_CONT | ADC_CR2_DMA;                          /* forever, one DMA request each */ // «12»
-    ADC1->CR2 |= ADC_CR2_SWSTART;
+    ADC1->SQR1 = (1U << ADC_SQR1_L_Pos)                               /* L = 1: two conversions */         // «11»
+               | (CH_POT << ADC_SQR1_SQ1_Pos) | (CH_VREFINT << ADC_SQR1_SQ2_Pos);
+    ADC1->CFGR = ADC_CFGR_CONT                                        /* forever */                       // «12»
+               | ADC_CFGR_DMAEN | ADC_CFGR_DMACFG                     /* one DMA request each, circular */
+               | ADC_CFGR_OVRMOD;                                     /* keep the newest on overrun */
+    ADC1->CR |= ADC_CR_ADSTART;
 }
 </script>
           <div id="ex-dma"></div>
-          <script type="text/plain" id="src-05-main" data-src="examples/05-adc-pot-dma/src/main.c" data-region="main" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="118" data-end="135" data-sha="087e98165953">
+          <script type="text/plain" id="src-05-main" data-src="examples/05-adc-pot-dma/src/main.c" data-region="main" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="136" data-end="153" data-sha="acedf8b27e42">
 for (;;)
 {
     delay_ms(500U);
@@ -177,7 +190,7 @@ for (;;)
     uart_puts("dma: PA1 mean ");
     uart_put_dec(pot);
     uart_puts(" = ");
-    uart_put_dec(adc_pin_mv(pot, vref));
+    uart_put_dec(adc_pin_mv(pot, vref, cal));
     uart_puts(" mV over ");
     uart_put_dec(SAMPLES);
     uart_puts(" samples\n");

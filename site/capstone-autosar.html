@@ -52,7 +52,7 @@
           <div class="sec-head"><h2><span class="sec-num">26.2</span>The TurnLight SWC</h2></div>
           <p>Each refactoring step is shown as before (stage 1), after (stage 3) and why.</p>
           <div class="cmp-host" id="cmp-in"></div>
-          <script type="text/plain" id="src-c-in-before" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="input" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="44" data-end="60" data-sha="6868106ee151">
+          <script type="text/plain" id="src-c-in-before" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="input" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="53" data-end="69" data-sha="69a94f80a4e5">
 static void job_input(void)            /* 10 ms: debounce the three buttons (TL-REQ-001) */
 {
     const uint32_t now = millis();
@@ -150,7 +150,7 @@ FUNC(void, LAMPMONITOR_CODE) RE_LampMonitor_10ms(void)
           <div class="sec-head"><h2><span class="sec-num">26.3</span>The RTE layer</h2></div>
           <p>The RTE replaces the global variables and direct calls of stage 1. Lamp output is the clearest case:</p>
           <div class="cmp-host" id="cmp-lamp"></div>
-          <script type="text/plain" id="src-c-lamp-before" data-src="capstone/turnlight/hw/tl_hw.c" data-region="ramp" data-lang="c" data-file="hw/tl_hw.c" data-start="83" data-end="102" data-sha="dca21b9eddab">
+          <script type="text/plain" id="src-c-lamp-before" data-src="capstone/turnlight/hw/tl_hw.c" data-region="ramp" data-lang="c" data-file="hw/tl_hw.c" data-start="96" data-end="115" data-sha="babacb3823ff">
 void tl_hw_lamp_ramp(const bool on[TL_SIDES], uint32_t dt_ms)
 {
     const uint32_t step = (TL_PWM_TOP * dt_ms) / TL_RAMP_MS;               /* full scale in 20 ms */   // «1»
@@ -238,7 +238,7 @@ TASK(Task50ms)
           <div class="sec-head"><h2><span class="sec-num">26.4</span>BSW-lite and MCAL</h2></div>
           <p>Communication moves from a hand-written job to configuration. Stage 1 packs and sends the frame itself; stage 3 writes signals and lets Com, PduR, CanIf and Can do the rest according to <code>Com_PBcfg.c</code>:</p>
           <div class="cmp-host" id="cmp-can"></div>
-          <script type="text/plain" id="src-c-can-before" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="can" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="111" data-end="144" data-sha="6868106ee151">
+          <script type="text/plain" id="src-c-can-before" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="can" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="120" data-end="153" data-sha="69a94f80a4e5">
 static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLightStatus TX */
 {
     static uint32_t since_tx_ms;
@@ -246,7 +246,7 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
     can_frame_t rx;
     while (can_receive(&rx))
     {
-        ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.dlc >= 1U));
+        ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.len >= 1U));
     }
     if (tl_comm_step(&s_comm, ack, 10U))                                  /* TL-REQ-007 */   // «5»
     {
@@ -265,9 +265,9 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
         s_status.out_right = s_mon.failed[TL_RIGHT];
         s_status.cluster_lost = s_comm.lost;
         s_status.alive++;
-        can_frame_t tx = {.id = TL_CAN_ID_STATUS, .dlc = TL_STATUS_DLC, .data = {0}};
+        can_frame_t tx = {.id = TL_CAN_ID_STATUS, .len = TL_STATUS_DLC, .data = {0}};
         tl_status_pack(&s_status, tx.data);   // «7»
-        (void)can_send(&tx);           /* a full mailbox drops this frame; the next cycle repeats it */
+        (void)can_send(&tx);           /* a full TX FIFO drops this frame; the next cycle repeats it */
         s_status_changed = false;
         since_tx_ms = 0U;
     }

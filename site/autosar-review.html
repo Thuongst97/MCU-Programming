@@ -43,11 +43,11 @@
           <p>Two findings that come up in almost every first review, with the version from this repository that passes:</p>
           <div class="cmp-host" id="cmp-swc"></div>
           <div class="cmp-host" id="cmp-wait"></div>
-          <script type="text/plain" id="src-r-swc-bad" data-src="autosar/gallery/gallery.c" data-region="swc-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="62" data-end="66" data-sha="1d96068ded30">
+          <script type="text/plain" id="src-r-swc-bad" data-src="autosar/gallery/gallery.c" data-region="swc-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="62" data-end="66" data-sha="f3d6e96c93f6">
 /* An "application" function that reads pins itself: tied to this ECU, untestable on a PC */
 boolean TurnLight_StalkLeftPressed(void)
 {
-    return ((GPIOB->IDR & GPIO_IDR_IDR12) == 0U) ? TRUE : FALSE;
+    return ((GPIOB->IDR & GPIO_IDR_ID12) == 0U) ? TRUE : FALSE;
 }
 </script>
           <script type="text/plain" id="src-r-swc-good" data-src="capstone/turnlight/stage3-autosar/asw/TurnLight/TurnLight.c" data-region="runnable" data-lang="c" data-file="asw/TurnLight/TurnLight.c" data-start="38" data-end="80" data-sha="a6d13e30ed98">
@@ -95,7 +95,7 @@ FUNC(void, TURNLIGHT_CODE) RE_TurnLight_10ms(void)
     (void)Rte_Call_Alive_CheckpointReached(0U);                               /* WdgM alive supervision */   // «8»
 }
 </script>
-          <script type="text/plain" id="src-r-wait-bad" data-src="autosar/gallery/gallery.c" data-region="wait-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="70" data-end="77" data-sha="1d96068ded30">
+          <script type="text/plain" id="src-r-wait-bad" data-src="autosar/gallery/gallery.c" data-region="wait-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="70" data-end="77" data-sha="f3d6e96c93f6">
 /* Waits forever if the crystal is missing: the ECU hangs before the watchdog is even running */
 void Clock_Start(void)
 {
@@ -105,7 +105,7 @@ void Clock_Start(void)
     }
 }
 </script>
-          <script type="text/plain" id="src-r-wait-good" data-src="autosar/mcal/mcu/Mcu.c" data-region="wait" data-lang="c" data-file="autosar/mcal/mcu/Mcu.c" data-start="36" data-end="46" data-sha="ca5f4354da21">
+          <script type="text/plain" id="src-r-wait-good" data-src="autosar/mcal/mcu/Mcu.c" data-region="wait" data-lang="c" data-file="autosar/mcal/mcu/Mcu.c" data-start="37" data-end="47" data-sha="efe18a465bd0">
 static FUNC(boolean, MCU_CODE) Mcu_WaitSet(volatile uint32 *reg, uint32 mask, uint32 value)
 {
     for (uint32 n = 0U; n < MCU_WAIT_LOOPS; ++n)

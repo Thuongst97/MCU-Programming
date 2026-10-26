@@ -1,70 +1,73 @@
 /* SPDX-License-Identifier: MIT
-   Module 01 · What Is a Microcontroller?: block diagram of the STM32F103, the 4 GB address space,
+   Module 01 · What Is a Microcontroller?: block diagram of the STM32G474, the 4 GB address space,
    memory-mapped registers and the toolchain pipeline. */
 (function () {
   "use strict";
   const { $, esc, Diagram, renderCodeExplorer, embedded, SequenceDiagram, Register } = window.MCU;
 
-  /* ------------------------------------------------ inside the chip (DS5319 block diagram, redrawn) */
-  Diagram.layered($("#lg-f103"), {
-    id: "f103",
-    label: "Block diagram of the STM32F103C8: core, AHB bus matrix, APB2 and APB1 peripherals",
+  /* ------------------------------------------------ inside the chip (DS12288 block diagram, redrawn and simplified) */
+  Diagram.layered($("#lg-g474"), {
+    id: "g474",
+    label: "Simplified block diagram of the STM32G474: core, AHB bus matrix with memories and AHB2, APB2 and APB1 peripherals",
     nodeH: 56,
-    toneLabels: { hw: "Cortex-M3 core", tool: "AHB: memories and bus masters", ecual: "APB2 peripherals (≤ 72 MHz)", svc: "APB1 peripherals (≤ 36 MHz)" },
+    toneLabels: { hw: "Cortex-M4 core", tool: "AHB: memories, DMA, GPIO, ADC", ecual: "APB2 peripherals (≤ 170 MHz)", svc: "APB1 peripherals (≤ 170 MHz)" },
     bands: [
-      { key: "core", tag: "Core", title: ["Cortex-M3"], sub: ["Arm IP"], tone: "hw" },
-      { key: "ahb", tag: "AHB", title: ["Bus matrix", "72 MHz max"], sub: ["memories, DMA"], tone: "tool" },
-      { key: "apb2", tag: "APB2", title: ["APB2 bridge"], sub: ["≤ 72 MHz"], tone: "ecual" },
-      { key: "apb1", tag: "APB1", title: ["APB1 bridge"], sub: ["≤ 36 MHz"], tone: "svc" },
+      { key: "core", tag: "Core", title: ["Cortex-M4F"], sub: ["Arm IP"], tone: "hw" },
+      { key: "ahb", tag: "AHB", title: ["Bus matrix", "170 MHz max"], sub: ["memories, DMA, AHB2"], tone: "tool" },
+      { key: "apb2", tag: "APB2", title: ["APB2 bridge"], sub: ["≤ 170 MHz"], tone: "ecual" },
+      { key: "apb1", tag: "APB1", title: ["APB1 bridge"], sub: ["≤ 170 MHz"], tone: "svc" },
     ],
     nodes: [
-      { id: "cpu", band: "core", title: "CPU", sub: "Thumb-2, ≤ 72 MHz", tip: "Cortex-M3 — ARMv7-M core: Thumb-2, hardware divide, no FPU" },
-      { id: "nvic", band: "core", title: "NVIC", sub: "43 IRQs, 16 levels" },
+      { id: "cpu", band: "core", title: "CPU + FPU", sub: "Thumb-2, ≤ 170 MHz", tip: "Cortex-M4 — ARMv7E-M core: Thumb-2, DSP instructions, single-precision FPU, MPU" },
+      { id: "nvic", band: "core", title: "NVIC", sub: "102 IRQs, 16 levels" },
       { id: "systick", band: "core", title: "SysTick", sub: "24-bit timer" },
-      { id: "dbg", band: "core", title: "SW-DP", sub: "debug port PA13/PA14", tip: "SW-DP — the Serial Wire Debug port the ST-Link talks to" },
-      { id: "bus", band: "ahb", title: "Bus matrix", sub: "ICode · DCode · System", tip: "Bus matrix — arbitrates between the CPU and DMA for memories and peripherals" },
-      { id: "flash", band: "ahb", title: "Flash 64 KB", sub: "0x08000000, prefetch", tip: "Flash — program memory, read through the flash interface with wait states" },
-      { id: "sram", band: "ahb", title: "SRAM 20 KB", sub: "0x20000000", tip: "SRAM — data, stack and heap; empty after power-on" },
-      { id: "dma", band: "ahb", title: "DMA1", sub: "7 channels" },
-      { id: "rcc", band: "ahb", title: "RCC", sub: "clocks and resets" },
-      { id: "gpio", band: "apb2", title: "GPIOA–C", sub: "+ AFIO, EXTI" },
-      { id: "usart1", band: "apb2", title: "USART1", sub: "PA9/PA10" },
-      { id: "spi1", band: "apb2", title: "SPI1", sub: "PA4–PA7" },
-      { id: "adc", band: "apb2", title: "ADC1/2", sub: "12-bit" },
-      { id: "tim1", band: "apb2", title: "TIM1", sub: "advanced timer" },
-      { id: "tim", band: "apb1", title: "TIM2–4", sub: "general purpose" },
-      { id: "usart23", band: "apb1", title: "USART2/3", sub: "" },
-      { id: "i2c", band: "apb1", title: "I2C1/2", sub: "" },
-      { id: "can", band: "apb1", title: "bxCAN", sub: "shares SRAM with USB" },
-      { id: "usb", band: "apb1", title: "USB FS", sub: "PA11/PA12" },
-      { id: "wdg", band: "apb1", title: "IWDG/WWDG", sub: "+ PWR, BKP, RTC" },
+      { id: "dbg", band: "core", title: "SW-DP", sub: "debug port PA13/PA14", tip: "SW-DP — the Serial Wire Debug port the on-board ST-LINK talks to" },
+      { id: "bus", band: "ahb", title: "Bus matrix", sub: "ICode · DCode · System", tip: "Bus matrix — arbitrates between the CPU and the DMA controllers for memories and peripherals" },
+      { id: "flash", band: "ahb", title: "Flash 512 KB", sub: "0x08000000, caches", tip: "Flash — program memory, read with wait states hidden by the instruction and data caches" },
+      { id: "sram", band: "ahb", title: "SRAM1+2 96 KB", sub: "0x20000000", tip: "SRAM1 (80 KB) + SRAM2 (16 KB), contiguous — data, stack and heap; reachable by DMA" },
+      { id: "ccm", band: "ahb", title: "CCM SRAM 32 KB", sub: "0x10000000, no DMA", tip: "CCM SRAM — on the core's buses only: fast, but the DMA controllers cannot reach it" },
+      { id: "dma", band: "ahb", title: "DMA1/2 + DMAMUX", sub: "2 × 8 channels" },
+      { id: "rcc", band: "ahb", title: "RCC, FLASH", sub: "clocks, wait states" },
+      { id: "gpio", band: "ahb", title: "GPIOA–G", sub: "AHB2, 0x48000000" },
+      { id: "adc", band: "ahb", title: "ADC1–5", sub: "AHB2, 12-bit" },
+      { id: "usart1", band: "apb2", title: "USART1", sub: "LIN in example 13" },
+      { id: "spi1", band: "apb2", title: "SPI1/4", sub: "SPI1 SCK on PA5 = LD2" },
+      { id: "tim1", band: "apb2", title: "TIM1/8/20, TIM15–17", sub: "advanced + small timers" },
+      { id: "syscfg", band: "apb2", title: "SYSCFG", sub: "EXTI port selection" },
+      { id: "tim", band: "apb1", title: "TIM2–7", sub: "TIM2/TIM5 32-bit" },
+      { id: "lpuart", band: "apb1", title: "LPUART1", sub: "ST-LINK virtual COM" },
+      { id: "i2c", band: "apb1", title: "I2C1–4, SPI2/3", sub: "" },
+      { id: "can", band: "apb1", title: "FDCAN1–3", sub: "CAN FD, message RAM" },
+      { id: "wdg", band: "apb1", title: "IWDG/WWDG", sub: "+ PWR, RTC, USB" },
     ],
     edges: [
       { from: "cpu", to: "bus", kind: "hw", label: "I/D/S buses" },
       { from: "dbg", to: "cpu", kind: "opt" },
       { from: "nvic", to: "cpu", kind: "opt" },
+      { from: "cpu", to: "ccm", kind: "hw" },
       { from: "bus", to: "flash", kind: "hw" },
       { from: "bus", to: "sram", kind: "hw" },
       { from: "dma", to: "bus", kind: "hw" },
-      { from: "bus", to: "rcc", kind: "hw" },
-      { from: "bus", to: "gpio", kind: "hw" }, { from: "bus", to: "usart1", kind: "hw" }, { from: "bus", to: "spi1", kind: "hw" },
-      { from: "bus", to: "adc", kind: "hw" }, { from: "bus", to: "tim1", kind: "hw" },
-      { from: "bus", to: "tim", kind: "hw" }, { from: "bus", to: "usart23", kind: "hw" }, { from: "bus", to: "i2c", kind: "hw" },
-      { from: "bus", to: "can", kind: "hw" }, { from: "bus", to: "usb", kind: "hw" }, { from: "bus", to: "wdg", kind: "hw" },
+      { from: "bus", to: "rcc", kind: "hw" }, { from: "bus", to: "gpio", kind: "hw" }, { from: "bus", to: "adc", kind: "hw" },
+      { from: "bus", to: "usart1", kind: "hw" }, { from: "bus", to: "spi1", kind: "hw" }, { from: "bus", to: "tim1", kind: "hw" }, { from: "bus", to: "syscfg", kind: "hw" },
+      { from: "bus", to: "tim", kind: "hw" }, { from: "bus", to: "lpuart", kind: "hw" }, { from: "bus", to: "i2c", kind: "hw" },
+      { from: "bus", to: "can", kind: "hw" }, { from: "bus", to: "wdg", kind: "hw" },
     ],
   });
 
-  /* ------------------------------------------------ address space (DS5319 memory map, redrawn; not to scale) */
+  /* ------------------------------------------------ address space (RM0440 memory map, redrawn; not to scale) */
   const REGIONS = [
-    { a: "0xE0000000", n: "Cortex-M3 internal peripherals", s: "NVIC, SysTick and SCB at 0xE000E000; debug units", d: "Part of the core, the same on every Cortex-M3. CMSIS gives them names: <code>NVIC</code>, <code>SysTick</code>, <code>SCB</code>." , c: "hw" },
-    { a: "0x42000000", n: "Peripheral bit-band alias", s: "one word per peripheral bit", d: "Each bit of the peripheral region also appears as a whole 32-bit word here. Writing 1 or 0 to that word sets or clears just that bit, atomically. ST's HAL uses it; this course uses BSRR-style registers instead (ARM DDI 0337).", c: "tool" },
-    { a: "0x40000000", n: "Peripherals", s: "APB1 0x40000000 · APB2 0x40010000 · AHB 0x40018000", d: "Every peripheral register. A few landmarks: TIM2 <code>0x40000000</code>, USART1 <code>0x40013800</code>, GPIOC <code>0x40011000</code>, RCC <code>0x40021000</code>, flash interface <code>0x40022000</code>.", c: "ecual" },
-    { a: "0x22000000", n: "SRAM bit-band alias", s: "one word per SRAM bit", d: "Same trick as above, for the first 1 MB of SRAM.", c: "tool" },
-    { a: "0x20000000", n: "SRAM, 20 KB", s: "0x20000000–0x20004FFF", d: "Global variables, the stack and the heap. Its content is random after power-on, which is why the startup code fills it.", c: "svc" },
-    { a: "0x1FFFF800", n: "Option bytes", s: "16 bytes", d: "Non-volatile settings such as read-out protection and write protection (PM0075).", c: "mcal" },
-    { a: "0x1FFFF000", n: "System memory, 2 KB", s: "ST's bootloader", d: "A small ROM program from ST that can load firmware over USART1. It runs when you boot with BOOT0 = 1 (AN2606). The flash size register sits just below the option bytes, at <code>0x1FFFF7E0</code>.", c: "mcal" },
-    { a: "0x08000000", n: "Flash, 64 KB", s: "0x08000000–0x0800FFFF", d: "Your program: vector table first, then code and constants. Survives power-off. Erased in 1 KB pages.", c: "asw" },
-    { a: "0x00000000", n: "Boot alias", s: "flash, system memory or SRAM", d: "Depending on the BOOT pins, flash (normal), system memory or SRAM also appears here. The core reads its first stack pointer and reset vector from address 0.", c: "rte" },
+    { a: "0xE0000000", n: "Cortex-M4 internal peripherals", s: "NVIC, SysTick, SCB (with CPACR) at 0xE000E000; debug units", d: "Part of the core, the same on every Cortex-M4. CMSIS gives them names: <code>NVIC</code>, <code>SysTick</code>, <code>SCB</code>. <code>SCB-&gt;CPACR</code> switches the FPU on.", c: "hw" },
+    { a: "0x50000000", n: "ADCs and DACs (AHB2)", s: "ADC1 at 0x50000000", d: "The analog blocks on AHB2: ADC1 <code>0x50000000</code>, ADC12 common registers just above it, DACs further up.", c: "ecual" },
+    { a: "0x48000000", n: "GPIO ports (AHB2)", s: "GPIOA 0x48000000 … GPIOG 0x48001800", d: "Each port has 1 KB of address space: GPIOA <code>0x48000000</code>, GPIOB <code>0x48000400</code>, GPIOC <code>0x48000800</code>. Being on AHB2 makes pin access fast.", c: "ecual" },
+    { a: "0x42000000", n: "Peripheral bit-band alias", s: "one word per peripheral bit", d: "Each bit of the APB/AHB1 peripheral region also appears as a whole 32-bit word here. Writing 1 or 0 to that word sets or clears just that bit, atomically. This course uses BSRR-style registers instead (ARM DDI 0403).", c: "tool" },
+    { a: "0x40000000", n: "APB1, APB2, AHB1 peripherals", s: "APB1 0x40000000 · APB2 0x40010000 · AHB1 0x40020000", d: "Landmarks: TIM2 <code>0x40000000</code>, FDCAN1 <code>0x40006400</code>, LPUART1 <code>0x40008000</code>, SYSCFG <code>0x40010000</code>, USART1 <code>0x40013800</code>, DMA1 <code>0x40020000</code>, RCC <code>0x40021000</code>, flash interface <code>0x40022000</code>.", c: "ecual" },
+    { a: "0x22000000", n: "SRAM1 bit-band alias", s: "one word per SRAM1 bit", d: "Same trick as above, for SRAM1.", c: "tool" },
+    { a: "0x20000000", n: "SRAM1 80 KB + SRAM2 16 KB", s: "0x20000000–0x20017FFF, contiguous", d: "Global variables, the stack and the heap. SRAM2 starts at <code>0x20014000</code>, right after SRAM1, so the linker treats both as one 96 KB region. Content is random after power-on, which is why the startup code fills it.", c: "svc" },
+    { a: "0x1FFF0000", n: "System memory and information block", s: "ST's bootloader, OTP, IDs, calibration", d: "ST's bootloader (AN2606) starts at <code>0x1FFF0000</code>. Above it: 1 KB of one-time-programmable memory at <code>0x1FFF7000</code>, the unique ID at <code>0x1FFF7590</code>, the flash size at <code>0x1FFF75E0</code> and the Vrefint calibration value used in <a href=\"adc-dma.html#noise\">module 09</a>.", c: "mcal" },
+    { a: "0x10000000", n: "CCM SRAM, 32 KB", s: "0x10000000–0x10007FFF", d: "Core-coupled memory: on the core's own buses, so it is fast for code and data. DMA cannot reach it. The linker script calls it <code>CCMRAM</code>; nothing goes there unless you ask.", c: "svc" },
+    { a: "0x08000000", n: "Flash, 512 KB", s: "0x08000000–0x0807FFFF", d: "Your program: vector table first, then code and constants. Survives power-off. Erased in 2 KB pages (two banks, the default) or 4 KB pages (single bank), programmed 64 bits at a time.", c: "asw" },
+    { a: "0x00000000", n: "Boot alias", s: "flash, system memory or SRAM1", d: "Depending on the boot configuration, flash (normal), system memory or SRAM1 also appears here. The core reads its first stack pointer and reset vector from address 0.", c: "rte" },
   ];
   const host = $("#mm-space");
   host.classList.add("hd-wrap");
@@ -78,7 +81,7 @@
       <text class="lg-sub" x="164" y="${y + 31}">${esc(r.s)}</text></g>
       <text class="hd-sub" x="140" y="${y + 24}" text-anchor="end">${esc(r.a)}</text>`;
   });
-  host.innerHTML = `<svg class="lg-svg" viewBox="0 0 ${W} ${10 + REGIONS.length * (RH + 6)}" role="group" aria-label="STM32F103 address space, highest addresses at the top">${svg}</svg><div class="sm-info" id="mm-space-info"></div>`;
+  host.innerHTML = `<svg class="lg-svg" viewBox="0 0 ${W} ${10 + REGIONS.length * (RH + 6)}" role="group" aria-label="STM32G474 address space, highest addresses at the top">${svg}</svg><div class="sm-info" id="mm-space-info"></div>`;
   const info = $("#mm-space-info");
   const show = (i) => {
     const r = REGIONS[i];
@@ -87,19 +90,19 @@
   };
   host.addEventListener("click", (e) => { const g = e.target.closest("[data-r]"); if (g) show(+g.dataset.r); });
   host.addEventListener("keydown", (e) => { const g = e.target.closest("[data-r]"); if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); show(+g.dataset.r); } });
-  show(7);
+  show(9);
 
   /* ------------------------------------------------ registers */
   renderCodeExplorer($("#ex-led"), {
     ...embedded("src-00-led-f"),
     notes: {
-      1: ["RCC-&gt;APB2ENR", "<code>RCC</code> is a pointer to a struct laid over the RCC registers at <code>0x40021000</code>; <code>APB2ENR</code> is the member at offset <code>0x18</code>. Setting bit <code>IOPCEN</code> switches on the clock of the GPIOC block."],
-      2: ["Read, clear, …", "Reads <code>GPIOC_CRH</code>, clears the four bits that belong to pin 13 with an inverted mask …"],
-      3: ["… set, write back", "… ORs in the new value and writes all 32 bits back. The settings of pins 8–12 and 14–15 are untouched."],
+      1: ["RCC-&gt;AHB2ENR", "<code>RCC</code> is a pointer to a struct laid over the RCC registers at <code>0x40021000</code>; <code>AHB2ENR</code> is the member at offset <code>0x4C</code>. Setting bit <code>GPIOAEN</code> switches on the clock of the GPIOA block. The read-back on the next line makes sure the write has reached the RCC before GPIOA is touched."],
+      2: ["Read, clear, …", "Reads <code>GPIOA_MODER</code> and clears the two bits that belong to pin 5 with an inverted mask …"],
+      3: ["… set, write back", "… ORs in <code>01</code> (general-purpose output) and writes all 32 bits back. The modes of the other 15 pins, including the SWD pins PA13/PA14, are untouched."],
       4: ["A write with a side effect", "Writing to <code>BSRR</code> changes the pin immediately. Reading <code>BSRR</code> back would not even return what you wrote: it is write-only. That is why registers are not ordinary memory."],
     },
   });
-  Register($("#reg-apb2enr"), { reg: "RCC_APB2ENR", value: 0x00000014 });
+  Register($("#reg-ahb2enr"), { reg: "RCC_AHB2ENR", value: 0x00000001 });
 
   /* ------------------------------------------------ toolchain */
   SequenceDiagram($("#seq-toolchain"), {
@@ -114,8 +117,8 @@
       { title: "Flash", sub: "0x08000000", tone: "hw" },
     ],
     steps: [
-      { from: 0, to: 1, label: "#include, #define", title: "Preprocess", detail: "<p>Headers are pasted in and macros replaced. <code>RCC-&gt;APB2ENR</code> becomes a pointer expression with a fixed address. Run <code>arm-none-eabi-gcc -E main.c</code> to see the result.</p>" },
-      { from: 1, to: 2, label: "Thumb-2 assembly", title: "Compile", detail: "<p>The compiler turns C into Thumb-2 instructions for the Cortex-M3 (<code>-mcpu=cortex-m3 -mthumb</code>), optimising as told (<code>-Og</code> for debugging, <code>-Os</code> for size).</p>", analogy: "Translating a recipe into the exact hand movements of one particular cook." },
+      { from: 0, to: 1, label: "#include, #define", title: "Preprocess", detail: "<p>Headers are pasted in and macros replaced. <code>RCC-&gt;AHB2ENR</code> becomes a pointer expression with a fixed address. Run <code>arm-none-eabi-gcc -E main.c</code> to see the result.</p>" },
+      { from: 1, to: 2, label: "Thumb-2 assembly", title: "Compile", detail: "<p>The compiler turns C into Thumb-2 and FPU instructions for the Cortex-M4 (<code>-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard</code>), optimising as told (<code>-Og</code> for debugging, <code>-Os</code> for size).</p>", analogy: "Translating a recipe into the exact hand movements of one particular cook." },
       { from: 2, to: 3, label: "main.o", title: "Assemble", detail: "<p>Each source file becomes an object file: machine code with <i>holes</i> where addresses of other functions and variables are not known yet.</p>" },
       { from: 3, to: 3, label: "place sections", title: "Link", detail: "<p>The linker combines all object files and libraries, decides the final address of every function and variable using the linker script (flash at <code>0x08000000</code>, RAM at <code>0x20000000</code>), fills the holes, and drops unused sections.</p>", analogy: "Typesetting a book: chapters written separately get page numbers, and every \"see page …\" is filled in." },
       { from: 3, to: 4, label: "app.elf", title: "ELF output", detail: "<p>The ELF holds code, data, symbol names and debug info. The debugger uses all of it.</p>" },

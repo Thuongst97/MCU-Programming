@@ -71,24 +71,30 @@
           <div class="sec-head"><h2><span class="sec-num">6.4</span>EXTI and AFIO_EXTICR</h2></div>
           <p>Any GPIO pin can raise an interrupt through the <b>EXTI</b> controller. There are 16 EXTI lines for pins (plus lines for PVD, RTC alarm and USB wake-up): line <i>n</i> serves pin <i>n</i> of <b>one</b> port, chosen in <code>AFIO_EXTICR</code> (RM0008 §10.2). So PA0 and PB0 cannot both interrupt at the same time.</p>
           <div id="seq-exti"></div>
-          <script type="text/plain" id="src-01-exti" data-src="examples/01-exti-button-debounce/src/main.c" data-region="exti" data-lang="c" data-file="examples/01-exti-button-debounce/src/main.c" data-start="29" data-end="46" data-sha="742749909636">
+          <script type="text/plain" id="src-01-exti" data-src="examples/01-exti-button-debounce/src/main.c" data-region="exti" data-lang="c" data-file="examples/01-exti-button-debounce/src/main.c" data-start="30" data-end="53" data-sha="5b0926fe06e1">
 static void exti_init(void)
 {
-    AFIO->EXTICR[0] = (AFIO->EXTICR[0] & ~AFIO_EXTICR1_EXTI0) | AFIO_EXTICR1_EXTI0_PA;  // «4»
-    EXTI->FTSR |= EXTI_FTSR_TR0;   /* falling edge: pressing pulls the pin to GND */       // «5»
-    EXTI->RTSR &= ~EXTI_RTSR_TR0;
-    EXTI->PR = EXTI_PR_PR0;        /* clear a stale pending flag (write 1 to clear) */
-    EXTI->IMR |= EXTI_IMR_MR0;     /* unmask line 0 */
-    NVIC_SetPriority(EXTI0_IRQn, 5U);                                                    // «6»
-    NVIC_EnableIRQ(EXTI0_IRQn);
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;          /* EXTI routing lives in SYSCFG on the G4 */
+    (void)RCC->APB2ENR;
+    SYSCFG->EXTICR[3] = (SYSCFG->EXTICR[3] & ~SYSCFG_EXTICR4_EXTI13)                     // «4»
+                        | SYSCFG_EXTICR4_EXTI13_PC;   /* line 13 listens to port C */
+    EXTI->RTSR1 |= EXTI_RTSR1_RT13;    /* both edges: we count bounces, polarity doesn't matter */  // «5»
+    EXTI->FTSR1 |= EXTI_FTSR1_FT13;
+    EXTI->PR1 = EXTI_PR1_PIF13;        /* clear a stale pending flag (write 1 to clear) */
+    EXTI->IMR1 |= EXTI_IMR1_IM13;      /* unmask line 13 */
+    NVIC_SetPriority(EXTI15_10_IRQn, 5U);       /* lines 10..15 share one vector */      // «6»
+    NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-void EXTI0_IRQHandler(void);
-void EXTI0_IRQHandler(void)
+void EXTI15_10_IRQHandler(void);
+void EXTI15_10_IRQHandler(void)
 {
-    EXTI->PR = EXTI_PR_PR0;        /* acknowledge first, or the interrupt fires again */   // «7»
-    s_raw_edges++;
-    s_edge_seen = true;            /* just a flag: the slow work happens in main() */     // «8»
+    if ((EXTI->PR1 & EXTI_PR1_PIF13) != 0U)
+    {
+        EXTI->PR1 = EXTI_PR1_PIF13;    /* acknowledge first, or the interrupt fires again */  // «7»
+        s_raw_edges++;
+        s_edge_seen = true;            /* just a flag: the slow work happens in main() */    // «8»
+    }
 }
 </script>
           <div id="ex-exti"></div>
@@ -99,7 +105,7 @@ void EXTI0_IRQHandler(void)
         <section class="doc-section" id="systick" data-title="SysTick time base">
           <div class="sec-head"><h2><span class="sec-num">6.5</span>SysTick time base</h2></div>
           <p>SysTick is a 24-bit down-counter inside the core. It reloads from <code>LOAD</code> when it reaches zero and can raise the SysTick exception each time. With HCLK = 72 MHz and <code>LOAD</code> = 71 999, that is exactly once per millisecond. The largest possible reload (2<sup>24</sup> − 1) gives about 233 ms at 72 MHz.</p>
-          <script type="text/plain" id="src-bsp-tick" data-src="examples/common/bsp/systick.c" data-region="tick" data-lang="c" data-file="examples/common/bsp/systick.c" data-start="6" data-end="22" data-sha="b65c20d8609d">
+          <script type="text/plain" id="src-bsp-tick" data-src="examples/common/bsp/systick.c" data-region="tick" data-lang="c" data-file="examples/common/bsp/systick.c" data-start="6" data-end="22" data-sha="44b9b53934d9">
 static volatile uint32_t s_ms;       /* written by the interrupt, read by main: volatile */   // «1»
 
 void SysTick_Handler(void);
@@ -115,7 +121,7 @@ void systick_init_1ms(void)
 
 uint32_t millis(void)
 {
-    return s_ms;   /* a single aligned 32-bit read is atomic on Cortex-M3 */                 // «4»
+    return s_ms;   /* a single aligned 32-bit read is atomic on Cortex-M4 */                 // «4»
 }
 </script>
           <div id="ex-tick"></div>
@@ -165,7 +171,7 @@ bool ringbuf_get(ringbuf_t *rb, uint8_t *byte)
 </script>
           <div id="ex-ring"></div>
           <p>But <code>USART1-&gt;CR1</code> is written by both sides, so the read-modify-write in <code>main()</code> is wrapped in a critical section that saves and restores <code>PRIMASK</code>:</p>
-          <script type="text/plain" id="src-04-write" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="write" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="58" data-end="81" data-sha="6330a97aedd6">
+          <script type="text/plain" id="src-04-write" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="write" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="68" data-end="91" data-sha="e5690058d8e2">
 static void tx_put(uint8_t b)
 {
     for (uint32_t n = 0U; !ringbuf_put(&s_tx, b) && (n < 1000000U); ++n)
@@ -175,7 +181,7 @@ static void tx_put(uint8_t b)
     /* CR1 is also written by the ISR, so this read-modify-write must not be interrupted. */
     const uint32_t primask = __get_PRIMASK();
     __disable_irq();                                                                            // «7»
-    USART1->CR1 |= USART_CR1_TXEIE;
+    LPUART1->CR1 |= USART_CR1_TXEIE_TXFNFIE;
     __set_PRIMASK(primask);
 }
 
@@ -198,7 +204,7 @@ static void uart_write(const char *s)
         <section class="doc-section" id="scheduler" data-title="A non-blocking cooperative scheduler">
           <div class="sec-head"><h2><span class="sec-num">6.7</span>A non-blocking cooperative scheduler</h2></div>
           <p>Most bare-metal firmware is a <b>super loop</b>: <code>for (;;)</code> calling functions in turn. It stops scaling when some work must happen every 10 ms and other work every second. A small cooperative scheduler fixes that: a table of tasks with periods, run to completion when they are due, timed by SysTick.</p>
-          <script type="text/plain" data-code data-src="examples/02-systick-scheduler/src/main.c" data-region="table" data-lang="c" data-file="examples/02-systick-scheduler/src/main.c" data-start="30" data-end="36" data-sha="595af247ce0b">
+          <script type="text/plain" data-code data-src="examples/02-systick-scheduler/src/main.c" data-region="table" data-lang="c" data-file="examples/02-systick-scheduler/src/main.c" data-start="30" data-end="36" data-sha="48361a741a1f">
 static task_t s_tasks[] = {
     /* name        function         period */                                  // «1»
     {"sample",    task_sample,      10U,   0U, 0U, 0U},

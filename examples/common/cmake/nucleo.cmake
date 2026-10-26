@@ -51,11 +51,11 @@ find_program(OPENOCD openocd)
 
 function(nucleo_add_executable name)
   cmake_parse_arguments(BP "OWN_STARTUP;NO_BSP;STARTFILES" "LINKER_SCRIPT" "SOURCES;INCLUDES;DEFINES;LIBS" ${ARGN})
-  if(NOT BP_LINKER_SCRIPT)
-    set(BP_LINKER_SCRIPT "${MCU_COMMON}/ld/stm32g474re.ld")
+  if(NOT MCU_LINKER_SCRIPT)
+    set(MCU_LINKER_SCRIPT "${MCU_COMMON}/ld/stm32g474re.ld")
   endif()
   add_executable(${name} ${BP_SOURCES})
-  set_target_properties(${name} PROPERTIES SUFFIX ".elf" LINK_DEPENDS "${BP_LINKER_SCRIPT};${MCU_COMMON}/ld/stm32g474_sections.ld")
+  set_target_properties(${name} PROPERTIES SUFFIX ".elf" LINK_DEPENDS "${MCU_LINKER_SCRIPT};${MCU_COMMON}/ld/stm32g474_sections.ld")
   target_compile_options(${name} PRIVATE ${MCU_C_FLAGS})
   target_include_directories(${name} PRIVATE ${BP_INCLUDES})
   target_compile_definitions(${name} PRIVATE ${BP_DEFINES})
@@ -71,7 +71,7 @@ function(nucleo_add_executable name)
   endif()
   # [region:link]
   target_link_options(${name} PRIVATE ${MCU_CPU_FLAGS} -L "${MCU_COMMON}/ld"
-    -T "${BP_LINKER_SCRIPT}" --specs=nano.specs --specs=nosys.specs                # «7»
+    -T "${MCU_LINKER_SCRIPT}" --specs=nano.specs --specs=nosys.specs                # «7»
     -Wl,--gc-sections -Wl,-Map=$<TARGET_FILE_DIR:${name}>/${name}.map -Wl,--print-memory-usage)   # «8»
   add_custom_command(TARGET ${name} POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${name}> $<TARGET_FILE_DIR:${name}>/${name}.hex   # «9»

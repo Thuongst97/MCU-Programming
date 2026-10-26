@@ -66,42 +66,49 @@
           </table></div>
           <div id="reg-sr"></div>
           <p>Example 04 enables only the receive interrupt at start-up and turns the transmit interrupt on whenever there is something to send:</p>
-          <script type="text/plain" id="src-04-init" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="init" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="17" data-end="26" data-sha="6330a97aedd6">
+          <script type="text/plain" id="src-04-init" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="init" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="20" data-end="31" data-sha="e5690058d8e2">
 static void uart_irq_init(uint32_t baud)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_USART1EN;
-    GPIOA->CRH = (GPIOA->CRH & ~(GPIO_CRH_CNF9 | GPIO_CRH_MODE9 | GPIO_CRH_CNF10 | GPIO_CRH_MODE10))
-                 | GPIO_CRH_CNF9_1 | GPIO_CRH_MODE9 | GPIO_CRH_CNF10_0;
-    USART1->BRR = (clock_pclk2() + (baud / 2U)) / baud;
-    USART1->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE;   /* RX interrupt on */ // «1»
-    NVIC_SetPriority(USART1_IRQn, 6U);                                                                // «2»
-    NVIC_EnableIRQ(USART1_IRQn);
+    RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
+    (void)RCC->APB1ENR2;
+    gpio_clock_on(BOARD_VCP_PORT);
+    gpio_af(BOARD_VCP_PORT, BOARD_VCP_TX_PIN, AF_PA2_LPUART1_TX);
+    gpio_af(BOARD_VCP_PORT, BOARD_VCP_RX_PIN, AF_PA3_LPUART1_RX);
+    LPUART1->BRR = (uint32_t)((256ULL * clock_pclk1() + (baud / 2U)) / baud);
+    LPUART1->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE_RXFNEIE;   /* RX interrupt on */ // «1»
+    NVIC_SetPriority(LPUART1_IRQn, 6U);                                                                     // «2»
+    NVIC_EnableIRQ(LPUART1_IRQn);
 }
 </script>
           <div id="ex-init"></div>
-          <script type="text/plain" id="src-04-isr" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="isr" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="30" data-end="54" data-sha="6330a97aedd6">
-void USART1_IRQHandler(void);
-void USART1_IRQHandler(void)
+          <script type="text/plain" id="src-04-isr" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="isr" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="35" data-end="64" data-sha="e5690058d8e2">
+void LPUART1_IRQHandler(void);
+void LPUART1_IRQHandler(void)
 {
-    const uint32_t sr = USART1->SR;
-    if ((sr & (USART_SR_RXNE | USART_SR_ORE)) != 0U)          /* byte received (or overrun) */      // «3»
+    const uint32_t isr = LPUART1->ISR;
+    if ((isr & USART_ISR_ORE) != 0U)                          /* overrun: a byte was lost */      // «3»
     {
-        const uint8_t b = (uint8_t)USART1->DR;                /* reading DR clears RXNE and ORE */
+        LPUART1->ICR = USART_ICR_ORECF;                       /* G4: ORE is cleared through ICR */
+        s_rx_dropped++;
+    }
+    if ((isr & USART_ISR_RXNE_RXFNE) != 0U)                   /* byte received */
+    {
+        const uint8_t b = (uint8_t)LPUART1->RDR;              /* reading RDR clears RXNE */
         if (!ringbuf_put(&s_rx, b))
         {
             s_rx_dropped++;                                   /* main() was too slow: count, don't block */
         }
     }
-    if (((USART1->CR1 & USART_CR1_TXEIE) != 0U) && ((sr & USART_SR_TXE) != 0U))                    // «4»
+    if (((LPUART1->CR1 & USART_CR1_TXEIE_TXFNFIE) != 0U) && ((isr & USART_ISR_TXE_TXFNF) != 0U))   // «4»
     {
         uint8_t b;
         if (ringbuf_get(&s_tx, &b))
         {
-            USART1->DR = b;
+            LPUART1->TDR = b;
         }
         else
         {
-            USART1->CR1 &= ~USART_CR1_TXEIE;                  /* nothing left: stop TXE interrupts */ // «5»
+            LPUART1->CR1 &= ~USART_CR1_TXEIE_TXFNFIE;         /* nothing left: stop TXE interrupts */ // «5»
         }
     }
 }
@@ -242,18 +249,18 @@ static void execute(shell_t *sh)
 </script>
           <div id="ex-exec"></div>
           <p>What a session looks like (from <code>expected-output.txt</code>):</p>
-          <script type="text/plain" data-code data-src="examples/04-uart-shell-ringbuffer/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="12" data-sha="97a4f705b42c">
+          <script type="text/plain" data-code data-src="examples/04-uart-shell-ringbuffer/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="12" data-sha="ca97b0e9e59b">
 Example 04: UART shell (type help)
 > help
 Commands:
   help - list commands
-  led - led on|off|toggle (PC13)
+  led - led on|off|toggle (LD2, PA5)
   clock - show the bus clocks
-  mco - mco hse|pll|off: clock out on PA8
+  mco - mco hsi|sys|off: clock out on PA8 (D7)
   uptime - milliseconds since start
   regs - dump RCC and FLASH registers
 > clock
-SYSCLK/HCLK 72000000 Hz, PCLK1 36000000 Hz, PCLK2 72000000 Hz
+SYSCLK/HCLK 170000000 Hz, PCLK1 170000000 Hz, PCLK2 170000000 Hz
 > 
 </script>
           <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 04)</span><p>✅ The Robot test types commands into the simulated UART and checks the answers and the LED. ⚠️ Characters arrive without real bit timing, so overruns never happen in simulation. ❌ Not tested on a Blue Pill yet.</p></div></div>

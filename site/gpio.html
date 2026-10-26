@@ -44,13 +44,12 @@
             <li><b>Pull direction comes from ODR.</b> In input pull mode (<code>CNF = 10</code>), the pin's bit in <code>ODR</code> chooses the resistor: 1 = pull-up, 0 = pull-down. Example 01 sets it with <code>BSRR</code>.</li>
             <li><b>No alternate-function number.</b> On the F1, setting a pin to "alternate function output" connects it to whichever peripheral is enabled on that pin. Inputs used by a peripheral (USART RX, SPI MISO) stay ordinary inputs. Conflicts are resolved by enabling only one peripheral per pin, or by remapping (<a href="#afio">below</a>).</li>
           </ul>
-          <script type="text/plain" id="src-01-gpio" data-src="examples/01-exti-button-debounce/src/main.c" data-region="gpio" data-lang="c" data-file="examples/01-exti-button-debounce/src/main.c" data-start="19" data-end="25" data-sha="742749909636">
+          <script type="text/plain" id="src-01-gpio" data-src="examples/01-exti-button-debounce/src/main.c" data-region="gpio" data-lang="c" data-file="examples/01-exti-button-debounce/src/main.c" data-start="21" data-end="26" data-sha="5b0926fe06e1">
 static void button_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_AFIOEN;                 // «1»
-    /* PA0: CNF = 10 (input with pull-up/pull-down), MODE = 00 (input). */
-    GPIOA->CRL = (GPIOA->CRL & ~(GPIO_CRL_CNF0 | GPIO_CRL_MODE0)) | GPIO_CRL_CNF0_1;   // «2»
-    GPIOA->BSRR = GPIO_BSRR_BS0;   /* ODR0 = 1 selects the pull-UP: idle level is high */ // «3»
+    gpio_clock_on(BOARD_BTN_PORT);                                           // «1»
+    gpio_mode(BOARD_BTN_PORT, BOARD_BTN_PIN, BSP_GPIO_INPUT);                // «2»
+    gpio_pull(BOARD_BTN_PORT, BOARD_BTN_PIN, BSP_GPIO_PULLDOWN);   /* as ST's BSP does */ // «3»
 }
 </script>
           <div id="ex-gpio"></div>
@@ -77,16 +76,16 @@ static void button_init(void)
             </tbody>
           </table></div>
           <p>The LED driver reads <code>ODR</code> to toggle, but writes through <code>BSRR</code>:</p>
-          <script type="text/plain" id="src-bsp-toggle" data-src="examples/common/bsp/led.c" data-region="toggle" data-lang="c" data-file="examples/common/bsp/led.c" data-start="24" data-end="34" data-sha="5e9d5780cce1">
+          <script type="text/plain" id="src-bsp-toggle" data-src="examples/common/bsp/led.c" data-region="toggle" data-lang="c" data-file="examples/common/bsp/led.c" data-start="24" data-end="34" data-sha="874349f3dd88">
 void led_toggle(void)
 {
-    if ((GPIOC->ODR & GPIO_ODR_ODR13) != 0U)   /* read back what we last drove */  // «1»
+    if ((BOARD_LED_PORT->ODR & GPIO_ODR_OD5) != 0U)   /* read back what we last drove */  // «1»
     {
-        led_on();
+        led_off();
     }
     else
     {
-        led_off();
+        led_on();
     }
 }
 </script>

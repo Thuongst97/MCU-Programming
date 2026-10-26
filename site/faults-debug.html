@@ -55,13 +55,15 @@
           <div id="reg-cfsr"></div>
           <div id="reg-hfsr"></div>
           <p id="fault-why" class="muted"></p>
-          <script type="text/plain" id="src-08-tables" data-src="examples/08-iwdg-hardfault/src/faultdecode.c" data-region="tables" data-lang="c" data-file="examples/08-iwdg-hardfault/src/faultdecode.c" data-start="14" data-end="21" data-sha="224370312755">
+          <script type="text/plain" id="src-08-tables" data-src="examples/08-iwdg-hardfault/src/faultdecode.c" data-region="tables" data-lang="c" data-file="examples/08-iwdg-hardfault/src/faultdecode.c" data-start="14" data-end="23" data-sha="e2560f02385e">
 static const flag_t s_cfsr[] = {
     {25U, "DIVBYZERO"}, {24U, "UNALIGNED"}, {19U, "NOCP"}, {18U, "INVPC"},                  /* UsageFault */ // «1»
     {17U, "INVSTATE"}, {16U, "UNDEFINSTR"},
-    {15U, "BFARVALID"}, {12U, "STKERR"}, {11U, "UNSTKERR"}, {10U, "IMPRECISERR"},            /* BusFault */
+    {15U, "BFARVALID"}, {13U, "LSPERR"}, {12U, "STKERR"}, {11U, "UNSTKERR"},                /* BusFault */
+    {10U, "IMPRECISERR"},
     {9U, "PRECISERR"}, {8U, "IBUSERR"},
-    {7U, "MMARVALID"}, {4U, "MSTKERR"}, {3U, "MUNSTKERR"}, {1U, "DACCVIOL"}, {0U, "IACCVIOL"},  /* MemManage */
+    {7U, "MMARVALID"}, {5U, "MLSPERR"}, {4U, "MSTKERR"}, {3U, "MUNSTKERR"},                /* MemManage */
+    {1U, "DACCVIOL"}, {0U, "IACCVIOL"},
 };
 static const flag_t s_hfsr[] = {{31U, "DEBUGEVT"}, {30U, "FORCED"}, {1U, "VECTTBL"}};                       // «2»
 </script>
@@ -83,7 +85,7 @@ static const flag_t s_hfsr[] = {{31U, "DEBUGEVT"}, {30U, "FORCED"}, {1U, "VECTTB
             </tbody>
           </table></div>
           <p>Which stack? The value in <code>LR</code> at handler entry is not a return address but <code>EXC_RETURN</code>; its bit 2 is 0 when the frame is on the main stack (MSP) and 1 when it is on the process stack (PSP, used by RTOS tasks). That test has to happen before any C code touches the stack, so the first part of the handler is three instructions of assembly:</p>
-          <script type="text/plain" id="src-08-handler" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="handler" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="49" data-end="78" data-sha="5aee32d3acad">
+          <script type="text/plain" id="src-08-handler" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="handler" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="50" data-end="79" data-sha="b8b58166f430">
 void HardFault_Handler(void) __attribute__((naked));
 void HardFault_Handler(void)
 {
@@ -122,11 +124,11 @@ void hardfault_c(const uint32_t *frame)
         <section class="doc-section" id="handler" data-title="A fault handler that logs">
           <div class="sec-head"><h2><span class="sec-num">15.4</span>A fault handler that logs</h2></div>
           <p>A fault handler in a product should do three things: record, report, recover. Example 08 records into a struct placed in the <code>.noinit</code> section, which the startup code neither copies nor zeroes, so it survives the reset that follows:</p>
-          <script type="text/plain" id="src-08-record" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="record" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="22" data-end="22" data-sha="5aee32d3acad">
+          <script type="text/plain" id="src-08-record" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="record" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="23" data-end="23" data-sha="b8b58166f430">
 __attribute__((section(".noinit"))) static fault_record_t s_last_fault;   /* survives a reset */  // «1»
 </script>
           <div id="ex-record"></div>
-          <script type="text/plain" id="src-08-boot2" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="boot" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="122" data-end="135" data-sha="5aee32d3acad">
+          <script type="text/plain" id="src-08-boot2" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="boot" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="123" data-end="136" data-sha="b8b58166f430">
 uart_puts("\nExample 08 boot, reset cause: ");
 uart_puts(reset_cause(RCC->CSR));                                                              // «14»
 uart_puts("\n");
@@ -143,8 +145,8 @@ if (s_last_fault.magic == FAULT_MAGIC)
 }
 </script>
           <div id="ex-boot2"></div>
-          <script type="text/plain" data-code data-src="examples/08-iwdg-hardfault/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="11" data-sha="43f765c1ee24">
-Example 08 boot, reset cause: power-on
+          <script type="text/plain" data-code data-src="examples/08-iwdg-hardfault/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="11" data-sha="66e5100a922d">
+Example 08 boot, reset cause: power-on or brown-out
 keys: d = divide by 0, u = undefined instruction, i = invalid state, b = bus fault,
       w = stop feeding the watchdog, h = this help
 
@@ -157,7 +159,7 @@ keys: d = divide by 0, u = undefined instruction, i = invalid state, b = bus fau
       w = stop feeding the watchdog, h = this help
 </script>
           <p>The four faults example 08 can trigger, one key each:</p>
-          <script type="text/plain" id="src-08-faults" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="faults" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="82" data-end="105" data-sha="5aee32d3acad">
+          <script type="text/plain" id="src-08-faults" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="faults" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="83" data-end="106" data-sha="b8b58166f430">
 static void fault_div0(void)
 {
     SCB->CCR |= SCB_CCR_DIV_0_TRP_Msk;              /* by default x / 0 silently gives 0 */        // «10»
@@ -179,7 +181,7 @@ static void fault_invstate(void)
 
 static void fault_bus(void)
 {
-    volatile uint32_t v = *(volatile uint32_t *)0x60000000U;   /* no memory there on the C8 */      // «13»
+    volatile uint32_t v = *(volatile uint32_t *)0x10008000U;   /* just past CCM SRAM: reserved */  // «13»
     (void)v;
 }
 </script>
@@ -191,7 +193,7 @@ static void fault_bus(void)
         <section class="doc-section" id="gdb" data-title="GDB and Cortex-Debug techniques">
           <div class="sec-head"><h2><span class="sec-num">15.5</span>GDB and Cortex-Debug techniques</h2></div>
           <p>A debugger stops the CPU and lets you look at everything. Beyond breakpoint-and-step, a few techniques find bugs much faster. This GDB script prints the fault registers and the stacked frame and lists the faulting source line:</p>
-          <script type="text/plain" id="src-gdb-fault" data-src="examples/08-iwdg-hardfault/debug/fault.gdb" data-region="fault" data-lang="sh" data-file="examples/08-iwdg-hardfault/debug/fault.gdb" data-start="7" data-end="25" data-sha="327a533d5fb1">
+          <script type="text/plain" id="src-gdb-fault" data-src="examples/08-iwdg-hardfault/debug/fault.gdb" data-region="fault" data-lang="sh" data-file="examples/08-iwdg-hardfault/debug/fault.gdb" data-start="8" data-end="26" data-sha="6237c7583b84">
 define fault
   printf "CFSR  0x%08x\n", *(unsigned int *)0xE000ED28
   printf "HFSR  0x%08x\n", *(unsigned int *)0xE000ED2C
@@ -213,7 +215,7 @@ Print the fault status registers and the stacked exception frame, then show the 
 end
 </script>
           <div id="ex-gdb-fault"></div>
-          <script type="text/plain" id="src-gdb-watch" data-src="examples/08-iwdg-hardfault/debug/fault.gdb" data-region="watch" data-lang="sh" data-file="examples/08-iwdg-hardfault/debug/fault.gdb" data-start="29" data-end="35" data-sha="327a533d5fb1">
+          <script type="text/plain" id="src-gdb-watch" data-src="examples/08-iwdg-hardfault/debug/fault.gdb" data-region="watch" data-lang="sh" data-file="examples/08-iwdg-hardfault/debug/fault.gdb" data-start="30" data-end="36" data-sha="6237c7583b84">
 # Stop when anything writes the fault record (a hardware watchpoint: DWT, 4 comparators)
 # watch s_last_fault.magic                                                     # «3»
 # Stop on the 100th call only: skip the first 99 hits of breakpoint 2
