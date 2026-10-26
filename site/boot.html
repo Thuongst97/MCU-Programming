@@ -26,36 +26,38 @@
           <div class="eyebrow">Module 03 · From reset to main</div>
           <h1>Startup Code, Vector Table &amp; Linker Scripts</h1>
           <p class="lead">Between pressing reset and the first line of <code>main()</code>, a few hundred instructions run that most programmers never see. This module walks through every one of them, and through the linker script that decides where each byte of your program ends up.</p>
-          <div class="page-meta"><span>⏱ 40 min read</span><span>🎯 Beginner → intermediate</span><span>📂 examples/00-bluepill-blink-uart/bare</span></div>
+          <div class="page-meta"><span>⏱ 40 min read</span><span>🎯 Beginner → intermediate</span><span>📂 examples/00-nucleo-blink-uart/bare</span></div>
         </header>
 
-        <section class="doc-section" id="boot-modes" data-title="Boot modes: BOOT0 and BOOT1">
-          <div class="sec-head"><h2><span class="sec-num">3.1</span>Boot modes: BOOT0 and BOOT1</h2></div>
-          <p>When the chip comes out of reset, it samples two pins to decide which memory to start from (RM0008 §3.4). The chosen memory is <i>aliased</i> at address <code>0x00000000</code>, where the core looks first.</p>
+        <section class="doc-section" id="boot-modes" data-title="Boot modes: PB8-BOOT0 and option bytes">
+          <div class="sec-head"><h2><span class="sec-num">3.1</span>Boot modes: PB8-BOOT0 and option bytes</h2></div>
+          <p>When the chip comes out of reset, it decides which memory to start from and <i>aliases</i> it at address <code>0x00000000</code>, where the core looks first (RM0440, boot configuration). On the G4 the decision uses one pin and three option bits stored in flash (<code>FLASH_OPTR</code>):</p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th>BOOT1 (PB2)</th><th>BOOT0</th><th>Boots from</th><th>Use</th></tr></thead>
+            <thead><tr><th>BOOT0</th><th>nBOOT1 (option bit)</th><th>Boots from</th><th>Use</th></tr></thead>
             <tbody>
-              <tr><td>x</td><td>0</td><td>Main flash <code>0x08000000</code></td><td>Normal operation: your program.</td></tr>
-              <tr><td>0</td><td>1</td><td>System memory <code>0x1FFFF000</code></td><td>ST's bootloader: flash new firmware over USART1 (AN2606), or recover a chip whose program disabled SWD.</td></tr>
-              <tr><td>1</td><td>1</td><td>Embedded SRAM <code>0x20000000</code></td><td>Rare: running code loaded into RAM by a debugger.</td></tr>
+              <tr><td>0</td><td>x</td><td>Main flash <code>0x08000000</code></td><td>Normal operation: your program.</td></tr>
+              <tr><td>1</td><td>1</td><td>System memory <code>0x1FFF0000</code></td><td>ST's bootloader: load new firmware over USART, I2C, SPI, FDCAN or USB (AN2606), or recover a chip whose program disabled SWD.</td></tr>
+              <tr><td>1</td><td>0</td><td>SRAM1 <code>0x20000000</code></td><td>Rare: running code a debugger loaded into RAM.</td></tr>
             </tbody>
           </table></div>
-          <p>The pins are sampled on the fourth rising edge of the system clock after reset, and again when leaving Standby mode, so changing a jumper takes effect at the next reset, not immediately.</p>
-          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The boot pins are a railway switch set before the train leaves. Moving the lever while the train is running changes nothing; the next departure takes the new track.</p></div></div>
+          <p>Where BOOT0 itself comes from is another option bit, <code>nSWBOOT0</code>. With the factory setting (<code>nSWBOOT0 = 1</code>) BOOT0 is the level of the <b>PB8-BOOT0</b> pin, sampled at reset. With <code>nSWBOOT0 = 0</code> the pin is ignored and BOOT0 is the option bit <code>nBOOT0</code> instead, which frees PB8 for ordinary use. ST's HAL names the two choices <code>OB_BOOT0_FROM_PIN</code> and <code>OB_BOOT0_FROM_OB</code>.</p>
+          <div id="reg-optr"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">PB8 is also Arduino D15 (I2C1 SCL)</span><p>PB8 is a normal I/O pin after reset, and on the NUCLEO it is the Arduino D15 / I2C SCL position. An I2C module with a pull-up resistor on SCL holds PB8 high while the chip resets, so it boots ST's bootloader instead of your program: LD2 stays dark and the debugger finds the PC in system memory. The course therefore puts its I2C OLED on PA9/PA8 (<a href="i2c.html#pitfalls">module 10</a>). If you must use PB8 at reset, clear <code>nSWBOOT0</code> with STM32CubeProgrammer, once, knowingly.</p></div></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The boot configuration is a railway switch set before the train leaves. Moving the lever while the train is running changes nothing; the next departure takes the new track. The option bits decide whether that lever is the one on the platform (the PB8 pin) or one locked in the signal box (<code>nBOOT0</code>).</p></div></div>
         </section>
 
         <section class="doc-section" id="reset-sequence" data-title="The reset sequence">
           <div class="sec-head"><h2><span class="sec-num">3.2</span>The reset sequence</h2></div>
-          <p>The Cortex-M3 needs no assembly to start: the hardware itself loads the stack pointer and jumps to C code (ARM DDI 0403 §B1.5). Step through it:</p>
+          <p>The Cortex-M4 needs no assembly to start: the hardware itself loads the stack pointer and jumps to C code (ARM DDI 0403, B1.5). Step through it:</p>
           <div id="seq-reset"></div>
         </section>
 
         <section class="doc-section" id="vector-table" data-title="The vector table">
           <div class="sec-head"><h2><span class="sec-num">3.3</span>The vector table</h2></div>
           <p>The vector table is an array of 32-bit words at the start of the image. Word 0 is the initial stack pointer; every word after that is the address of a handler: reset, faults, system exceptions, then the device interrupts in the order of their IRQ numbers. In C it is simply an array of function pointers placed in its own section:</p>
-          <script type="text/plain" id="src-boot-vectors" data-src="examples/00-bluepill-blink-uart/bare/src/startup.c" data-region="vectors" data-lang="c" data-file="bare/src/startup.c" data-start="126" data-end="140" data-sha="b8e0317f0830">
+          <script type="text/plain" id="src-boot-vectors" data-src="examples/00-nucleo-blink-uart/bare/src/startup.c" data-region="vectors" data-lang="c" data-file="bare/src/startup.c" data-start="197" data-end="211" data-sha="e7a5401f61ae">
 __attribute__((section(".isr_vector"), used))                 // «6»
-const vector_t g_vector_table[16 + 43] = {
+const vector_t g_vector_table[16 + 102] = {
     (vector_t)(uintptr_t)_estack,   /* 0: initial main stack pointer (MSP) */   // «7»
     Reset_Handler,                  /* 1: reset */                               // «8»
     NMI_Handler,                    /* 2 */
@@ -72,7 +74,7 @@ const vector_t g_vector_table[16 + 43] = {
 </script>
           <div id="ex-vectors"></div>
           <p>Handlers you don't write fall back to <code>Default_Handler</code> through weak aliases:</p>
-          <script type="text/plain" id="src-boot-weak" data-src="examples/00-bluepill-blink-uart/bare/src/startup.c" data-region="weak" data-lang="c" data-file="bare/src/startup.c" data-start="66" data-end="75" data-sha="b8e0317f0830">
+          <script type="text/plain" id="src-boot-weak" data-src="examples/00-nucleo-blink-uart/bare/src/startup.c" data-region="weak" data-lang="c" data-file="bare/src/startup.c" data-start="78" data-end="87" data-sha="e7a5401f61ae">
 #define WEAK_ALIAS __attribute__((weak, alias("Default_Handler")))   // «5»
 void NMI_Handler(void) WEAK_ALIAS;
 void HardFault_Handler(void) WEAK_ALIAS;
@@ -85,10 +87,10 @@ void PendSV_Handler(void) WEAK_ALIAS;
 void SysTick_Handler(void) WEAK_ALIAS;
 </script>
           <div id="ex-weak"></div>
-          <p>The table has exactly 16 + 43 entries. A compile-time check keeps it in step with the IRQ numbers in ST's header, so a missing line can never shift every handler after it:</p>
-          <script type="text/plain" id="src-boot-guard" data-src="examples/00-bluepill-blink-uart/bare/src/startup.c" data-region="guard" data-lang="c" data-file="bare/src/startup.c" data-start="189" data-end="190" data-sha="b8e0317f0830">
-_Static_assert(sizeof(g_vector_table) / sizeof(g_vector_table[0]) == 16U + (uint32_t)USBWakeUp_IRQn + 1U,
-               "vector table size must match IRQn_Type in stm32f103xb.h");   // «10»
+          <p>The table has exactly 16 + 102 entries: the G474's interrupt lines run from 0 (<code>WWDG_IRQn</code>) to 101 (<code>FMAC_IRQn</code>), with a few reserved slots in between that hold 0. A compile-time check keeps it in step with the IRQ numbers in ST's header, so a missing line can never shift every handler after it:</p>
+          <script type="text/plain" id="src-boot-guard" data-src="examples/00-nucleo-blink-uart/bare/src/startup.c" data-region="guard" data-lang="c" data-file="bare/src/startup.c" data-start="321" data-end="322" data-sha="e7a5401f61ae">
+_Static_assert(sizeof(g_vector_table) / sizeof(g_vector_table[0]) == 16U + (uint32_t)FMAC_IRQn + 1U,
+               "vector table size must match IRQn_Type in stm32g474xx.h");   // «10»
 </script>
           <div id="ex-guard"></div>
           <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">A typo in a handler name fails silently</span><p>Write <code>void USART1_IRQHandle(void)</code> (missing "r") and the program still links: your function is simply never called, and the interrupt runs <code>Default_Handler</code>, which loops forever. If your program "hangs" right after enabling an interrupt, halt it in the debugger: a PC inside <code>Default_Handler</code> means a name mismatch.</p></div></div>
@@ -102,15 +104,22 @@ _Static_assert(sizeof(g_vector_table) / sizeof(g_vector_table[0]) == 16U + (uint
             <tbody>
               <tr><td><code>.isr_vector</code></td><td>the vector table</td><td>flash, first</td><td><code>g_vector_table</code></td></tr>
               <tr><td><code>.text</code> / <code>.rodata</code></td><td>code and constants</td><td>flash</td><td><code>main()</code>, <code>const char msg[] = "hi";</code></td></tr>
-              <tr><td><code>.data</code></td><td>globals with a non-zero initial value</td><td>RAM at run time, initial values in flash</td><td><code>uint32_t SystemCoreClock = 8000000;</code></td></tr>
+              <tr><td><code>.data</code></td><td>globals with a non-zero initial value</td><td>RAM at run time, initial values in flash</td><td><code>uint32_t SystemCoreClock = 16000000;</code></td></tr>
               <tr><td><code>.bss</code></td><td>globals without initial value (or 0)</td><td>RAM, zeroed by startup; nothing in flash</td><td><code>static volatile uint32_t s_ms;</code></td></tr>
               <tr><td>stack / heap</td><td>local variables, return addresses; <code>malloc</code></td><td>RAM, whatever is left</td><td>—</td></tr>
             </tbody>
           </table></div>
+          <p>The G474 adds a sixth place: the 32 KB <b>CCM SRAM</b>. Our linker script declares it as a region (<code>CCMRAM</code>) but places nothing there, so it stays free for code or data you deliberately move there with a section attribute, never for DMA buffers.</p>
           <p>The key idea is the difference between where a section is <b>stored</b> (its load address, LMA) and where it <b>runs</b> (its virtual address, VMA). For <code>.data</code> they differ: the initial values are stored in flash and copied to RAM by the startup code before <code>main()</code>.</p>
-          <script type="text/plain" id="src-boot-reset" data-src="examples/00-bluepill-blink-uart/bare/src/startup.c" data-region="reset" data-lang="c" data-file="bare/src/startup.c" data-start="31" data-end="51" data-sha="b8e0317f0830">
+          <script type="text/plain" id="src-boot-reset" data-src="examples/00-nucleo-blink-uart/bare/src/startup.c" data-region="reset" data-lang="c" data-file="bare/src/startup.c" data-start="37" data-end="63" data-sha="e7a5401f61ae">
 void Reset_Handler(void)
 {
+    /* 0. Enable the FPU before any code that might use a floating-point register. The build
+     *    uses -mfloat-abi=hard, so the compiler may emit FPU instructions anywhere in C code;
+     *    one before this line would raise a UsageFault (NOCP). */
+    SCB->CPACR |= CPACR_CP10_FULL | CPACR_CP11_FULL;   // «9»
+    __DSB();
+    __ISB();                                           /* the next instruction sees the change */
     /* 1. Copy initial values of .data from flash to RAM. */
     const uint32_t *src = _sidata;                         // «1»
     for (uint32_t *dst = _sdata; dst < _edata; ++dst, ++src)
@@ -137,25 +146,26 @@ void Reset_Handler(void)
         <section class="doc-section" id="linker-script" data-title="Writing the linker script">
           <div class="sec-head"><h2><span class="sec-num">3.5</span>Writing the linker script</h2></div>
           <p>The linker script tells the linker what memory exists and which section goes where. Ours fits on one screen. First the memory and the stack:</p>
-          <script type="text/plain" id="src-boot-ldmem" data-src="examples/00-bluepill-blink-uart/bare/ld/stm32f103c8_64k.ld" data-region="memory" data-lang="ld" data-file="ld/stm32f103c8_64k.ld" data-start="7" data-end="20" data-sha="283e758fac69">
+          <script type="text/plain" id="src-boot-ldmem" data-src="examples/00-nucleo-blink-uart/bare/ld/stm32g474re.ld" data-region="memory" data-lang="ld" data-file="ld/stm32g474re.ld" data-start="6" data-end="20" data-sha="96dd660a1a81">
 ENTRY(Reset_Handler)                       /* «1» */
 
 MEMORY                                     /* «2» */
 {
-  FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 64K
-  RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 20K
+  FLASH  (rx)  : ORIGIN = 0x08000000, LENGTH = 512K
+  RAM    (xrw) : ORIGIN = 0x20000000, LENGTH = 96K    /* SRAM1 80 KB + SRAM2 16 KB, back to back */
+  CCMRAM (xrw) : ORIGIN = 0x10000000, LENGTH = 32K    /* CCM SRAM: core only, no DMA; unused here */
 }
 
-/* Top of RAM. AAPCS wants an 8-byte aligned stack; ORIGIN + LENGTH is 0x20005000. */
+/* Top of RAM. AAPCS wants an 8-byte aligned stack; ORIGIN + LENGTH is 0x20018000. */
 _estack = ORIGIN(RAM) + LENGTH(RAM);       /* «3» */
 
 /* The link fails if the static data plus these reserves do not fit into RAM. */
 _Min_Heap_Size  = 0x000;                   /* no malloc in this course */
-_Min_Stack_Size = 0x400;                   /* 1 KB main stack: checked, not enforced at run time */
+_Min_Stack_Size = 0x800;                   /* 2 KB main stack: checked, not enforced at run time */
 </script>
           <div id="ex-ldmem"></div>
           <p>Then the two data sections, where the symbols the startup code uses are defined:</p>
-          <script type="text/plain" id="src-boot-lddata" data-src="examples/00-bluepill-blink-uart/bare/ld/stm32f103c8_64k.ld" data-region="data" data-lang="ld" data-file="ld/stm32f103c8_64k.ld" data-start="52" data-end="76" data-sha="283e758fac69">
+          <script type="text/plain" id="src-boot-lddata" data-src="examples/00-nucleo-blink-uart/bare/ld/stm32g474re.ld" data-region="data" data-lang="ld" data-file="ld/stm32g474re.ld" data-start="52" data-end="76" data-sha="96dd660a1a81">
 /* Initialised variables live in RAM (VMA) but their start values are stored in flash (LMA). */
 _sidata = LOADADDR(.data);               /* «5» */
 .data :
@@ -188,22 +198,24 @@ _sidata = LOADADDR(.data);               /* «5» */
 
         <section class="doc-section" id="memmap-viz" data-title="Memory-map visualizer">
           <div class="sec-head"><h2><span class="sec-num">3.6</span>Memory-map visualizer</h2></div>
-          <p>This is example 00 as CI built it, at true scale: 64 KB of flash and 20 KB of RAM. Hover a section for its address and size; step through the startup to see which parts move.</p>
+          <p>This is example 00 as CI built it, at true scale: 512 KB of flash and the 96 KB SRAM1+SRAM2 region. Hover a section for its address and size; step through the startup to see which parts move.</p>
           <div id="mm-boot"></div>
           <p>To read the same information from the command line, use the map file the build writes next to the ELF, or:</p>
-          <script type="text/plain" data-code data-lang="console" data-file="terminal">$ arm-none-eabi-objdump -h build/bluepill-debug/examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf   # sections, VMA, LMA
-          $ arm-none-eabi-nm -n --size-sort -S build/…/00-bluepill-blink-uart.elf | tail                                 # biggest symbols
-          $ arm-none-eabi-size -A build/…/00-bluepill-blink-uart.elf</script>
+          <script type="text/plain" data-code data-lang="console" data-file="terminal">$ arm-none-eabi-objdump -h build/nucleo-debug/examples/00-nucleo-blink-uart/bare/00-nucleo-blink-uart.elf   # sections, VMA, LMA
+          $ arm-none-eabi-nm -n --size-sort -S build/…/00-nucleo-blink-uart.elf | tail                                 # biggest symbols
+          $ arm-none-eabi-size -A build/…/00-nucleo-blink-uart.elf</script>
         </section>
 
         <section class="doc-section" id="c-vs-asm" data-title="Startup in C vs ST&#x27;s assembly">
           <div class="sec-head"><h2><span class="sec-num">3.7</span>Startup in C vs ST&#x27;s assembly</h2></div>
           <p>ST ships its startup code in assembly. Here is its reset handler, from the vendored CMSIS device package. This is the only place the course shows it:</p>
-          <script type="text/plain" data-code data-src="third_party/cmsis_device_f1/Source/Templates/gcc/startup_stm32f103xb.s" data-lines="58-102" data-lang="asm" data-file="startup_stm32f103xb.s (ST, Apache-2.0)" data-start="58" data-end="102" data-sha="a9a5fc7ed5ff">
-  .section .text.Reset_Handler
-  .weak Reset_Handler
-  .type Reset_Handler, %function
+          <script type="text/plain" data-code data-src="third_party/cmsis_device_g4/Source/Templates/gcc/startup_stm32g474xx.s" data-lines="58-107" data-lang="asm" data-file="startup_stm32g474xx.s (ST, Apache-2.0)" data-start="58" data-end="107" data-sha="2d1952a86701">
+    .section	.text.Reset_Handler
+	.weak	Reset_Handler
+	.type	Reset_Handler, %function
 Reset_Handler:
+  ldr   r0, =_estack
+  mov   sp, r0          /* set stack pointer */
 
 /* Call the clock system initialization function.*/
     bl  SystemInit
@@ -213,7 +225,7 @@ Reset_Handler:
   ldr r1, =_edata
   ldr r2, =_sidata
   movs r3, #0
-  b LoopCopyDataInit
+  b	LoopCopyDataInit
 
 CopyDataInit:
   ldr r4, [r2, r3]
@@ -242,15 +254,19 @@ LoopFillZerobss:
 /* Call static constructors */
     bl __libc_init_array
 /* Call the application's entry point.*/
-  bl main
-  bx lr
-.size Reset_Handler, .-Reset_Handler
+	bl	main
+
+LoopForever:
+    b LoopForever
+
+.size	Reset_Handler, .-Reset_Handler
 </script>
           <p>It does the same four things as our C version, in a slightly different order:</p>
           <div class="table-wrap"><table class="t">
             <thead><tr><th><span class="sr-only">Aspect</span></th><th>ST assembly</th><th>Course C (<code>startup.c</code>)</th></tr></thead>
             <tbody>
-              <tr><td>Order</td><td><code>SystemInit()</code> first, then copy and zero</td><td>Copy and zero first, then <code>SystemInit()</code>, so <code>SystemInit</code> may use initialised globals</td></tr>
+              <tr><td>Order</td><td><code>SystemInit()</code> first (ST's version switches the FPU on there), then copy and zero</td><td>FPU on, copy and zero, then <code>SystemInit()</code>, so <code>SystemInit</code> may use initialised globals</td></tr>
+              <tr><td>Stack pointer</td><td>Loads <code>_estack</code> into SP again, by hand</td><td>Relies on the hardware, which loaded it from word 0</td></tr>
               <tr><td>C++ constructors</td><td>Calls <code>__libc_init_array</code></td><td>Not needed: no C++, no constructors (and we link with <code>-nostartfiles</code>)</td></tr>
               <tr><td>Vector table</td><td>A list of <code>.word</code> directives</td><td>A <code>const</code> array with a size check at compile time</td></tr>
               <tr><td>Readability</td><td>Needs Thumb-2 assembly</td><td>Ordinary C, steppable in the debugger</td></tr>
@@ -261,7 +277,8 @@ LoopFillZerobss:
 
         <section class="doc-section" id="pitfalls" data-title="Pitfalls">
           <div class="sec-head"><h2><span class="sec-num">3.8</span>Pitfalls</h2></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">ST's generic linker script is not for the C8</span><p>ST's <code>STM32F103XB_FLASH.ld</code> declares 128 KB of flash (the XB part) and sets <code>_estack = 0x20004FFF</code>, an odd address, one byte below the end of RAM. The Cortex-M3 rounds SP down to a multiple of 4, but the Arm procedure call standard asks for 8-byte alignment at function calls, which matters for 64-bit values and <code>printf</code>. Our script uses <code>ORIGIN(RAM) + LENGTH(RAM)</code> = <code>0x20005000</code> and 64 KB.</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Floating point before the FPU is on</span><p>The build uses <code>-mfloat-abi=hard</code>. If any code that runs before <code>SCB-&gt;CPACR</code> enables CP10/CP11 touches an FPU register, even a struct copy the compiler chose to do with <code>vldm</code>/<code>vstm</code>, the core raises a UsageFault with <code>CFSR.NOCP</code> set, and with no fault handler yet, the chip locks up in HardFault. That is why the CPACR write is the very first statement of <code>Reset_Handler</code>.</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Keep the stack 8-byte aligned and out of CCM SRAM</span><p>The Arm procedure call standard asks for an 8-byte aligned stack at every public function call; <code>ORIGIN(RAM) + LENGTH(RAM)</code> = <code>0x20018000</code> is. Putting the stack in CCM SRAM looks attractive (it is fast), but a local buffer handed to DMA then never receives a byte, because DMA cannot reach CCM SRAM.</p></div></div>
           <ul>
             <li><b>Stack overflow is silent.</b> The stack grows down into <code>.bss</code> and <code>.data</code> and corrupts globals. The linker's reserve only checks that space exists at build time. <a href="rtos.html#stack">Module 14</a> shows run-time checks.</li>
             <li><b>Forgetting <code>KEEP()</code></b> on the vector table lets <code>--gc-sections</code> throw it away; the image then starts with code instead of a stack pointer, and the chip never runs.</li>
@@ -283,7 +300,9 @@ LoopFillZerobss:
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/memmap/00-bluepill-blink-uart.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
+  <script src="assets/js/data/memmap/00-nucleo-blink-uart.js?v=__BUILD__"></script>
+  <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/memorymap.js?v=__BUILD__"></script>
   <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
   <script src="assets/js/pages/boot.js?v=__BUILD__"></script>

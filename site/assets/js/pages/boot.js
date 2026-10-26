@@ -2,29 +2,33 @@
    Module 03 · Startup Code, Vector Table & Linker Scripts. */
 (function () {
   "use strict";
-  const { $, renderCodeExplorer, embedded, SequenceDiagram, MemoryMap, Checklist } = window.MCU;
+  const { $, renderCodeExplorer, embedded, SequenceDiagram, MemoryMap, Checklist, Register } = window.MCU;
+
+  Register($("#reg-optr"), { reg: "FLASH_OPTR", value: 0xFFEFF8AA, show: ["nBOOT0", "nSWBOOT0", "nBOOT1", "DBANK", "RDP"] });
   const explore = (host, id, notes) => renderCodeExplorer($(host), { ...embedded(id), notes });
 
   SequenceDiagram($("#seq-reset"), {
-    ariaLabel: "What the Cortex-M3 does from reset to main()",
+    ariaLabel: "What the Cortex-M4 does from reset to main()",
     laneW: 160,
     lanes: [
       { title: "Reset logic", sub: "power-on, NRST, watchdog", tone: "hw" },
-      { title: "Cortex-M3", sub: "core registers", tone: "hw" },
+      { title: "Cortex-M4", sub: "core registers", tone: "hw" },
       { title: "Flash", sub: "vector table @0x08000000", tone: "hw" },
       { title: "Reset_Handler", sub: "startup.c", tone: "asw" },
       { title: "main()", sub: "your program", tone: "asw" },
     ],
     steps: [
       { from: 0, to: 1, kind: "irq", label: "reset released", title: "Reset is released",
-        detail: "<p>Power-on, the NRST pin, a watchdog or a software request all end the same way: the core starts from a known state, running on the 8 MHz HSI, in privileged Thread mode, with interrupts enabled but every peripheral interrupt disabled.</p>",
+        detail: "<p>Power-on, the NRST pin, a watchdog or a software request all end the same way: the core starts from a known state, running on the 16 MHz HSI16, in privileged Thread mode, with interrupts enabled but every peripheral interrupt disabled and the FPU switched off.</p>",
         analogy: "Pressing the start button of a machine: the operator begins with the first page of the manual, every time." },
       { from: 1, to: 2, kind: "bus", label: "read word 0", title: "Load the stack pointer",
-        detail: "<p>The core reads the 32-bit word at address 0 (aliased to <code>0x08000000</code> when BOOT0 = 0) into the main stack pointer, MSP. For our program that is <code>_estack</code> = <code>0x20005000</code>, the top of RAM.</p>" },
+        detail: "<p>The core reads the 32-bit word at address 0 (aliased to <code>0x08000000</code> in the normal boot mode) into the main stack pointer, MSP. For our program that is <code>_estack</code> = <code>0x20018000</code>, the top of SRAM1+SRAM2.</p>" },
       { from: 1, to: 2, kind: "bus", label: "read word 1", title: "Load the reset vector",
         detail: "<p>Word 1 is the address of <code>Reset_Handler</code>, with bit 0 set to mark Thumb code. The core loads it into PC. No instruction has run yet.</p>" },
       { from: 1, to: 3, kind: "call", label: "jump", title: "Reset_Handler runs",
         detail: "<p>From here on, it is ordinary compiled C. The stack already works, so function calls and local variables are fine; global variables are not initialised yet.</p>" },
+      { from: 3, to: 3, label: "FPU on (CPACR)", title: "Switch the FPU on",
+        detail: "<p>Sets the CP10 and CP11 access fields in <code>SCB-&gt;CPACR</code>, then <code>DSB</code>/<code>ISB</code>. From now on the compiler-generated floating-point instructions work. Before this line, one of them would fault.</p>" },
       { from: 3, to: 3, label: "copy .data, zero .bss", title: "Prepare RAM",
         detail: "<p>Copies the initial values of <code>.data</code> from flash to RAM and fills <code>.bss</code> with zeros, using the addresses the linker script exported (<code>_sidata</code>, <code>_sdata</code>, <code>_edata</code>, <code>_sbss</code>, <code>_ebss</code>).</p>",
         analogy: "Unpacking the suitcase (flash) into the hotel room (RAM) and emptying the drawers you didn't bring anything for." },
@@ -44,7 +48,8 @@
     6: [".isr_vector", "The section the linker script places first in flash. <code>used</code> keeps the array even though no code refers to it."],
     7: ["Initial SP", "Not a function at all: the address of the top of the stack, cast to the table's type because the hardware wants it in slot 0."],
     8: ["Reset vector", "Where the CPU jumps after loading SP."],
-    10: ["Compile-time size check", "<code>USBWakeUp_IRQn</code> is the last IRQ number in ST's header (42). 16 system slots + 43 interrupts = 59 entries; any mismatch stops the build."],
+    9: ["FPU first", "CP10 and CP11 together are the FPU. Their access fields in <code>CPACR</code> are 0 (no access) after reset; <code>0b11</code> gives full access. CMSIS names the register but not these fields, so the startup defines two named constants with their source (PM0214)."],
+    10: ["Compile-time size check", "<code>FMAC_IRQn</code> is the last IRQ number in ST's header (101). 16 system slots + 102 interrupt lines = 118 entries; any mismatch stops the build."],
   };
   explore("#ex-vectors", "src-boot-vectors", STARTUP);
   explore("#ex-weak", "src-boot-weak", STARTUP);
@@ -52,20 +57,21 @@
   explore("#ex-reset", "src-boot-reset", STARTUP);
   const LD = {
     1: ["ENTRY", "Records the entry point in the ELF header. Debuggers use it; the chip uses the reset vector."],
-    2: ["MEMORY", "Names the regions and their sizes. <code>rx</code> and <code>xrw</code> are attributes the linker uses to place sections that are not assigned explicitly."],
+    2: ["MEMORY", "Names the regions and their sizes: flash, the contiguous SRAM1+SRAM2, and CCM SRAM. <code>rx</code> and <code>xrw</code> are attributes the linker uses to place sections that are not assigned explicitly."],
     3: ["_estack", "A symbol, not a variable: it has an address but no storage. The startup code uses its address as the initial stack pointer."],
     5: ["_sidata", "<code>LOADADDR(.data)</code> is where the initial values sit in flash."],
     6: ["VMA in RAM, LMA in flash", "<code>&gt;RAM</code>: addresses used by the code are in RAM. <code>AT&gt; FLASH</code>: the bytes are stored in flash, right after <code>.text</code>."],
   };
   explore("#ex-ldmem", "src-boot-ldmem", LD);
   explore("#ex-lddata", "src-boot-lddata", LD);
-  MemoryMap($("#mm-boot"), { map: "00-bluepill-blink-uart" });
+  MemoryMap($("#mm-boot"), { map: "00-nucleo-blink-uart" });
 
   Checklist($("#ck-boot"), [
     "You can say which two words the core reads before running any instruction, and from where.",
     "You found <code>_estack</code>, <code>_sidata</code> and <code>_ebss</code> in the output of <code>arm-none-eabi-nm</code> for example 00.",
     "You can explain why <code>uint32_t x = 5;</code> takes space in both flash and RAM, but <code>uint32_t y;</code> only in RAM.",
-    "You stepped through <code>Reset_Handler</code> in the debugger and watched <code>SystemCoreClock</code> (a <code>.data</code> variable) receive its value 8000000 in the copy loop.",
+    "You stepped through <code>Reset_Handler</code> in the debugger and watched <code>SystemCoreClock</code> (a <code>.data</code> variable) receive its value 16000000 in the copy loop.",
     "You know what happens when an interrupt has no handler, and how to spot it in the debugger.",
+    "You can say why the CPACR write comes before the copy loop, and what a pull-up on PB8 does at reset.",
   ], { key: "boot" });
 })();

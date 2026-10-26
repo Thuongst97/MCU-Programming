@@ -26,7 +26,7 @@
           <div class="eyebrow">Reference D · Reference</div>
           <h1>Appendix: ST&#x27;s LL Drivers</h1>
           <p class="lead">The course writes registers through the CMSIS header. ST offers two layers on top: HAL, which you met on the setup page, and the Low-Layer (LL) drivers. This appendix shows what LL is, puts it next to the register code you already know, and helps you decide which one a project should use.</p>
-          <div class="page-meta"><span>⏱ 20 min read</span><span>🎯 Beginner</span><span>📂 examples/00-bluepill-blink-uart/ll</span></div>
+          <div class="page-meta"><span>⏱ 20 min read</span><span>🎯 Beginner</span><span>📂 examples/00-nucleo-blink-uart/ll</span></div>
         </header>
 
         <section class="doc-section" id="what-ll" data-title="What LL is (and isn&#x27;t)">
@@ -38,20 +38,20 @@
             <li>a few helper functions (<code>LL_USART_SetBaudRate</code>, <code>LL_RCC_GetSystemClocksFreq</code>) do arithmetic you would otherwise write by hand.</li>
           </ul>
           <p>The course's LL build of example 00 uses the same startup code and linker script as the register build and only the header-only parts of LL, taken from the CubeMX-generated HAL folder (<code>examples/00-…/hal/Drivers</code>, the one place vendor HAL code lives in this repository).</p>
-          <script type="text/plain" id="src-ll-io" data-src="examples/00-bluepill-blink-uart/ll/src/main.c" data-region="io" data-lang="c" data-file="examples/00-bluepill-blink-uart/ll/src/main.c" data-start="48" data-end="61" data-sha="fddb1a5bffe4">
+          <script type="text/plain" id="src-ll-io" data-src="examples/00-nucleo-blink-uart/ll/src/main.c" data-region="io" data-lang="c" data-file="examples/00-nucleo-blink-uart/ll/src/main.c" data-start="51" data-end="64" data-sha="142fca76a614">
 static void io_init(void)
 {
-    LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOA | LL_APB2_GRP1_PERIPH_GPIOC | LL_APB2_GRP1_PERIPH_USART1); // «5»
-    LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_13, LL_GPIO_MODE_OUTPUT);                                   // «6»
-    LL_GPIO_SetPinSpeed(GPIOC, LL_GPIO_PIN_13, LL_GPIO_SPEED_FREQ_LOW);
-    LL_GPIO_SetPinOutputType(GPIOC, LL_GPIO_PIN_13, LL_GPIO_OUTPUT_PUSHPULL);
-    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_9, LL_GPIO_MODE_ALTERNATE);
-    LL_GPIO_SetPinSpeed(GPIOA, LL_GPIO_PIN_9, LL_GPIO_SPEED_FREQ_HIGH);
-    LL_GPIO_SetPinOutputType(GPIOA, LL_GPIO_PIN_9, LL_GPIO_OUTPUT_PUSHPULL);
-    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_10, LL_GPIO_MODE_FLOATING);
-    LL_USART_SetBaudRate(USART1, SystemCoreClock, 115200U);      /* computes BRR for you */          // «7»
-    LL_USART_SetTransferDirection(USART1, LL_USART_DIRECTION_TX_RX);
-    LL_USART_Enable(USART1);
+    LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);                                              // «5»
+    LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_LPUART1);
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_5, LL_GPIO_MODE_OUTPUT);                                    // «6»
+    LL_GPIO_SetPinOutputType(GPIOA, LL_GPIO_PIN_5, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_2, LL_GPIO_AF_12);   /* LPUART1_TX */
+    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_3, LL_GPIO_AF_12);   /* LPUART1_RX */
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_2, LL_GPIO_MODE_ALTERNATE);
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_3, LL_GPIO_MODE_ALTERNATE);
+    LL_LPUART_SetBaudRate(LPUART1, SystemCoreClock, LL_LPUART_PRESCALER_DIV1, 115200U);   /* computes BRR */ // «7»
+    LL_LPUART_SetTransferDirection(LPUART1, LL_LPUART_DIRECTION_TX_RX);
+    LL_LPUART_Enable(LPUART1);
 }
 </script>
           <div id="ex-ll-io"></div>
@@ -62,52 +62,57 @@ static void io_init(void)
           <div class="sec-head"><h2><span class="sec-num">D.2</span>Registers vs LL side by side</h2></div>
           <p>The clock setup, written with registers (left) and with LL (right). Read them line by line: almost every LL call has exactly one register statement on the other side.</p>
           <div class="cmp-host" id="cmp-clock"></div>
-          <script type="text/plain" id="src-bare-clock" data-src="examples/00-bluepill-blink-uart/bare/src/main.c" data-region="clock" data-lang="c" data-file="examples/00-bluepill-blink-uart/bare/src/main.c" data-start="58" data-end="81" data-sha="c4395b86a08f">
-static int clock_72mhz(void)
+          <script type="text/plain" id="src-bare-clock" data-src="examples/00-nucleo-blink-uart/bare/src/main.c" data-region="clock" data-lang="c" data-file="examples/00-nucleo-blink-uart/bare/src/main.c" data-start="66" data-end="92" data-sha="aea1671c53b8">
+static int clock_170mhz(void)
 {
-    RCC->CR |= RCC_CR_HSEON;                                         /* start the 8 MHz crystal */  // «6»
-    if (!wait_set(&RCC->CR, RCC_CR_HSERDY, RCC_CR_HSERDY))
-    {
-        return 1;                                                    /* no crystal: stay on HSI */
-    }
-    FLASH->ACR = FLASH_ACR_PRFTBE | (2U << FLASH_ACR_LATENCY_Pos);   /* 2 wait states BEFORE speeding up */ // «7»
-    RCC->CFGR |= RCC_CFGR_PPRE1_DIV2                                 /* APB1 <= 36 MHz */            // «8»
-               | RCC_CFGR_PLLSRC                                     /* PLL input: HSE */
-               | RCC_CFGR_PLLMULL9;                                  /* 8 MHz x 9 = 72 MHz */        // «9»
+    RCC->APB1ENR1 |= RCC_APB1ENR1_PWREN;                             /* clock the PWR block */
+    (void)RCC->APB1ENR1;
+    PWR->CR5 &= ~PWR_CR5_R1MODE;                                     /* range 1 BOOST: > 150 MHz */  // «6»
+    FLASH->ACR = FLASH_ACR_LATENCY_4WS                               /* 4 wait states BEFORE speeding up */ // «7»
+               | FLASH_ACR_PRFTEN | FLASH_ACR_ICEN | FLASH_ACR_DCEN;
+    RCC->PLLCFGR = RCC_PLLCFGR_PLLSRC_HSI                            /* PLL input: HSI16 */          // «8»
+                 | ((4U - 1U) << RCC_PLLCFGR_PLLM_Pos)               /* /4  -> 4 MHz */
+                 | (85U << RCC_PLLCFGR_PLLN_Pos)                     /* x85 -> 340 MHz VCO */         // «9»
+                 | RCC_PLLCFGR_PLLREN;                               /* /2 on PLLR -> 170 MHz */
     RCC->CR |= RCC_CR_PLLON;
     if (!wait_set(&RCC->CR, RCC_CR_PLLRDY, RCC_CR_PLLRDY))
     {
-        return 2;
+        return 1;                                                    /* no lock: stay on HSI16 */
     }
-    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;        /* switch SYSCLK to the PLL */  // «10»
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_HPRE) | RCC_CFGR_HPRE_DIV2;   /* AHB /2 for the jump */      // «10»
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;        /* switch SYSCLK to the PLL */
     if (!wait_set(&RCC->CFGR, RCC_CFGR_SWS, RCC_CFGR_SWS_PLL))       /* hardware confirms in SWS */  // «11»
     {
-        return 3;
+        return 2;
     }
-    SystemCoreClock = 72000000U;
+    crude_delay(100U);                                               /* >= 1 us at 85 MHz */
+    RCC->CFGR &= ~RCC_CFGR_HPRE;                                     /* AHB /1: full 170 MHz */
+    SystemCoreClock = 170000000U;
     return 0;
 }
 </script>
-          <script type="text/plain" id="src-ll-clock" data-src="examples/00-bluepill-blink-uart/ll/src/main.c" data-region="clock" data-lang="c" data-file="examples/00-bluepill-blink-uart/ll/src/main.c" data-start="24" data-end="44" data-sha="fddb1a5bffe4">
-static int clock_72mhz(void)
+          <script type="text/plain" id="src-ll-clock" data-src="examples/00-nucleo-blink-uart/ll/src/main.c" data-region="clock" data-lang="c" data-file="examples/00-nucleo-blink-uart/ll/src/main.c" data-start="25" data-end="47" data-sha="142fca76a614">
+static int clock_170mhz(void)
 {
     uint32_t n;
-    LL_RCC_HSE_Enable();                                          /* RCC->CR |= RCC_CR_HSEON */         // «1»
-    for (n = 0U; (LL_RCC_HSE_IsReady() == 0U) && (n < WAIT_LOOPS); ++n) { }
-    if (n == WAIT_LOOPS) { return 1; }
-    LL_FLASH_SetLatency(LL_FLASH_LATENCY_2);                      /* FLASH->ACR LATENCY field = 2 */  // «2»
+    LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);            /* RCC->APB1ENR1 |= PWREN */
+    LL_PWR_EnableRange1BoostMode();                               /* PWR->CR5 &= ~R1MODE */            // «1»
+    LL_FLASH_SetLatency(LL_FLASH_LATENCY_4);                      /* FLASH->ACR LATENCY = 4 WS */      // «2»
     LL_FLASH_EnablePrefetch();
-    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE_DIV_1, LL_RCC_PLL_MUL_9);                       // «3»
+    LL_FLASH_EnableInstCache();
+    LL_FLASH_EnableDataCache();
+    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI, LL_RCC_PLLM_DIV_4, 85U, LL_RCC_PLLR_DIV_2);     // «3»
+    LL_RCC_PLL_EnableDomain_SYS();                                /* PLLREN */
     LL_RCC_PLL_Enable();
     for (n = 0U; (LL_RCC_PLL_IsReady() == 0U) && (n < WAIT_LOOPS); ++n) { }
-    if (n == WAIT_LOOPS) { return 2; }
-    LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
-    LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_2);                   /* APB1 <= 36 MHz */
-    LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_1);
+    if (n == WAIT_LOOPS) { return 1; }
+    LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_2);                  /* the /2 step above 80 MHz */
     LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);                                                 // «4»
     for (n = 0U; (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL) && (n < WAIT_LOOPS); ++n) { }
-    if (n == WAIT_LOOPS) { return 3; }
-    SystemCoreClock = 72000000U;
+    if (n == WAIT_LOOPS) { return 2; }
+    for (volatile uint32_t d = 0U; d < 100U; ++d) { }            /* >= 1 us at 85 MHz */
+    LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
+    SystemCoreClock = 170000000U;
     return 0;
 }
 </script>
