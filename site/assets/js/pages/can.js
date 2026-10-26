@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
-   Module 12 · CAN with bxCAN (and CAN FD, LIN in Theory). */
+   Module 12 · CAN and CAN FD with FDCAN (and LIN in Theory). */
 (function () {
   "use strict";
   const { $, esc, renderCodeExplorer, embedded, Register, Pinout, Waveform, Wave, Calc, StateMachine, SequenceDiagram, Checklist } = window.MCU;
@@ -74,40 +74,70 @@
     states: [
       { id: "active", label: "Error active", sub: "TEC ≤ 127, REC ≤ 127", x: 30, y: 90, tone: "svc", desc: "<p>Normal state. On an error the node sends an <b>active</b> error frame (6 dominant bits) that destroys the frame for everyone.</p>" },
       { id: "passive", label: "Error passive", sub: "TEC or REC > 127", x: 400, y: 90, tone: "rte", desc: "<p>The node still communicates but may only send <b>passive</b> error flags (recessive), so it can no longer disturb others, and it waits longer before retransmitting.</p>" },
-      { id: "off", label: "Bus off", sub: "TEC > 255", x: 770, y: 90, tone: "cdd", desc: "<p>The node has disconnected itself. bxCAN can recover automatically after 128 × 11 recessive bits if <code>CAN_MCR.ABOM</code> is set (example 11 sets it).</p>" },
+      { id: "off", label: "Bus off", sub: "TEC > 255", x: 770, y: 90, tone: "cdd", desc: "<p>The node has disconnected itself. The G4's FDCAN sets <code>CCCR.INIT</code> and stays off the bus until software clears <code>INIT</code>; then it waits for 129 × 11 recessive bits before taking part again. Whether and when to do that is an application decision (AUTOSAR's CanSM makes it).</p>" },
     ],
     transitions: [
       { from: "active", to: "passive", label: "errors pile up", desc: "Each transmit error adds 8 to TEC, a receive error usually 1 to REC; each success subtracts 1." },
       { from: "passive", to: "active", label: "both ≤ 127" },
       { from: "passive", to: "off", label: "TEC > 255" },
-      { from: "off", to: "active", label: "128 × 11 recessive", bend: 60 },
+      { from: "off", to: "active", label: "INIT cleared, 129 × 11 recessive", bend: 60 },
     ],
   });
-  Register($("#reg-esr"), { reg: "CAN_ESR", value: 0x00080000 });
+  Register($("#reg-esr"), { reg: "FDCAN_PSR", value: 0x0000000f });
+  Register($("#reg-ecr"), { reg: "FDCAN_ECR", value: 0x00000000 });
 
-  /* ------------------------------------------------ bit timing: the calculator drives the register view */
-  const btr = Register($("#reg-btr"), { reg: "CAN_BTR", value: 0x001e0003 });
-  Calc.widget($("#calc-can"), "can", { onResult: (r) => { if (r) btr.set(r.btr); } });
+  /* ------------------------------------------------ bit timing: the calculators drive the register view */
+  const nbtp = Register($("#reg-nbtp"), { reg: "FDCAN_NBTP", value: 0x04100f02 });
+  Calc.widget($("#calc-can"), "can", { onResult: (r) => { if (r) nbtp.set(r.reg); } });
+  Calc.widget($("#calc-can-data"), "canData");
 
-  /* ------------------------------------------------ bxCAN code */
-  Register($("#reg-mcr"), { reg: "CAN_MCR", value: 0x00000041 });
+  /* ------------------------------------------------ FDCAN code */
+  Register($("#reg-cccr"), { reg: "FDCAN_CCCR", value: 0x00000303 });
   const N11 = {
-    1: ["Remap to PB8/PB9", "<code>CAN_REMAP = 10</code>. <code>SWJ_CFG</code> reads back as undefined, so the write sets it explicitly to its reset value (keep SWD)."],
-    2: ["Wake up and initialise", "After reset bxCAN sleeps. Writing <code>MCR</code> with <code>INRQ</code> (and without <code>SLEEP</code>) requests Initialization mode; <code>ABOM</code> enables automatic bus-off recovery."],
-    3: ["Bit timing", "Only writable in Initialization mode. For the self-test, LBKM + SILM loop TX to RX inside the chip."],
-    4: ["Filters", "Filter init mode, then bank 0 as one 32-bit mask filter with mask 0 (accept all) assigned to FIFO 0."],
-    5: ["Shared vector", "FIFO 0 interrupt is IRQ 20, shared with USB low-priority: one more reason the two can't coexist."],
-    6: ["Join the bus", "Clearing <code>INRQ</code> leaves Initialization only after 11 recessive bits on CAN_RX; a missing transceiver keeps <code>INAK</code> set and the wait times out."],
-    7: ["Three mailboxes", "Pick an empty one; if all three wait for the bus, report it instead of overwriting a pending frame."],
-    8: ["Request transmission", "Identifier in bits 31:21 for standard IDs, then <code>TXRQ</code>. Arbitration and retries happen in hardware."],
-    9: ["Read the FIFO head", "Identifier, length and the 8 data bytes of the oldest frame."],
-    10: ["Release the slot", "<code>RFOM0</code> frees the FIFO entry; the next frame moves up. Without it the FIFO fills after three frames and later ones are lost (or overwrite, depending on <code>RFLM</code>)."],
-    11: ["Silent loopback self-test", "Proves the clock, the bit timing and the driver work before any wiring is involved."],
-    12: ["Node B reacts", "Mirror the button on the LED and answer, so node A can see the round trip."],
-    13: ["Event + cycle", "Send on change and every 100 ms: the typical pattern for automotive signals, so a receiver also notices when the sender disappears."],
-    14: ["Watch the counters", "On a healthy bus TEC and REC stay at 0. Unplug the other node and watch TEC climb on hardware."],
+    1: ["Kernel clock first", "<code>FDCANSEL = 10</code> selects PCLK1 (170 MHz). The reset value selects HSE, which is not running in this course, and the controller would count no time quanta at all."],
+    2: ["Off the bus", "<code>INIT</code> is already 1 after reset; setting it again makes the function safe to call twice. The wait confirms the controller really stopped."],
+    3: ["Nominal bit timing", "<code>CCE</code> unlocks the protected registers; <code>NBTP</code> takes the arbitration-phase timing, each field as value − 1."],
+    4: ["CAN FD on", "Only if a data-phase timing is given: <code>DBTP</code>, then <code>FDOE</code> (allow FD frames) and <code>BRSE</code> (allow the bit-rate switch)."],
+    5: ["No filters, FIFO 0", "After zeroing the message RAM, <code>RXGFC = 0</code> means: no filter elements, and standard frames that match none go to RX FIFO 0."],
+    6: ["Internal loopback", "<code>TEST</code> + <code>MON</code> keep the controller off the pins; <code>TEST.LBCK</code> feeds its own TX back into its RX. A self-test without wires."],
+    7: ["Join the bus", "Clearing <code>INIT</code> makes the controller wait for 11 recessive bits on FDCAN1_RX. Without a transceiver, RX may never be recessive and the wait times out."],
+    8: ["TX FIFO full?", "<code>TXFQS.TFQF</code>: all three TX elements still wait for the bus. Report it rather than overwrite a pending frame."],
+    9: ["Write the element", "Header word 0: the 11-bit ID in bits 28:18. Word 1: DLC in bits 19:16, plus FDF and BRS for CAN FD. Then the data, 4 bytes per word, padding with zeros up to the DLC's length."],
+    10: ["Request transmission", "Setting the element's bit in <code>TXBAR</code> hands it to the controller, which arbitrates and retries in hardware."],
+    11: ["Read the element", "At the FIFO's get index: ID from word 0, DLC, FDF and BRS from word 1, then the data words."],
+    12: ["Release the slot", "Writing the get index to <code>RXF0A</code> frees the element. Without it the FIFO fills after three frames and later ones are lost."],
+    13: ["Internal loopback self-test", "Proves the clock, both bit timings and the driver work, CAN FD included, before any wiring is involved."],
+    14: ["Node B reacts", "Mirror the button on the LED and answer, so node A can see the round trip."],
+    15: ["Event + cycle", "Send on change and every 100 ms: the typical pattern for automotive signals, so a receiver also notices when the sender disappears."],
+    16: ["A CAN FD frame", "Once a second, 16 bytes with <code>fd</code> and <code>brs</code> set: the data phase runs at 1 Mbit/s."],
+    17: ["Watch the counters", "On a healthy bus TEC and REC stay at 0. Unplug the other node and watch TEC climb on hardware: no ACK is a transmit error."],
   };
   ["init", "tx", "rx", "self", "main"].forEach((r) => explore(`#ex-${r}`, `src-11-${r}`, N11));
+  explore("#ex-dlc", "src-11-dlc", {});
+
+  /* ------------------------------------------------ message RAM layout (RM0440 FDCAN message RAM, redrawn) */
+  const MRAM = [
+    { o: 0x000, n: "Standard ID filters", s: "28 × 1 word", d: "One word per filter: type (range, dual ID or classic ID + mask), what to do on a match, and two 11-bit IDs." },
+    { o: 0x070, n: "Extended ID filters", s: "8 × 2 words", d: "The same for 29-bit identifiers." },
+    { o: 0x0B0, n: "RX FIFO 0", s: "3 × 18 words", d: "Received frames. Example 11 and the AUTOSAR Can driver read from here." },
+    { o: 0x188, n: "RX FIFO 1", s: "3 × 18 words", d: "A second receive FIFO, for frames a filter sends there." },
+    { o: 0x260, n: "TX event FIFO", s: "3 × 2 words", d: "Optional: the ID and timestamp of each frame that went out." },
+    { o: 0x278, n: "TX buffers / FIFO", s: "3 × 18 words", d: "Frames to send. Example 11 uses them as a FIFO (<code>TXBC = 0</code>)." },
+  ];
+  const mr = $("#mram");
+  let ms = "";
+  MRAM.forEach((m, i) => {
+    const y = 10 + i * 44;
+    ms += `<g class="lg-node tn-${i < 2 ? "mcal" : i < 4 ? "svc" : "asw"}" data-m="${i}" tabindex="0" role="button" aria-label="${esc(m.n)}"><rect class="lg-card" x="150" y="${y}" width="520" height="38" rx="7"/><text class="lg-title" x="164" y="${y + 17}">${esc(m.n)}</text><text class="lg-sub" x="164" y="${y + 31}">${esc(m.s)}</text></g><text class="hd-sub" x="140" y="${y + 24}" text-anchor="end">+0x${m.o.toString(16).toUpperCase().padStart(3, "0")}</text>`;
+  });
+  mr.innerHTML = `<svg class="lg-svg" viewBox="0 0 690 ${10 + MRAM.length * 44}" role="group" aria-label="FDCAN1 message RAM layout from SRAMCAN_BASE">${ms}</svg><div class="sm-info" id="mram-info"></div>`;
+  const showM = (i) => {
+    mr.querySelectorAll("[data-m]").forEach((g) => g.classList.toggle("focus", +g.dataset.m === i));
+    $("#mram-info").innerHTML = `<h3 class="w-title">SRAMCAN_BASE + 0x${MRAM[i].o.toString(16).toUpperCase().padStart(3, "0")} · ${esc(MRAM[i].n)}</h3><p>${MRAM[i].d}</p>`;
+  };
+  mr.addEventListener("click", (e) => { const g = e.target.closest("[data-m]"); if (g) showM(+g.dataset.m); });
+  mr.addEventListener("keydown", (e) => { const g = e.target.closest("[data-m]"); if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); showM(+g.dataset.m); } });
+  showM(2);
 
   /* ------------------------------------------------ filters: mask-mode checker */
   const flt = $("#flt");
@@ -125,23 +155,23 @@
   drawFlt();
 
   /* ------------------------------------------------ two nodes */
-  Pinout($("#po-can"), { board: "bluepill", mode: "wiring", ...window.MCU_DATA.wiring["11"] });
+  Pinout($("#po-can"), { board: "nucleo", mode: "wiring", ...window.MCU_DATA.wiring["11"] });
   SequenceDiagram($("#seq-can"), {
     ariaLabel: "Button on node A switches the LED on node B over CAN",
     laneW: 165,
     lanes: [
-      { title: "Node A", sub: "button PA0", tone: "asw" },
-      { title: "bxCAN A", sub: "mailbox", tone: "mcal" },
+      { title: "Node A", sub: "button B1", tone: "asw" },
+      { title: "FDCAN1 A", sub: "TX FIFO", tone: "mcal" },
       { title: "Bus", sub: "CAN_H / CAN_L", tone: "hw" },
-      { title: "bxCAN B", sub: "FIFO 0", tone: "mcal" },
-      { title: "Node B", sub: "LED PC13", tone: "asw" },
+      { title: "FDCAN1 B", sub: "RX FIFO 0", tone: "mcal" },
+      { title: "Node B", sub: "LED LD2", tone: "asw" },
     ],
     steps: [
-      { from: 0, to: 1, kind: "call", label: "can_send(0x100)", title: "Button pressed", detail: "<p>Node A notices the change and fills a mailbox with ID <code>0x100</code> (hypothetical), data[0] = 1.</p>" },
-      { from: 1, to: 2, kind: "pdu", label: "frame", title: "On the wire", detail: "<p>bxCAN waits for an idle bus, sends SOF, wins arbitration, and sends the frame with CRC and stuff bits.</p>" },
+      { from: 0, to: 1, kind: "call", label: "can_send(0x100)", title: "Button pressed", detail: "<p>Node A notices the change and writes a TX element with ID <code>0x100</code> (hypothetical), data[0] = 1.</p>" },
+      { from: 1, to: 2, kind: "pdu", label: "frame", title: "On the wire", detail: "<p>The controller waits for an idle bus, sends SOF, wins arbitration, and sends the frame with CRC and stuff bits.</p>" },
       { from: 2, to: 3, kind: "pdu", label: "ACK", title: "Received and acknowledged", detail: "<p>Node B's controller checks the CRC and drives the ACK slot dominant. Without any receiver, A would retry forever and its TEC would rise.</p>" },
-      { from: 3, to: 4, kind: "irq", label: "FMP0 → IRQ 20", title: "Interrupt on node B", detail: "<p>The frame passes filter bank 0 into FIFO 0; the handler copies it into a queue for <code>main()</code>.</p>" },
-      { from: 4, to: 4, label: "LED on", title: "Act", detail: "<p>Node B switches its LED and answers with frame <code>0x101</code>.</p>" },
+      { from: 3, to: 4, kind: "irq", label: "RF0N → IRQ 21", title: "Interrupt on node B", detail: "<p>The frame lands in RX FIFO 0; <code>IR.RF0N</code> raises <code>FDCAN1_IT0</code> (IRQ 21) and the handler copies the element into a queue for <code>main()</code>.</p>" },
+      { from: 4, to: 4, label: "LD2 on", title: "Act", detail: "<p>Node B switches its LED and answers with frame <code>0x101</code>.</p>" },
       { from: 4, to: 0, kind: "ret", label: "0x101 (LED state)", title: "Round trip", detail: "<p>Node A prints the reply: the whole path works in both directions.</p>" },
     ],
   });
@@ -157,9 +187,9 @@
   renderCodeExplorer($("#ex-13-cs"), { ...embedded("src-13-cs"), notes: N13 });
   Checklist($("#ck-can"), [
     "You can explain dominant and recessive, and why the lowest ID wins arbitration.",
-    "You can compute <code>CAN_BTR</code> for 500 kbit/s and 250 kbit/s at 36 MHz.",
-    "Example 11's self-test passes on one board without any transceiver.",
-    "With two boards wired, the button on node A switches the LED on node B, and both report TEC 0 / REC 0.",
+    "You can compute <code>FDCAN_NBTP</code> for 500 kbit/s and 250 kbit/s at 170 MHz, and say why the sample point is 85 % and not 87.5 %.",
+    "Example 11's internal-loopback self-test passes on one board without any transceiver.",
+    "With two boards wired, B1 on node A switches LD2 on node B, node B prints the 16-byte CAN FD frames, and both report TEC 0 / REC 0.",
     "You unplugged the bus on node A and watched its TEC rise to error passive.",
   ], { key: "can" });
 })();
