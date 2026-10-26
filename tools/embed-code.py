@@ -4,7 +4,7 @@
 
 A page declares what it wants:
 
-  <script type="text/plain" data-code data-src="examples/00-bluepill-blink-uart/bare/src/main.c"
+  <script type="text/plain" data-code data-src="examples/00-nucleo-blink-uart/bare/src/main.c"
           data-region="clock" data-lang="c" data-file="main.c"></script>
 
 and this tool fills the tag with the file's content and adds data-start / data-end (line numbers

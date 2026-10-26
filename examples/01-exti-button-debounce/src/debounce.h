@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  * Button debouncing as a pure state machine: no registers, no time source, so it runs (and is
- * unit-tested) on the host as well as on the Blue Pill. */
+ * unit-tested) on the host as well as on the NUCLEO. */
 #ifndef DEBOUNCE_H
 #define DEBOUNCE_H
 

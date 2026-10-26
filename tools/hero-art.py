@@ -9,8 +9,8 @@ Run:   python3 tools/hero-art.py            # print the SVG
 Colours come from the --hv-* custom properties in main.css, so one SVG works in both themes.
 
 Concept: the software layers the course builds towards (application SWC, RTE, BSW, MCAL) float as
-glass panes above the one physical board everything runs on: an STM32F103C8T6 "Blue Pill" with its
-pin headers, BOOT jumpers, PC13 LED, 8 MHz crystal and the 4-pin SWD header with an ST-Link cable.
+glass panes above the one physical board everything runs on: a NUCLEO-G474RE with its ST-LINK/V3E
+section, the STM32G474RET6, Arduino and Morpho header rows, B1/B2 buttons, LD2 and the USB cable.
 A light column rises from the MCU die through every pane; packets cross the RTE pane.
 
 Geometry follows the sibling site (aaos14-academy): an isometric grid with plane coordinates
@@ -156,16 +156,16 @@ def layer3():
 
 def layer4():
     tiles = [
-        (14, 14, 118, 104, "MCAL", "STM32F1 registers", chips(["Dio", "Pwm"], 62)),
-        (132, 14, 190, 104, "Can", "bxCAN"),
+        (14, 14, 118, 104, "MCAL", "STM32G4 registers", chips(["Dio", "Pwm"], 62)),
+        (132, 14, 190, 104, "Can", "FDCAN1"),
         (14, 120, 74, 180, "Adc", ""),
         (88, 120, 190, 180, "Port · Gpt · Wdg", "Mcu · Fls"),
     ]
     return pane(3, tiles, label="L4 · MCAL · microcontroller drivers")
 
 
-# ------------------------------------------------------------------ the Blue Pill (L5)
-V0, V1 = -0.46, 0.46            # the board is long and narrow: u spans the length, v the width
+# ------------------------------------------------------------------ the NUCLEO-G474RE (L5)
+V0, V1 = -0.9, 0.9              # a NUCLEO-64 is nearly square: u spans the length, v the width
 
 
 def chip(cx, cy, X0, Y0, X1, Y1, h, label, sub=""):
@@ -197,42 +197,43 @@ def header_row(cx, cy, v, n=20, u0=-0.84, u1=0.84):
 def layer5():
     i = 4
     cx, cy = CX[i], CY[i]
-    s = f'<g transform="{plane(cx, cy, -BOARD_T - 10, -1.25, 1.25, -0.9, 0.9)}"><rect class="hv-floor" width="200" height="200" rx="60"/></g>'
+    s = f'<g transform="{plane(cx, cy, -BOARD_T - 10, -1.25, 1.25, -1.1, 1.1)}"><rect class="hv-floor" width="200" height="200" rx="60"/></g>'
     s += f'<g transform="{plane(cx, cy, -BOARD_T - 6, -1.08, 1.08, V0 - 0.1, V1 + 0.1)}"><rect class="hv-underglow" width="200" height="200" rx="44"/></g>'
     s += box(cx, cy, -1, 1, V0, V1, -BOARD_T, 0, "pcb", top=False)
-    # PCB top face in plane coordinates; the board occupies Y = 54..146 of the 0..200 plane
-    pcb = '<rect class="hw-pcb" x="1" y="55" width="198" height="90" rx="5"/>'
-    for d in ("M80,92 H58 V80 H40", "M80,104 H62 V120 H40", "M120,92 H142 V80 H160", "M120,108 H150 V126 H178",
-              "M100,84 V66", "M100,116 V134"):
+    # PCB top face in plane coordinates; the board occupies Y = 10..190 of the 0..200 plane.
+    # Left: the ST-LINK/V3E part (USB, probe MCU); right: the STM32G474 part with its headers.
+    pcb = '<rect class="hw-pcb" x="1" y="11" width="198" height="178" rx="6"/>'
+    pcb += '<path class="hw-trace" d="M58,14 V170" stroke-dasharray="3 3"/>'
+    for d in ("M42,92 H60 V96 H80", "M42,104 H70 V108 H80", "M120,92 H134 V88 H146", "M120,100 H150 V122",
+              "M100,80 V44", "M100,120 V156", "M120,108 H164 V106 H170"):
         pcb += f'<path class="hw-trace" d="{d}"/>'
-    for x, y in ((40, 80), (40, 120), (160, 80), (178, 126), (100, 66), (100, 134)):
+    for x, y in ((100, 44), (100, 156), (150, 122), (60, 96)):
         pcb += f'<circle class="hw-via" cx="{x}" cy="{y}" r="1.8"/>'
-    pcb += ('<text class="hw-silk" x="8" y="66">PB12</text><text class="hw-silk" x="8" y="141">GND</text>'
-            '<text class="hw-silk" x="150" y="66">B11</text><text class="hw-silk" x="134" y="141">3.3 · DIO · CLK · GND</text>'
-            '<text class="hw-silk" x="52" y="100">BOOT0/1</text><text class="hw-silk" x="22" y="112">PC13</text>')
-    s += f'<g transform="{plane(cx, cy, 0)}">{pcb}<text class="hv-engrave" x="58" y="152">L5 · STM32F103C8T6 · BLUE PILL</text></g>'
-    # pin headers along both long edges
-    s += header_row(cx, cy, V0 + 0.07)
-    s += header_row(cx, cy, V1 - 0.07)
-    # MCU (Cortex-M3), 8 MHz crystal, BOOT jumpers, reset button, LED, micro-USB, SWD header
-    s += chip(cx, cy, 80, 82, 120, 118, 4, "STM32", "F103C8T6")
-    s += boxp(cx, cy, 128, 86, 140, 96, 0, 4, "can")
-    s += boxp(cx, cy, 50, 86, 56, 98, 0, 3, "strip") + boxp(cx, cy, 50, 86, 56, 91, 3, 6, "jumper")
-    s += boxp(cx, cy, 58, 86, 64, 98, 0, 3, "strip") + boxp(cx, cy, 58, 86, 64, 91, 3, 6, "jumper")
-    s += boxp(cx, cy, 64, 104, 74, 114, 0, 3, "button")
-    s += boxp(cx, cy, 24, 104, 30, 108, 0, 1.5, "led")
-    lx, ly = P(cx, cy, *uv(27, 106), 2.2)
+    pcb += ('<text class="hw-silk" x="10" y="72">ST-LINK/V3E</text><text class="hw-silk" x="10" y="134">SWD · VCP</text>'
+            '<text class="hw-silk" x="146" y="70">B2 RESET</text><text class="hw-silk" x="146" y="142">B1 USER</text>'
+            '<text class="hw-silk" x="166" y="102">LD2</text><text class="hw-silk" x="126" y="84">X3</text>'
+            '<text class="hw-silk" x="68" y="56">CN5 · CN9</text><text class="hw-silk" x="68" y="146">CN6 · CN8</text>')
+    s += f'<g transform="{plane(cx, cy, 0)}">{pcb}<text class="hv-engrave" x="62" y="185">L5 · STM32G474RET6 · NUCLEO-G474RE</text></g>'
+    # Arduino headers just inside each long edge, Morpho rows on the edge itself
+    s += header_row(cx, cy, V0 + 0.1, n=19, u0=-0.32, u1=0.96)
+    s += header_row(cx, cy, V0 + 0.22, n=16, u0=-0.2, u1=0.96)
+    s += header_row(cx, cy, V1 - 0.3, n=16, u0=-0.2, u1=0.96)
+    s += header_row(cx, cy, V1 - 0.18, n=19, u0=-0.32, u1=0.96)
+    # STM32G474 (Cortex-M4F) in the middle, under the light column; the ST-LINK's own MCU on the left
+    s += chip(cx, cy, 80, 80, 120, 120, 4, "STM32", "G474RET6")
+    s += chip(cx, cy, 22, 88, 40, 106, 3, "ST")
+    s += boxp(cx, cy, 126, 86, 138, 94, 0, 4, "can")               # X3, 24 MHz (not used by the course)
+    s += boxp(cx, cy, 148, 72, 158, 82, 0, 3, "button")            # B2 RESET
+    s += boxp(cx, cy, 148, 122, 158, 132, 0, 3, "button")          # B1 USER
+    s += boxp(cx, cy, 168, 106, 174, 110, 0, 1.5, "led")            # LD2 on PA5
+    lx, ly = P(cx, cy, *uv(171, 108), 2.2)
     s += f'<circle class="hv-led" cx="{lx:.1f}" cy="{ly:.1f}" r="1.6"/>'
-    s += boxp(cx, cy, 0, 90, 12, 110, 0, 6, "metal")
-    s += boxp(cx, cy, 186, 84, 196, 118, 0, 3.2, "strip")
+    s += boxp(cx, cy, 0, 90, 12, 110, 0, 6, "metal")               # USB connector of the ST-LINK
+    # the USB cable leaving the ST-LINK connector: power, SWD and the virtual COM port in one
     for k in range(4):
-        Y = 88 + k * 8.5
-        s += boxp(cx, cy, 190, Y - 0.8, 192, Y + 0.8, 3.2, 10, "pin")
-    # the ST-Link cable leaving the SWD header
-    for k in range(4):
-        Y = 88 + k * 8.5
-        x0, y0 = P(cx, cy, *uv(196, Y), 8)
-        d = f"M{x0:.1f},{y0:.1f} C{x0 + 22:.1f},{y0 + 6:.1f} {x0 + 30:.1f},{y0 + 24:.1f} {x0 + 40 + k * 4:.1f},{y0 + 60:.1f}"
+        Y = 93 + k * 4.5
+        x0, y0 = P(cx, cy, *uv(0, Y), 3)
+        d = f"M{x0:.1f},{y0:.1f} C{x0 - 20:.1f},{y0 + 8:.1f} {x0 - 26:.1f},{y0 + 26:.1f} {x0 - 30 - k * 3:.1f},{y0 + 62:.1f}"
         s += f'<path class="hv-wire w{k + 1}" d="{d}"/>'
         if k in (1, 2):
             s += pulse(d, 1.9, -0.7 * k)

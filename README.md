@@ -1,12 +1,14 @@
 # MCU-Programming — MCU Academy
 
 An interactive learning site that takes software engineers from "what is a microcontroller?" to
-AUTOSAR-structured automotive firmware. Every example targets the **STM32F103C8T6 "Blue Pill"**
-programmed with an **ST-Link V2**, and can also run without hardware in **Renode**.
+AUTOSAR-structured automotive firmware. Every example targets the **NUCLEO-G474RE**
+(STM32G474RET6, Arm Cortex-M4F, 170 MHz; the STM32G474VET6 runs the same firmware), programmed and
+debugged through its on-board **ST-LINK/V3E**. There is no simulator for this chip: pure logic is
+unit-tested on the host, everything else needs the board.
 
 **Status:** all 31 pages are written: 26 modules from fundamentals to AUTOSAR (24–26 are the
-TurnLight capstone) and five reference appendices, with 14 examples. All firmware builds in CI, and
-every example that Renode can simulate passes its Robot test there.
+TurnLight capstone) and five reference appendices, with 14 examples. All firmware builds in CI and
+the pure logic passes its host tests.
 **Nothing has been tested on a real board yet, and AUTOSAR requirement IDs are still to be checked
 against the R25-11 PDFs.** [`docs/verification.md`](docs/verification.md) lists exactly what is and isn't
 verified. See [`PLAN.md`](PLAN.md) for the design and roadmap (§11.2 has the progress log),
@@ -35,12 +37,12 @@ node --test tests/site/*.test.mjs
 npm ci --prefix tests/site && npm --prefix tests/site run smoke   # Playwright browser smoke test
 ```
 
-Firmware (needs the Arm GNU toolchain, CMake and Ninja; Renode for the simulation tests):
+Firmware (needs the Arm GNU toolchain, CMake and Ninja):
 
 ```sh
-cmake --preset bluepill-debug && cmake --build --preset bluepill-debug   # every example + capstone
+cmake --preset nucleo-debug && cmake --build --preset nucleo-debug       # every example + capstone
 cmake --preset host-tests && ctest --preset host-tests                   # Unity host tests
-python3 tools/run-renode-tests.py                                        # Robot suites in Renode
+python3 tools/check-pins.py                                              # AF_ constants match ST's pin data
 python3 tools/run-misra.py                                               # MISRA C:2012 ratchet (cppcheck)
 ```
 
@@ -50,10 +52,10 @@ python3 tools/run-misra.py                                               # MISRA
 |---|---|
 | `site/` | The static site deployed to GitHub Pages (HTML, `assets/css/main.css`, `assets/js/`) |
 | `tools/` | Authoring and check tools; `versions.json` pins every tool and library version |
-| `third_party/` | Vendored CMSIS core, STM32F1 device headers, Unity and the FreeRTOS kernel (no submodules) |
+| `third_party/` | Vendored CMSIS core, STM32G4 device headers, ST's open pin data, Unity and the FreeRTOS kernel (no submodules) |
 | `tests/` | Tool tests (Python) and site tests (Node + Playwright) |
 | `.github/workflows/` | CI, Pages deploy, weekly external link check |
-| `examples/` | Examples 00–13 and `common/` (startup, linker script, BSP, OpenOCD and Renode files) |
+| `examples/` | Examples 00–13 and `common/` (startup, linker script, BSP, OpenOCD configuration) |
 | `autosar/` | AUTOSAR-style teaching library (MCAL, ECU abstraction, services, OS shim): not AUTOSAR-conformant |
 | `capstone/turnlight/` | The TurnLight capstone: one ECU in three stages plus a cluster node |
 | `docs/` | Verification status, AUTOSAR self-review log, MISRA compliance and deviations |

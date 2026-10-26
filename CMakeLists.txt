@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: MIT
 # Top-level build for every example (cross presets) or for the host unit tests (host preset).
-#   cmake --preset bluepill-debug && cmake --build --preset bluepill-debug
+#   cmake --preset nucleo-debug && cmake --build --preset nucleo-debug
 #   cmake --preset host-tests && cmake --build --preset host-tests && ctest --preset host-tests
 cmake_minimum_required(VERSION 3.25)
 project(mcu_academy LANGUAGES C)
 
 if(CMAKE_CROSSCOMPILING)
   enable_language(ASM)
-  include(examples/common/cmake/bluepill.cmake)
+  include(examples/common/cmake/nucleo.cmake)
   # every example folder that has a CMakeLists.txt, in catalog order
   file(GLOB example_dirs LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/examples/[0-9][0-9]-*")
   list(SORT example_dirs)

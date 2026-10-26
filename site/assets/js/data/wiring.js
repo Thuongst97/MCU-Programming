@@ -3,61 +3,48 @@
    Wiring of every example, in one place. Pages draw it with
    MCU.Pinout(host, { mode: "wiring", ...MCU_DATA.wiring["00"] }) and
    tools/export-wiring.mjs writes examples/NN-…/wiring.svg from the same data.
-   pin: header label ("A9"), or "swd:GND" / "left:GND" / "right:GND" when the
-   name exists more than once; to: "<part>.<pin>" from bluepill-pins.js parts.
+   pin: Arduino label ("D8", "A1"), Morpho pin name ("PA11"), power label ("3V3"),
+   or "left:GND" / "right:GND" when the name exists more than once;
+   to: "<part>.<pin>" from nucleo-pins.js parts.
    ========================================================================= */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
   else (root.MCU_DATA = root.MCU_DATA || {}).wiring = factory();
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
-  const SWD = [
-    { pin: "swd:SWDIO", to: "stlink.SWDIO", kind: "swd" },
-    { pin: "swd:SWCLK", to: "stlink.SWCLK", kind: "swd" },
-    { pin: "swd:GND", to: "stlink.GND", kind: "ground" },
-    { pin: "swd:3V3", to: "stlink.3.3V", kind: "power" },
-  ];
-  const UART = [
-    { pin: "A9", to: "usbuart.RX" },
-    { pin: "A10", to: "usbuart.TX" },
-    { pin: "left:GND", to: "usbuart.GND", kind: "ground" },
-  ];
+  // Power, SWD and the virtual COM port reach the board over the one ST-LINK USB cable: no wires.
+  const BTN = [{ pin: "A0", to: "button.1" }, { pin: "left:GND", to: "button.2", kind: "ground" }];
+  const CAN = [{ pin: "left:3V3", to: "canfd.3V3", kind: "power" }, { pin: "left:GND", to: "canfd.GND", kind: "ground" },
+    { pin: "PA12", to: "canfd.TXD" }, { pin: "PA11", to: "canfd.RXD" }];
+  const OLED = [{ pin: "right:GND", to: "oled.GND", kind: "ground" }, { pin: "left:3V3", to: "oled.VCC", kind: "power" },
+    { pin: "D8", to: "oled.SCL" }, { pin: "D7", to: "oled.SDA" }];
   return {
-    "00": { title: "Example 00: ST-Link on SWD, USB-UART on USART1", highlight: ["PA9", "PA10", "PC13"], wiring: [...SWD, ...UART] },
-    "01": { title: "Example 01: button on PA0 to GND", highlight: ["PA0", "PA9", "PA10", "PC13"],
-      wiring: [...SWD, ...UART, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
-    "02": { title: "Example 02: ST-Link + USB-UART only", highlight: ["PA9", "PA10", "PC13"], wiring: [...SWD, ...UART] },
-    "04": { title: "Example 04: ST-Link + USB-UART (type into the shell)", highlight: ["PA9", "PA10", "PC13"], wiring: [...SWD, ...UART] },
-    "05": { title: "Example 05: 10 kΩ potentiometer on PA1", highlight: ["PA1", "PA9", "PA10"],
-      wiring: [...SWD, ...UART, { pin: "right:3V3", to: "pot.1", kind: "power" }, { pin: "A1", to: "pot.W" }, { pin: "right:GND", to: "pot.3", kind: "ground" }] },
-    "06": { title: "Example 06: SSD1306 OLED on I2C1 (PB6 SCL, PB7 SDA)", highlight: ["PB6", "PB7", "PA9", "PA10"],
-      wiring: [...SWD, ...UART, { pin: "left:GND", to: "oled.GND", kind: "ground" }, { pin: "left:3V3", to: "oled.VCC", kind: "power" }, { pin: "B6", to: "oled.SCL" }, { pin: "B7", to: "oled.SDA" }] },
-    "07": { title: "Example 07: W25Qxx flash on SPI1 (CS PA4, CLK PA5, DO PA6, DI PA7)", highlight: ["PA4", "PA5", "PA6", "PA7"],
-      wiring: [...SWD, ...UART, { pin: "A4", to: "w25q.CS" }, { pin: "A6", to: "w25q.DO" }, { pin: "right:GND", to: "w25q.GND", kind: "ground" },
-        { pin: "right:3V3", to: "w25q.VCC", kind: "power" }, { pin: "A5", to: "w25q.CLK" }, { pin: "A7", to: "w25q.DI" }] },
-    "08": { title: "Example 08: ST-Link + USB-UART (keys trigger the faults)", highlight: ["PA9", "PA10", "PC13"], wiring: [...SWD, ...UART] },
-    "09": { title: "Example 09: wake-up button on PA0", highlight: ["PA0", "PA9", "PA10"],
-      wiring: [...SWD, ...UART, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
-    "11": { title: "Example 11 (each node): SN65HVD230 on PB8/PB9; node A also has a button on PA0", highlight: ["PB8", "PB9", "PA0"],
-      wiring: [...SWD, ...UART, { pin: "left:3V3", to: "sn65.3V3", kind: "power" }, { pin: "left:GND", to: "sn65.GND", kind: "ground" },
-        { pin: "B9", to: "sn65.D" }, { pin: "B8", to: "sn65.R" }, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
-    "10": { title: "Example 10: optional button on PA0 (EXTI0 → semaphore)", highlight: ["PA0", "PC13", "PA9", "PA10"],
-      wiring: [...SWD, ...UART, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
-    "12": { title: "Example 12: USB-UART for updates, optional button on PA0 (stay in the bootloader)", highlight: ["PA0", "PC13", "PA9", "PA10"],
-      wiring: [...SWD, ...UART, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
-    "tl-ecu": { title: "TurnLight ECU node: stalk and hazard buttons, two PWM lamps, current pot, CAN transceiver", highlight: ["PB12", "PB13", "PB14", "PA6", "PA7", "PA1", "PB8", "PB9"],
-      wiring: [...SWD, ...UART, { pin: "B12", to: "stalkL.1" }, { pin: "B13", to: "stalkR.1" }, { pin: "B14", to: "hazard.1" },
+    "00": { title: "Example 00: nothing to wire (USB cable to the ST-LINK)", highlight: ["PA5", "PA2", "PA3"], wiring: [] },
+    "01": { title: "Example 01: B1 (PC13) and LD2 (PA5) are on the board", highlight: ["PC13", "PA5", "PA2", "PA3"], wiring: [] },
+    "02": { title: "Example 02: nothing to wire", highlight: ["PA5", "PA2", "PA3"], wiring: [] },
+    "03": { title: "Example 03: LED on D12 (PA6, TIM3 CH1), jumper D12 → A0 (PA0, TIM2 CH1)", highlight: ["PA6", "PA0"],
+      wiring: [{ pin: "D12", to: "led.A" }, { pin: "right:GND", to: "led.K", kind: "ground" }, { pin: "D12", to: "jumper.1" }, { pin: "A0", to: "jumper.2" }] },
+    "04": { title: "Example 04: nothing to wire (type into the shell); MCO on D7 (PA8)", highlight: ["PA2", "PA3", "PA8"], wiring: [] },
+    "05": { title: "Example 05: 10 kΩ potentiometer on A1 (PA1)", highlight: ["PA1"],
+      wiring: [{ pin: "left:3V3", to: "pot.1", kind: "power" }, { pin: "A1", to: "pot.W" }, { pin: "left:GND", to: "pot.3", kind: "ground" }] },
+    "06": { title: "Example 06: SSD1306 OLED on I2C2 (D8 = PA9 SCL, D7 = PA8 SDA)", highlight: ["PA9", "PA8"], wiring: OLED },
+    "07": { title: "Example 07: W25Qxx flash on SPI2 (CS PB12, CLK PB13, DO PB14, DI PB15; Morpho)", highlight: ["PB12", "PB13", "PB14", "PB15"],
+      wiring: [{ pin: "PB12", to: "w25q.CS" }, { pin: "PB14", to: "w25q.DO" }, { pin: "right:GND", to: "w25q.GND", kind: "ground" },
+        { pin: "left:3V3", to: "w25q.VCC", kind: "power" }, { pin: "PB13", to: "w25q.CLK" }, { pin: "PB15", to: "w25q.DI" }] },
+    "08": { title: "Example 08: nothing to wire (keys in the terminal trigger the faults)", highlight: ["PA2", "PA3", "PA5"], wiring: [] },
+    "09": { title: "Example 09: B1 (PC13) wakes the chip from Stop", highlight: ["PC13", "PA5"], wiring: [] },
+    "10": { title: "Example 10: B1 (PC13) → EXTI → semaphore", highlight: ["PC13", "PA5"], wiring: [] },
+    "11": { title: "Example 11 (each node): CAN FD transceiver on PA12 (TX) / PA11 (RX)", highlight: ["PA11", "PA12", "PC13"], wiring: CAN },
+    "12": { title: "Example 12: updates over the virtual COM port; hold B1 at reset to stay in the bootloader", highlight: ["PC13", "PA2", "PA3"], wiring: [] },
+    "13": { title: "Example 13 (each node): LIN at logic level, USART1 TX on D8 (PA9, through a diode), RX on D2 (PA10)", highlight: ["PA9", "PA10"],
+      wiring: [{ pin: "D8", to: "lin.K" }, { pin: "D2", to: "lin.RX" }, { pin: "left:3V3", to: "lin.3V3", kind: "power" }] },
+    "tl-ecu": { title: "TurnLight ECU node: stalk and hazard buttons, two PWM lamps, current pot, CAN FD transceiver",
+      highlight: ["PB12", "PB13", "PB14", "PA6", "PA7", "PA1", "PA11", "PA12"],
+      wiring: [{ pin: "PB12", to: "stalkL.1" }, { pin: "PB13", to: "stalkR.1" }, { pin: "PB14", to: "hazard.1" },
         { pin: "right:GND", to: "stalkL.2", kind: "ground" }, { pin: "right:GND", to: "stalkR.2", kind: "ground" }, { pin: "right:GND", to: "hazard.2", kind: "ground" },
-        { pin: "A6", to: "lampL.A" }, { pin: "A7", to: "lampR.A" }, { pin: "left:GND", to: "lampL.K", kind: "ground" }, { pin: "left:GND", to: "lampR.K", kind: "ground" },
-        { pin: "left:3V3", to: "pot.1", kind: "power" }, { pin: "A1", to: "pot.W" }, { pin: "left:GND", to: "pot.3", kind: "ground" },
-        { pin: "left:3V3", to: "sn65.3V3", kind: "power" }, { pin: "left:GND", to: "sn65.GND", kind: "ground" }, { pin: "B9", to: "sn65.D" }, { pin: "B8", to: "sn65.R" }] },
-    "tl-cluster": { title: "TurnLight cluster node: SSD1306 OLED, CAN transceiver, optional mute button on PA0", highlight: ["PB6", "PB7", "PB8", "PB9", "PA0"],
-      wiring: [...SWD, ...UART, { pin: "left:3V3", to: "oled.VCC", kind: "power" }, { pin: "left:GND", to: "oled.GND", kind: "ground" }, { pin: "B6", to: "oled.SCL" }, { pin: "B7", to: "oled.SDA" },
-        { pin: "left:3V3", to: "sn65.3V3", kind: "power" }, { pin: "left:GND", to: "sn65.GND", kind: "ground" }, { pin: "B9", to: "sn65.D" }, { pin: "B8", to: "sn65.R" },
-        { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
-    "13": { title: "Example 13 (each node): LIN at logic level on PA2 (TX, through a diode) / PA3 (RX); slave button on PA0", highlight: ["PA2", "PA3", "PA0"],
-      wiring: [...SWD, ...UART, { pin: "A2", to: "jumper.1" }, { pin: "A3", to: "jumper.2" }, { pin: "A0", to: "button.1" }, { pin: "right:GND", to: "button.2", kind: "ground" }] },
-    "03": { title: "Example 03: LED on PA6 (TIM3 CH1), jumper PA6 → PA0 (TIM2 CH1)", highlight: ["PA6", "PA0", "PA9", "PA10"],
-      wiring: [...SWD, ...UART, { pin: "A6", to: "led.A" }, { pin: "right:GND", to: "led.K", kind: "ground" }, { pin: "A6", to: "jumper.1" }, { pin: "A0", to: "jumper.2" }] },
+        { pin: "D12", to: "lampL.A" }, { pin: "D11", to: "lampR.A" }, { pin: "right:GND", to: "lampL.K", kind: "ground" }, { pin: "right:GND", to: "lampR.K", kind: "ground" },
+        { pin: "left:3V3", to: "pot.1", kind: "power" }, { pin: "A1", to: "pot.W" }, { pin: "left:GND", to: "pot.3", kind: "ground" }, ...CAN] },
+    "tl-cluster": { title: "TurnLight cluster node: SSD1306 OLED on I2C2, CAN FD transceiver; B1 mutes the acknowledgements",
+      highlight: ["PA9", "PA8", "PA11", "PA12", "PC13"], wiring: [...OLED, ...CAN] },
   };
 });

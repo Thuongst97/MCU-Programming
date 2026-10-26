@@ -29,42 +29,43 @@
   draw();
 
   const N05 = {
-    1: ["Two clocks", "GPIOA for the pin and ADC1 itself. The ADC's conversion clock comes from PCLK2 ÷ ADCPRE, set to ÷ 6 = 12 MHz by the clock code (maximum 14 MHz)."],
-    2: ["Analog mode", "MODE = 00 and CNF = 00 disconnect the digital input buffer from the pin, which would otherwise draw current and add noise."],
-    3: ["Sampling time", "239.5 cycles (20 µs at 12 MHz) gives the sampling capacitor time to charge through a 10 kΩ potentiometer."],
-    4: ["Power up", "The first write of <code>ADON</code> wakes the ADC. <code>TSVREFE</code> connects the internal reference and temperature sensor. <code>EXTSEL = 111</code> with <code>EXTTRIG</code> makes the <code>SWSTART</code> bit the trigger."],
-    5: ["Calibrate", "Reset the calibration registers, then run self-calibration once after power-up (RM0008 §11.4). Both bits clear themselves when done; the waits have timeouts."],
+    1: ["One clock for two ADCs", "ADC1 and ADC2 share <code>ADC12EN</code> in <code>RCC_AHB2ENR</code> and a common register block, <code>ADC12_COMMON</code>. Its <code>CKMODE = 11</code> clocks them synchronously from HCLK ÷ 4 = 42.5 MHz; <code>VREFEN</code> switches the internal reference on."],
+    2: ["Analog mode", "<code>MODE1 = 11</code>. It is also PA1's reset state, but writing it makes the intent explicit: the digital input buffer is disconnected, which saves current and noise."],
+    3: ["1. Out of deep power-down, 2. regulator on", "The ADC starts in deep power-down. Clear <code>DEEPPWD</code>, set <code>ADVREGEN</code>, then wait the regulator's start-up time (20 µs maximum, DS12288). The code waits 1 ms, which is plenty."],
+    4: ["3. Calibrate", "Single-ended calibration (<code>ADCALDIF = 0</code>), started with <code>ADCAL</code>, which hardware clears when done. Only possible while the ADC is disabled. The wait has a timeout."],
+    5: ["Sampling time", "640.5 cycles (about 15 µs at 42.5 MHz) gives the sampling capacitor time to charge through a 10 kΩ pot. Channels 0–9 are in <code>SMPR1</code>, 10–18 in <code>SMPR2</code>."],
     6: ["One channel", "Sequence length 1 (<code>SQR1.L = 0</code>), first conversion = the requested channel."],
-    7: ["Start", "Software trigger."],
+    7: ["Start", "<code>ADSTART</code> starts the regular sequence in software-trigger mode."],
     8: ["Wait for EOC", "End of conversion. Reading <code>DR</code> returns the result right-aligned and clears <code>EOC</code>."],
-    9: ["Peripheral and memory addresses", "DMA copies from the ADC data register to our buffer."],
+    9: ["DMAMUX: connect the request", "ADC1's request (ID 5) goes to DMAMUX channel 0, which drives DMA1 channel 1. Without this line the DMA channel never starts. DMA1 and DMAMUX1 both have clock bits in <code>RCC_AHB1ENR</code>."],
     10: ["Circular, 16-bit", "Memory address increments, peripheral address stays; half-words on both sides; at the end of the buffer the channel starts again at the beginning."],
-    11: ["Scan two channels", "PA1 then Vrefint, again and again. Results land interleaved: even slots PA1, odd slots Vrefint."],
-    12: ["Continuous + DMA", "The ADC restarts itself after each sequence and requests a DMA transfer after each conversion. The CPU is no longer involved."],
+    11: ["Two channels", "PA1 (channel 2) then Vrefint (channel 18), again and again. Results land interleaved: even slots PA1, odd slots Vrefint."],
+    12: ["Continuous + DMA, forever", "<code>CONT</code> restarts the sequence by itself, <code>DMAEN</code> requests a transfer per conversion, <code>DMACFG</code> keeps doing so for a circular buffer, and <code>OVRMOD</code> lets a new result overwrite an unread one instead of stopping."],
     13: ["Average whenever you like", "The buffer is always full of recent samples; reading it costs nothing but the averaging loop."],
-    14: ["No samples?", "If the DMA never ran, the Vrefint mean is 0. The program says so instead of printing nonsense (this is what happens in Renode)."],
+    14: ["No samples?", "If the DMA never ran, the Vrefint mean is 0. The program says so instead of printing nonsense. On real hardware this points at a missing DMAMUX request or a buffer in CCM SRAM."],
   };
   ["init", "single", "dma", "main"].forEach((r) => explore(`#ex-${r}`, `src-05-${r}`, N05));
   explore("#ex-math", "src-05-math", {
-    1: ["Supply from the reference", "Vrefint is about 1.20 V whatever VDDA is. If it reads 1489, VDDA = 1.20 V × 4095 ÷ 1489 = 3.30 V."],
-    2: ["Pin voltage without knowing VDDA", "VDDA cancels out: pin = raw × 1.20 V ÷ vrefint_raw. Integer arithmetic with rounding; no floating point on a core without an FPU."],
+    1: ["Supply from the calibration", "<code>VREFINT_CAL</code> is what Vrefint read at VDDA = 3.0 V. Vrefint itself does not change with VDDA, so its reading falls as VDDA rises: VDDA = 3000 mV × cal ÷ raw."],
+    2: ["Pin voltage", "raw ÷ 4095 × VDDA, with VDDA from the line above, in 64-bit integer arithmetic with rounding. The G4 has an FPU, but integer maths keeps the function exact and trivially host-testable."],
     3: ["Mean of one channel", "Walk the interleaved buffer with a stride of 2."],
   });
-  Register($("#reg-adccr2"), { reg: "ADC_CR2", value: 0x009e0001 });
-  Pinout($("#po-adc"), { board: "bluepill", mode: "wiring", ...window.MCU_DATA.wiring["05"] });
+  Register($("#reg-adccr2"), { reg: "ADC_CR", value: 0x10000001 });
+  Pinout($("#po-adc"), { board: "nucleo", mode: "wiring", ...window.MCU_DATA.wiring["05"] });
+  Register($("#reg-dmamux"), { reg: "DMAMUX_CxCR", value: 0x00000005 });
   Register($("#reg-dmaccr"), { reg: "DMA_CCR", value: 0x000005a1 });
 
   SequenceDiagram($("#seq-dma"), {
     ariaLabel: "ADC conversion results moved to SRAM by DMA",
     laneW: 170,
     lanes: [
-      { title: "ADC1", sub: "scan + continuous", tone: "hw" },
-      { title: "DMA1 ch1", sub: "circular", tone: "tool" },
+      { title: "ADC1", sub: "sequence + continuous", tone: "hw" },
+      { title: "DMAMUX ch0 → DMA1 ch1", sub: "circular", tone: "tool" },
       { title: "SRAM", sub: "s_buf[64]", tone: "svc" },
       { title: "CPU", sub: "main()", tone: "asw" },
     ],
     steps: [
-      { from: 0, to: 1, kind: "dma", label: "request (EOC)", title: "A conversion finishes", detail: "<p>With <code>ADC_CR2.DMA</code> set, end of conversion raises a request on DMA1 channel 1 instead of waiting for the CPU.</p>" },
+      { from: 0, to: 1, kind: "dma", label: "request (EOC)", title: "A conversion finishes", detail: "<p>With <code>CFGR.DMAEN</code> set, end of conversion raises the ADC1 DMA request. DMAMUX channel 0 is set to request ID 5 and forwards it to DMA1 channel 1.</p>" },
       { from: 1, to: 0, kind: "bus", label: "read ADC1->DR", title: "DMA reads the result", detail: "<p>The DMA controller takes a bus cycle and reads 16 bits from <code>CPAR</code>. Reading <code>DR</code> clears <code>EOC</code>, just as a CPU read would.</p>" },
       { from: 1, to: 2, kind: "dma", label: "write s_buf[i]", title: "…and stores it", detail: "<p>It writes the half-word to <code>CMAR</code>, then increments the memory address and decrements <code>CNDTR</code>.</p>", analogy: "A conveyor belt that drops each finished part into the next free slot of a rack." },
       { from: 1, to: 1, label: "CNDTR = 0 → reload", title: "Wrap around", detail: "<p>In circular mode the counter and addresses reload automatically. With <code>HTIE</code>/<code>TCIE</code> the channel can also interrupt at the half and at the end.</p>" },
@@ -74,8 +75,8 @@
 
   Checklist($("#ck-adc"), [
     "You can explain how a SAR ADC finds 12 bits in 12 steps, and why sampling time matters.",
-    "Example 05 prints about 1650 mV with the pot in the middle, and the value follows the knob.",
+    "You can list the four bring-up steps of the G4 ADC in order. Example 05 prints about 1650 mV with the pot in the middle, and the value follows the knob.",
     "Part 2 prints averaged readings: DMA is running and the CPU only averages.",
-    "You know which DMA channel serves ADC1 and what circular mode does.",
+    "You can say what DMAMUX does, which request ID ADC1 has, and why a DMA buffer must not live in CCM SRAM.",
   ], { key: "adc-dma" });
 })();

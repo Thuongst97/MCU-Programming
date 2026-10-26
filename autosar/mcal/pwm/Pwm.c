@@ -4,7 +4,7 @@
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  */
 #include "Pwm.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #if (PWM_DEV_ERROR_DETECT == STD_ON)
 #include "Det.h"
 #define PWM_DET(api, err) ((void)Det_ReportError(PWM_MODULE_ID, 0U, (api), (err)))
@@ -50,7 +50,7 @@ FUNC(void, PWM_CODE) Pwm_Init(P2CONST(Pwm_ConfigType, AUTOMATIC, PWM_APPL_CONST)
         PWM_DET(PWM_INIT_SID, PWM_E_ALREADY_INITIALIZED);   // «1»
         return;
     }
-    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN | RCC_APB1ENR_TIM3EN | RCC_APB1ENR_TIM4EN;
+    RCC->APB1ENR1 |= RCC_APB1ENR1_TIM2EN | RCC_APB1ENR1_TIM3EN | RCC_APB1ENR1_TIM4EN;
     for (uint8 i = 0U; i < ConfigPtr->numChannels; ++i)
     {
         P2CONST(Pwm_ChannelConfigType, AUTOMATIC, PWM_APPL_CONST) c = &ConfigPtr->channels[i];

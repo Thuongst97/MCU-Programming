@@ -3,20 +3,20 @@
   "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
   "configurePresets": [
     {
-      "name": "bluepill-base", "hidden": true, "generator": "Ninja",
+      "name": "nucleo-base", "hidden": true, "generator": "Ninja",
       "toolchainFile": "${sourceDir}/examples/common/cmake/arm-none-eabi.cmake",
       "binaryDir": "${sourceDir}/build/${presetName}"
     },
-    { "name": "bluepill-debug", "inherits": "bluepill-base", "displayName": "Blue Pill (Debug, -Og)", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
-    { "name": "bluepill-release", "inherits": "bluepill-base", "displayName": "Blue Pill (Release, -Os)", "cacheVariables": { "CMAKE_BUILD_TYPE": "MinSizeRel" } },
+    { "name": "nucleo-debug", "inherits": "nucleo-base", "displayName": "NUCLEO-G474RE (Debug, -Og)", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "nucleo-release", "inherits": "nucleo-base", "displayName": "NUCLEO-G474RE (Release, -Os)", "cacheVariables": { "CMAKE_BUILD_TYPE": "MinSizeRel" } },
     {
       "name": "host-tests", "displayName": "Host unit tests (Unity)", "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/host-tests", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
     }
   ],
   "buildPresets": [
-    { "name": "bluepill-debug", "configurePreset": "bluepill-debug" },
-    { "name": "bluepill-release", "configurePreset": "bluepill-release" },
+    { "name": "nucleo-debug", "configurePreset": "nucleo-debug" },
+    { "name": "nucleo-release", "configurePreset": "nucleo-release" },
     { "name": "host-tests", "configurePreset": "host-tests" }
   ],
   "testPresets": [

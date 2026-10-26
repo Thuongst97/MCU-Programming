@@ -1,13 +1,15 @@
 /* SPDX-License-Identifier: MIT
- * Flash layout shared by the bootloader and the application of example 12 (must match ld/). */
+ * Flash layout shared by the bootloader and the application of example 12 (must match ld/).
+ * The G474's page size depends on the DBANK option bit: 2 KB in dual-bank mode, 4 KB in
+ * single-bank mode (RM0440 "Flash memory organization"). Everything here sits on 4 KB
+ * boundaries so it works in both. */
 #ifndef LAYOUT_H
 #define LAYOUT_H
 
-#define FLASH_PAGE_SIZE   1024U          /* medium-density F103: 1 KB pages (PM0075) */
-#define BL_BASE           0x08000000UL   /* bootloader, 15 KB of code */
-#define RECORD_ADDR       0x08003C00UL   /* last page of the 16 KB slot: image record */
+#define BL_BASE           0x08000000UL   /* bootloader, 12 KB of code */
+#define RECORD_ADDR       0x08003000UL   /* last 4 KB of the 16 KB slot: image record */
 #define APP_BASE          0x08004000UL   /* application slot */
-#define APP_SIZE_MAX      (48UL * 1024UL)
+#define APP_SIZE_MAX      (240UL * 1024UL)   /* up to the end of bank 1 (0x08040000) */
 #define RECORD_MAGIC      0xB0071DADUL
 
 typedef struct

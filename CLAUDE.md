@@ -5,9 +5,12 @@ rules that must never drift. If PLAN.md and this file disagree, this file wins; 
 
 ## What this repo is
 A static learning site (`site/`, deployed to GitHub Pages) that teaches MCU programming, from first
-principles to AUTOSAR Classic. **Every example runs on one board: the STM32F103C8T6 "Blue Pill"
-programmed with an ST-Link V2 over SWD.** Example firmware lives in `examples/`, `autosar/` and
-`capstone/`. It compiles in CI and is embedded into pages by tool, never pasted by hand.
+principles to AUTOSAR Classic. **Every example runs on one board: the NUCLEO-G474RE
+(STM32G474RET6, Arm Cortex-M4 with FPU, 170 MHz), programmed through its on-board ST-LINK/V3E over
+SWD.** The STM32G474VET6 (LQFP100) is the same die: firmware runs unchanged, only package pin
+numbers differ. Example firmware lives in `examples/`, `autosar/` and `capstone/`. It compiles in
+CI and is embedded into pages by tool, never pasted by hand. There is **no simulator** for this
+chip (Renode has no STM32G4 model): examples are hardware-only, and pure logic is host-tested.
 
 The site is a sibling of `Thuongst97/Android-Knowledge/aaos14-academy`. When unsure how something
 should look or behave, do what that site does.
@@ -15,29 +18,44 @@ should look or behave, do what that site does.
 ## Hard rules
 
 ### Accuracy
-1. **Board facts use STM32F10x names and values from RM0008**: `GPIOx_CRL/CRH`, `RCC_APB2ENR`,
-   `AFIO_MAPR`, bxCAN `CAN_BTR`, and so on. Never use STM32F4-style registers (`MODER`, `AFR`, `OSPEEDR`).
-2. Memory: **64 KB flash, 20 KB SRAM**. Never rely on the undocumented second 64 KB, never use
-   OpenOCD's stock `board/stm32f103c8_blue_pill.cfg` (it sets 128 KB), and never copy ST's
-   `STM32F103XB_FLASH.ld` (128 KB, misaligned `_estack`).
+1. **Board facts use STM32G4 names and values from RM0440**: `GPIOx_MODER/OTYPER/OSPEEDR/PUPDR/AFR`,
+   `RCC_AHB2ENR`, `RCC_PLLCFGR`, `PWR_CR5`, `FDCAN_NBTP/DBTP`, `LPUART1`, `DMAMUX`, and so on. Never
+   use STM32F1-style registers (`CRL/CRH`, `AFIO_MAPR`, bxCAN `CAN_BTR`) except on a page that
+   explicitly compares families.
+2. Memory: **512 KB flash, 128 KB SRAM** = SRAM1 80 KB + SRAM2 16 KB (one contiguous 96 KB region at
+   `0x20000000`) + CCM SRAM 32 KB at `0x10000000`. The linker script has `RAM` (96 KB) and `CCMRAM`
+   (32 KB) regions; the stack lives in `RAM`. DMA can't reach CCM SRAM: never put a DMA buffer there.
 3. Every technical claim must be traceable to a source listed in the page's references:
-   DS5319, RM0008, PM0056, PM0075, ES096, AN2606, AN3155, ARM DDI 0403/0337, AUTOSAR CP R25-11
-   documents, ISO summaries, tool manuals. Cite the **document ID + section** in the `R` entry.
+   DS12288, RM0440, PM0214, ES0430, UM2505, AN2606, ARM DDI 0403/0439, AUTOSAR CP R25-11
+   documents, ISO summaries, tool manuals. ST's GitHub sources (CMSIS header, NUCLEO BSP,
+   STM32_open_pin_data) back register and pin facts. Cite the **document ID + section** in the `R` entry.
    Community sources (forums, vendor schematics) get `kind: "community"` and their claims are
    phrased as "on most boards; check yours".
 4. Pinned tool and library versions live **only** in `tools/versions.json`. Pages render them from
    there. Never type a tool version number into prose. (Spec editions are fixed decisions and may be
    written out: AUTOSAR CP **R25-11**, **MISRA C:2012** numbering.)
-5. Simulation honesty: every example page has a "Simulation fidelity" callout (✅ / ⚠️ / ❌). Never
-   imply that Renode reproduces timing, analog values, power, OLED pixels or CAN bit timing.
+5. Hardware honesty: every example page has a "How this was verified" callout (✅ / ⚠️ / ❌):
+   builds in CI, host-tested logic, and whether it has run on a real NUCLEO-G474RE (`tested_on`).
+   Never claim a simulation or a hardware run that didn't happen.
 6. Known traps that must be taught correctly wherever they come up:
-   - PC13 LED is **active-low**. PC13–PC15 sink only ~3 mA, run at ≤ 2 MHz and must not source current.
-   - `AFIO_MAPR.SWJ_CFG`: use `JTAGDISABLE`, **never** `DISABLE` (that locks out SWD).
-   - 72 MHz needs `FLASH_ACR.LATENCY = 2`, which is `(2U << FLASH_ACR_LATENCY_Pos)`. `FLASH_ACR_LATENCY_2` is the mask `0x4` (bit 2 of the field), **not** two wait states.
-   - APB1 ≤ 36 MHz; timer clocks are ×2 when the APB prescaler ≠ 1; ADC clock ≤ 14 MHz.
-   - USB and bxCAN share 512 B SRAM and IRQ vectors 19/20, so they can't run at the same time.
-   - Every hardware wait loop has a timeout. Renode doesn't model `RCC_CFGR.SWS` without our overlay.
-   - Clone chips report SW-DP ID `0x2ba01477`. Use `bluepill-clone.cfg`; never edit installed OpenOCD scripts.
+   - LD2 on PA5 is **active-high** (1 = on). PA5 is also Arduino D13 / `SPI1_SCK`: never use SPI1 on PA5 with the LED.
+   - B1 (USER) on PC13 reads **1 when pressed** per ST's NUCLEO BSP; a community board file says the
+     opposite, so pages say "check yours" and code keeps the polarity in `BOARD_BTN_PRESSED`.
+   - SWD is PA13/PA14 (SWO on PB3). Never change their `MODER`/`AFR`: that locks out the debugger
+     until a connect-under-reset.
+   - 170 MHz needs range 1 **boost** (`PWR_CR5.R1MODE = 0`), 4 flash wait states (`FLASH_ACR_LATENCY_4WS`,
+     a real value macro on the G4) and an **AHB ÷2 step for ≥ 1 µs** when switching SYSCLK above 80 MHz.
+   - FPU: enable CP10/CP11 in `SCB->CPACR` before any floating-point instruction (the build uses
+     `-mfloat-abi=hard`). An exception that uses the FPU stacks 18 extra words (lazy stacking).
+   - Timer clocks are ×2 when an APB prescaler ≠ 1 (at the course setup both are ÷1, so timers run at 170 MHz).
+   - DMA requests go through **DMAMUX**: enabling a DMA channel without its DMAMUX request does nothing.
+   - The ADC leaves deep power-down (`DEEPPWD = 0`), starts its regulator (`ADVREGEN`, then wait),
+     and calibrates (`ADCAL`) before `ADEN`. Skipping a step gives wrong or no conversions.
+   - FDCAN message RAM has a fixed layout on the G4; the NUCLEO has **no CAN transceiver**, and the one
+     you add must be rated for the CAN FD data bit rate.
+   - Flash is programmed in 64-bit double words; page size depends on the `DBANK` option bit.
+   - Every hardware wait loop has a timeout.
+   - Never edit installed OpenOCD scripts; use `examples/common/openocd/nucleo-g474re.cfg`.
 
 ### Copyright
 7. **MISRA C / AUTOSAR C++14 guidelines are copyrighted.** Cite rule numbers ("MISRA C:2012
@@ -49,17 +67,19 @@ should look or behave, do what that site does.
    added to `tools/autosar-ids.txt`). Short API signatures are fine. Don't copy prose passages or
    figures; draw our own diagrams.
 9. ST/Arm manuals: no copied figures, tables or long text. Redraw and paraphrase. Register field
-   descriptions are written in our words with the RM0008 section cited.
+   descriptions are written in our words with the RM0440 section cited.
 10. Third-party code is **vendored into `third_party/<component>/`**: only the needed subset, the
     upstream LICENSE unchanged, and a README with the upstream URL, tag, full commit SHA and update
     command. Never edit it in place; update only with `python3 tools/update-third-party.py <component> <tag>`,
     which also updates `tools/versions.json`. **No git submodules, no CMake FetchContent**, so a ZIP
     download builds offline. The only exception is the CubeMX-generated HAL inside
-    `examples/00-bluepill-blink-uart/hal/`.
-10a. **The STM32F103 SVD is not committed** (licence unclear, PLAN.md §2.4). Cortex-Debug uses
-    `.cache/svd/STM32F103.svd` from `tools/fetch-svd.py`. Register-viewer data
-    (`site/assets/js/data/regs-stm32f103.js`) is hand-authored from RM0008, in our own words, and
-    `tools/check-regs.py` must pass (addresses and bit fields match `stm32f103xb.h`).
+    `examples/00-nucleo-blink-uart/hal/`.
+10a. **The STM32G474 SVD is not committed** (PLAN.md §2.4). Cortex-Debug uses
+    `.cache/svd/STM32G474.svd` from `tools/fetch-svd.py`. Register-viewer data
+    (`site/assets/js/data/regs-stm32g474.js`) is hand-authored from RM0440, in our own words, and
+    `tools/check-regs.py` must pass (addresses and bit fields match `stm32g474xx.h`). Pin data
+    (`site/assets/js/data/nucleo-pins.js`) is generated from ST's open pin data by `tools/gen-pins.py`,
+    and `tools/check-pins.py` checks every `AF_<pin>_<signal>` constant in the firmware against it.
 10b. Licences: code is **MIT**. Every new code file (C, H, S, ld, CMake, Python, JS, CSS) starts with
     `SPDX-License-Identifier: MIT`. Prose and diagrams are **CC BY 4.0** (`LICENSE-CONTENT`, stated in
     the footer).
@@ -95,13 +115,15 @@ should look or behave, do what that site does.
 17. "Bad" code in bad-vs-good comparisons must also compile (warnings allowed only where noted).
 18. Firmware style: C11, `-Wall -Wextra -Werror` for our code, `.clang-format` in repo, no dynamic
     allocation, no recursion, fixed-width types (`uint32_t`) outside AUTOSAR BSW (which uses `uint32` etc.).
-19. **Plain registers through the CMSIS device header** (`stm32f103xb.h` from `third_party/cmsis_device_f1`)
-    are the main style: `RCC->CFGR`, `RCC_CFGR_SW_PLL`, `(2U << FLASH_ACR_LATENCY_Pos)`. **Never hand-type
-    a peripheral address or a magic bit value** in firmware. Teaching snippets that show the raw address
-    are labelled "what the macro expands to".
+19. **Plain registers through the CMSIS device header** (`stm32g474xx.h` from `third_party/cmsis_device_g4`)
+    are the main style: `RCC->CFGR`, `RCC_CFGR_SW_PLL`, `FLASH_ACR_LATENCY_4WS`, `(85U << RCC_PLLCFGR_PLLN_Pos)`.
+    **Never hand-type a peripheral address or a magic bit value** in firmware. Values the header doesn't
+    name get a named constant with its source: alternate-function numbers as `AF_<pin>_<signal>`
+    (`examples/common/bsp/board.h`), CPACR fields in the startup. Teaching snippets that show the raw
+    address are labelled "what the macro expands to".
 20. HAL appears **only** in `setup.html` (path A, side-by-side comparison, `examples/00-…/hal/`). LL appears
     **only** in Appendix D (`ll-drivers.html`, `examples/00-…/ll/`). Neither becomes a parallel track.
-21. Startup code is **C** (`startup.c` / `examples/common/startup/startup_stm32f103.c`). ST's assembly
+21. Startup code is **C** (`startup.c` / `examples/common/startup/startup_stm32g474.c`). ST's assembly
     startup is shown once, on `boot.html#c-vs-asm`, as a comparison.
 22. Build system: **CMake + Ninja only**. No Makefiles anywhere. What CMake generates is explained once,
     on `setup.html#cmake-under-hood`.
@@ -159,15 +181,14 @@ should look or behave, do what that site does.
 | Section number | `<module num>.<n>` in `.sec-num`; references auto-append as the last number | `4.3` |
 | Page script | `site/assets/js/pages/<page-id>.js` (+ `<page-id>-<topic>.js` if large) | `pages/setup.js` |
 | Engine | `site/assets/js/engines/<engine>.js`, exported on `window.MCU.<Name>` | `MCU.Register` |
-| Data file | `site/assets/js/data/<subject>.js`, exported on `window.MCU_DATA.<key>` | `MCU_DATA.bluepill` |
+| Data file | `site/assets/js/data/<subject>.js`, exported on `window.MCU_DATA.<key>` | `MCU_DATA.nucleo` |
 | DOM ids for diagrams | `<kind>-<topic>` | `#clk-tree`, `#seq-irq-entry`, `#reg-rcc-cfgr` |
 | Embedded source ids | `src-<example>-<region>` | `src-00-clock` |
 | CSS component classes | short prefix per engine | `.pin-*`, `.reg-*`, `.clk-*`, `.wv-*`, `.mm-*` |
 | localStorage keys | `mcu-` prefix, always wrapped in try/catch | `mcu-theme`, `mcu-code-lang`, `mcu-os`, `mcu-done-<page>` |
 | Example folder | `examples/NN-kebab-name/` (NN two digits, catalog order) | `examples/05-adc-pot-dma/` |
-| Example targets | `NN-kebab-name.elf/.hex/.bin`; CMake targets `flash-<name>`, `renode-<name>` | `flash-00-bluepill-blink-uart` |
-| Robot test | `examples/NN-…/test/NN.robot`; Renode script `renode/NN.resc` | |
-| Images | `site/assets/img/<page-id>-<what>.webp`, ≤ 150 KB, with `alt` text | `setup-swd-wiring.webp` |
+| Example targets | `NN-kebab-name.elf/.hex/.bin`; CMake target `flash-<name>` | `flash-00-nucleo-blink-uart` |
+| Images | `site/assets/img/<page-id>-<what>.webp`, ≤ 150 KB, with `alt` text | `setup-nucleo-usb.webp` |
 | Reference keys (`R`) | camelCase, doc-oriented | `rm0008Rcc`, `ds5319Pins`, `swsDio` |
 
 ## AUTOSAR self-review checklist
@@ -204,8 +225,9 @@ Run this for every AUTOSAR page (modules 18–23, 26) and every file in `autosar
    `.page-meta` with read time, level and main example), then one `section.doc-section[id][data-title]`
    per `SITE` section with `.sec-head h2 .sec-num`. Keep ids identical to `SITE`.
 5. Example code: write or extend the example in `examples/` first, make it build
-   (`cmake --preset bluepill-debug && cmake --build --preset bluepill-debug`), add regions and «n»
-   markers, run its Robot test, then embed it with `tools/embed-code.py`.
+   (`cmake --preset nucleo-debug && cmake --build --preset nucleo-debug`), add regions and «n»
+   markers, run its host tests and, if you can, run it on a NUCLEO-G474RE; then embed it with
+   `tools/embed-code.py`.
 6. Diagrams: use an existing engine with a data object. Only write a new engine if PLAN.md §9 has
    one planned; otherwise propose it in PLAN.md first.
 7. References: add `R` entries (`{ t, url, doc, rev, sec, kind }`) and list them in `REFS[<id>]`.
@@ -218,11 +240,10 @@ Run this for every AUTOSAR page (modules 18–23, 26) and every file in `autosar
 10. Commit with a message like `module 05 gpio: sections model…swj, example 01 regions`.
 
 ## How to add a new example
-1. `examples/NN-name/` with `README.md` front matter (`id, title, modules, peripherals, flavor, sim, hw, tested_on`),
-   `CMakeLists.txt` (use `examples/common/cmake/bluepill.cmake`), `src/`, `expected-output.txt`,
-   `wiring.svg` (export from the pinout engine), `renode/NN.resc` + `test/NN.robot` if simulatable,
-   `test/` host tests if there is pure logic.
-2. Use `examples/common/` (startup, linker, BSP, OpenOCD cfgs, Renode overlay). Don't copy them,
+1. `examples/NN-name/` with `README.md` front matter (`id, title, modules, peripherals, flavor, hw, tested_on`),
+   `CMakeLists.txt` (use `examples/common/cmake/nucleo.cmake`), `src/`, `expected-output.txt`,
+   `wiring.svg` (export from the pinout engine), `test/` host tests if there is pure logic.
+2. Use `examples/common/` (startup, linker, BSP, OpenOCD cfg). Don't copy them,
    except example 00, which owns its startup + linker on purpose for teaching. Include third-party code
    only from `third_party/` via the shared CMake helpers. If a new component is needed, vendor it with
    `tools/update-third-party.py` first.
@@ -247,14 +268,14 @@ npm ci --prefix tests/site && npm --prefix tests/site run smoke   # Playwright s
 Firmware, simulation and analysis:
 ```sh
 python3 tools/fetch-svd.py                               # SVD for Cortex-Debug → .cache/svd/ (not committed)
-cmake --preset bluepill-debug && cmake --build --preset bluepill-debug   # every example, autosar/, capstone
-cmake --build --preset bluepill-debug --target flash-00-bluepill-blink-uart   # OpenOCD + ST-Link (renode-<name> opens Renode)
-python3 tools/run-renode-tests.py                        # every Robot suite (or pass one .robot path)
+cmake --preset nucleo-debug && cmake --build --preset nucleo-debug   # every example, autosar/, capstone
+cmake --build --preset nucleo-debug --target flash-00-nucleo-blink-uart   # OpenOCD + the on-board ST-LINK
+python3 tools/check-pins.py                              # AF_ constants match ST's pin data
 cmake --preset host-tests && ctest --preset host-tests   # Unity host tests
 python3 tools/run-misra.py                               # MISRA ratchet (cppcheck); --list, --update
 python3 tools/check-autosar.py                           # AUTOSAR-style conventions in autosar/ + stage 3
 python3 tools/gen-autosar-cfg.py capstone/turnlight/stage3-autosar/cfg   # MemMap + Compiler_Cfg.h (--check in CI)
-python3 tools/update-third-party.py freertos_kernel V11.3.2      # vendor a new component (after adding it to versions.json)
+python3 tools/update-third-party.py freertos_kernel V11.3.2      # re-vendor a component (after editing versions.json)
 ```
 
 ## Git

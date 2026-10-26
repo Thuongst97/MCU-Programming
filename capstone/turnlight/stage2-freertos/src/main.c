@@ -5,6 +5,7 @@
  * for the watchdog supervisor's check-ins. Every object is allocated statically.
  */
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "FreeRTOS.h"
@@ -19,13 +20,21 @@
 #include "debounce.h"
 #include "lampmon.h"
 #include "led.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #include "tl_hw.h"
 #include "tl_msg.h"
 #include "turnlight_sm.h"
 #include "uart_log.h"
 
 #define STACK_WORDS 256U
+
+/* 500 kbit/s classic CAN from the FDCAN kernel clock (PCLK1), sample point 87.5 % target. */
+static bool can_start(void)
+{
+    can_timing_t nominal;
+    return (can_timing_calc(clock_pclk1(), 500000U, 875U, &CAN_NOMINAL_LIMITS, &nominal) == 0)
+           && can_init(&nominal, NULL, CAN_MODE_NORMAL);
+}
 
 typedef struct
 {
@@ -211,7 +220,7 @@ static void can_task(void *arg)        /* priority 2: on change, or every 10 ms 
         can_frame_t rx;
         while (can_receive(&rx))
         {
-            ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.dlc >= 1U));
+            ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.len >= 1U));
         }
         bool send = (ev & EV_STATUS_CHANGED) != 0U;
         if (tl_comm_step(&comm, ack, dt))
@@ -232,7 +241,7 @@ static void can_task(void *arg)        /* priority 2: on change, or every 10 ms 
             st.out_right = snap.failed[TL_RIGHT];
             st.cluster_lost = comm.lost;
             st.alive++;
-            can_frame_t tx = {.id = TL_CAN_ID_STATUS, .dlc = TL_STATUS_DLC, .data = {0}};
+            can_frame_t tx = {.id = TL_CAN_ID_STATUS, .len = TL_STATUS_DLC, .data = {0}};
             tl_status_pack(&st, tx.data);
             (void)can_send(&tx);
             since_tx_ms = 0U;
@@ -266,7 +275,7 @@ static void start(task_mem_t *m, TaskFunction_t fn, const char *name, UBaseType_
 
 int main(void)
 {
-    const clock_status_t clk = clock_init_72mhz();
+    const clock_status_t clk = clock_init_170mhz();
     uart_log_init(115200U);
     led_init();
     NVIC_SetPriorityGrouping(0U);
@@ -278,7 +287,7 @@ int main(void)
     {
         uart_puts("dem: TL_E_ADC_INIT failed\n");
     }
-    if (!can_init(CAN_BTR_500K_36MHZ, CAN_MODE_NORMAL))    /* its RX interrupt runs at priority 5 */
+    if (!can_start())    /* its RX interrupt runs at priority 5 */
     {
         uart_puts("dem: TL_E_CAN_INIT failed\n");
     }

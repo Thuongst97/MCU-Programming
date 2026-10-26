@@ -123,12 +123,12 @@ test("glossary filters by text and category", async ({ browser }) => {
   const { page, context, problems } = await open(browser, SITE + "glossary.html");
   const all = await page.locator(".gloss-item").count();
   expect(all).toBeGreaterThan(50);
-  await page.fill("#g-search", "bxcan");
+  await page.fill("#g-search", "fdcan");
   const hits = page.locator(".gloss-item");
   await expect(hits).not.toHaveCount(all);
   const texts = await hits.allInnerTexts();
-  expect(texts.length).toBeGreaterThan(1);                  // bxCAN itself + terms that mention it
-  for (const t of texts) expect(t.toLowerCase()).toContain("bxcan");
+  expect(texts.length).toBeGreaterThan(1);                  // FDCAN itself + terms that mention it
+  for (const t of texts) expect(t.toLowerCase()).toContain("fdcan");
   await page.fill("#g-search", "");
   await page.click('.gloss-cat[data-c="autosar"]');
   const n = await page.locator(".gloss-item").count();
@@ -157,15 +157,15 @@ test("engines render and respond (fixture page)", async ({ browser }) => {
   await page.hover('#lg-demo .lg-node[data-id="swc"]');
   await expect(page.locator("#lg-demo .lg-edge.lit")).toHaveCount(1);
   // pinout: wiring view drew parts; clicking a pin fills the side panel; search highlights
-  await expect(page.locator("#po-demo .po-ext")).toHaveCount(3);
+  await expect(page.locator("#po-demo .po-ext")).toHaveCount(7);
   await page.click('#po-demo [data-pin="PA9"] .po-dot');
   await expect(page.locator("#po-demo .po-panel .w-title")).toContainText("PA9");
-  await page.fill("#po-demo .po-search", "CAN_TX");
+  await page.fill("#po-demo .po-search", "FDCAN1_TX");
   await expect(page.locator("#po-demo .po-pin.match")).toHaveCount(2);
   // register: the C expression follows the value; toggling a bit changes it
-  await expect(page.locator("#reg-demo .reg-cexpr")).toHaveText("RCC->CFGR = RCC_CFGR_PLLMULL9 | RCC_CFGR_PLLSRC | RCC_CFGR_PPRE1_DIV2 | RCC_CFGR_SW_PLL;");
+  await expect(page.locator("#reg-demo .reg-cexpr")).toHaveText("RCC->CFGR = RCC_CFGR_SW_PLL;");
   await page.click('#reg-demo .reg-bit[data-bit="0"]');
-  await expect(page.locator("#reg-demo .reg-hex")).toHaveText("0x001D0403");
+  await expect(page.locator("#reg-demo .reg-hex")).toHaveText("0x0000000E");
   // memory map: stepping highlights .data in flash and RAM
   await page.click('#mm-demo [data-act="next"]');
   await page.click('#mm-demo [data-act="next"]');
@@ -173,10 +173,10 @@ test("engines render and respond (fixture page)", async ({ browser }) => {
   // checklist: ticking persists the count
   await page.check("#ck-demo input[data-i='1']");
   await expect(page.locator("#ck-demo .ck-count")).toHaveText("1 / 2");
-  // waveform: CAN frame with field bands; clock tree flags an illegal APB1 and shows the latency
+  // waveform: CAN frame with field bands; clock tree flags 170 MHz without boost mode
   await expect(page.locator("#wv-demo .wv-band").first()).toBeAttached();
   await expect(page.locator("#clk-demo .clk-okmsg")).toBeVisible();
-  await page.selectOption('#clk-demo select[data-k="ppre1"]', "1");
+  await page.uncheck('#clk-demo input[data-k="boost"]');
   await expect(page.locator("#clk-demo .clk-viol li")).toHaveCount(1);
   // calculator: best CAN timing row is highlighted and reacts to input
   await expect(page.locator("#calc-demo .calc-best")).toHaveCount(1);

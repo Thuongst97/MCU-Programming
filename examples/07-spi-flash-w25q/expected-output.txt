@@ -1,4 +1,4 @@
-Example 07: SPI1 + W25Qxx flash (CS on PA4)
+Example 07: SPI2 + W25Qxx flash (CS on PB12)
 JEDEC ID EF 40 16: Winbond, 4096 KB
 erase sector 0x001000: OK
 erased bytes read 0xFF: OK

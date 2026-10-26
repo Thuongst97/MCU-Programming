@@ -55,7 +55,7 @@
             <li>a one-element <b>mailbox</b> (<code>xQueueOverwrite</code> / <code>xQueuePeek</code>) holding the latest outputs, logic → lamp and can: readers always get the newest complete snapshot, never a half-updated one;</li>
             <li><b>event groups</b>: one bit "status changed" logic → can, and one bit per task for the supervisor.</li>
           </ul>
-          <script type="text/plain" id="src-s2-input" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="input" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="87" data-end="110" data-sha="0e33be8744e8">
+          <script type="text/plain" id="src-s2-input" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="input" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="96" data-end="119" data-sha="1c2709a10824">
 static void input_task(void *arg)      /* 10 ms, priority 3: debounce, send edges as events */
 {
     (void)arg;
@@ -82,7 +82,7 @@ static void input_task(void *arg)      /* 10 ms, priority 3: debounce, send edge
 }
 </script>
           <div id="ex-s2-input"></div>
-          <script type="text/plain" id="src-s2-logic" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="logic" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="114" data-end="176" data-sha="0e33be8744e8">
+          <script type="text/plain" id="src-s2-logic" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="logic" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="123" data-end="185" data-sha="1c2709a10824">
 static void logic_task(void *arg)      /* 10 ms, priority 3: lamp monitor + state machine */
 {
     (void)arg;
@@ -148,7 +148,7 @@ static void logic_task(void *arg)      /* 10 ms, priority 3: lamp monitor + stat
 }
 </script>
           <div id="ex-s2-logic"></div>
-          <script type="text/plain" id="src-s2-can" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="can" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="194" data-end="242" data-sha="0e33be8744e8">
+          <script type="text/plain" id="src-s2-can" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="can" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="203" data-end="251" data-sha="1c2709a10824">
 static void can_task(void *arg)        /* priority 2: on change, or every 10 ms for RX + the 100 ms cycle */
 {
     (void)arg;
@@ -169,7 +169,7 @@ static void can_task(void *arg)        /* priority 2: on change, or every 10 ms 
         can_frame_t rx;
         while (can_receive(&rx))
         {
-            ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.dlc >= 1U));
+            ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.len >= 1U));
         }
         bool send = (ev & EV_STATUS_CHANGED) != 0U;
         if (tl_comm_step(&comm, ack, dt))
@@ -190,7 +190,7 @@ static void can_task(void *arg)        /* priority 2: on change, or every 10 ms 
             st.out_right = snap.failed[TL_RIGHT];
             st.cluster_lost = comm.lost;
             st.alive++;
-            can_frame_t tx = {.id = TL_CAN_ID_STATUS, .dlc = TL_STATUS_DLC, .data = {0}};
+            can_frame_t tx = {.id = TL_CAN_ID_STATUS, .len = TL_STATUS_DLC, .data = {0}};
             tl_status_pack(&st, tx.data);
             (void)can_send(&tx);
             since_tx_ms = 0U;
@@ -200,12 +200,12 @@ static void can_task(void *arg)        /* priority 2: on change, or every 10 ms 
 }
 </script>
           <div id="ex-s2-can"></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The UART is shared too</span><p>Four tasks print to one UART. Without the mutex in <code>log3()</code>, a higher-priority task could interrupt a line halfway and mix two log messages, and the Renode tests, which read whole lines, would fail at random. Any resource used by more than one task needs a lock or a single owner.</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The UART is shared too</span><p>Four tasks print to one UART. Without the mutex in <code>log3()</code>, a higher-priority task could interrupt a line halfway and mix two log messages, and anyone reading the log, a person at a terminal or a script, would see garbled lines at random. Any resource used by more than one task needs a lock or a single owner.</p></div></div>
         </section>
 
         <section class="doc-section" id="timing" data-title="Timing and watchdog supervision">
           <div class="sec-head"><h2><span class="sec-num">25.3</span>Timing and watchdog supervision</h2></div>
-          <script type="text/plain" id="src-s2-sup" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="supervisor" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="246" data-end="259" data-sha="0e33be8744e8">
+          <script type="text/plain" id="src-s2-sup" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="supervisor" data-lang="c" data-file="capstone/turnlight/stage2-freertos/src/main.c" data-start="255" data-end="268" data-sha="1c2709a10824">
 static void supervisor_task(void *arg) /* priority 1 (lowest): feeds IWDG only when everyone checked in */
 {
     (void)arg;
@@ -238,7 +238,7 @@ static void supervisor_task(void *arg) /* priority 1 (lowest): feeds IWDG only w
           <div class="sec-head"><h2><span class="sec-num">25.4</span>What changed</h2></div>
           <p>The same requirement, two integrations: the supervisor.</p>
           <div class="cmp-host" id="cmp-sup"></div>
-          <script type="text/plain" id="src-c-s1sup" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="supervisor" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="148" data-end="155" data-sha="6868106ee151">
+          <script type="text/plain" id="src-c-s1sup" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="supervisor" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="157" data-end="164" data-sha="69a94f80a4e5">
 static void job_supervisor(void)       /* 50 ms: feed the watchdog only if every job ran (TL-REQ-009) */
 {
     if (s_alive == ALIVE_ALL)   // «8»
@@ -248,7 +248,7 @@ static void job_supervisor(void)       /* 50 ms: feed the watchdog only if every
     s_alive = 0U;
 }
 </script>
-          <script type="text/plain" id="src-c-s2sup" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="supervisor" data-lang="c" data-file="stage2-freertos/src/main.c" data-start="246" data-end="259" data-sha="0e33be8744e8">
+          <script type="text/plain" id="src-c-s2sup" data-src="capstone/turnlight/stage2-freertos/src/main.c" data-region="supervisor" data-lang="c" data-file="stage2-freertos/src/main.c" data-start="255" data-end="268" data-sha="1c2709a10824">
 static void supervisor_task(void *arg) /* priority 1 (lowest): feeds IWDG only when everyone checked in */
 {
     (void)arg;
@@ -267,7 +267,7 @@ static void supervisor_task(void *arg) /* priority 1 (lowest): feeds IWDG only w
           <div class="table-wrap"><table class="t">
             <thead><tr><th><span class="sr-only">Aspect</span></th><th>Stage 1: bare metal</th><th>Stage 2: FreeRTOS</th></tr></thead>
             <tbody>
-              <tr><td>Flash / RAM (debug build)</td><td>about 7.6 KB / 1.4 KB</td><td>about 21 KB / 8.6 KB (kernel + 5 stacks)</td></tr>
+              <tr><td>Flash / RAM (debug build)</td><td>about 9.8 KB / 2.6 KB</td><td>about 23 KB / 9.6 KB (kernel + 5 stacks)</td></tr>
               <tr><td>A slow job</td><td>delays every other job</td><td>only delays lower-priority tasks</td></tr>
               <tr><td>Waiting in the middle of a job</td><td>impossible; split into states</td><td>natural: block on a queue or event</td></tr>
               <tr><td>Shared data</td><td>plain globals, one context</td><td>queues, mailbox, mutex</td></tr>

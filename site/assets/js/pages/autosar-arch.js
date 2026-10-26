@@ -14,7 +14,7 @@
       { key: "svc", tag: "Svc", title: ["Services"], sub: ["vendor BSW"] },
       { key: "ecual", tag: "ECUAL", title: ["ECU abstraction"], sub: ["vendor + project"] },
       { key: "mcal", tag: "MCAL", title: ["MCAL"], sub: ["silicon vendor"] },
-      { key: "hw", tag: "HW", title: ["STM32F103"], sub: ["registers"] },
+      { key: "hw", tag: "HW", title: ["STM32G474"], sub: ["registers"] },
     ],
     nodes: [
       { id: "tl", band: "asw", at: [0.05, 0.45], title: "TurnLight", sub: "RE_TurnLight_10ms", tip: "Application SWC: the turn-signal state machine" },
@@ -30,10 +30,10 @@
       { id: "wdgif", band: "ecual", title: "WdgIf", sub: "device mapping" },
       { id: "dio", band: "mcal", title: "Dio / Port", sub: "pins" },
       { id: "pwm", band: "mcal", title: "Pwm / Adc", sub: "lamps, current" },
-      { id: "can", band: "mcal", title: "Can", sub: "bxCAN" },
+      { id: "can", band: "mcal", title: "Can", sub: "FDCAN1, classic frames" },
       { id: "wdg", band: "mcal", title: "Wdg / Mcu", sub: "IWDG, clocks" },
       { id: "gpio", band: "hw", title: "GPIO, TIM3, ADC1", sub: "PB12-14, PA6/7, PA1" },
-      { id: "bxcan", band: "hw", title: "bxCAN, IWDG", sub: "PB8/9, LSI" },
+      { id: "fdcan", band: "hw", title: "FDCAN1, IWDG", sub: "PA11/12, LSI" },
     ],
     edges: [
       { from: "tl", to: "rte", kind: "rte" }, { from: "lm", to: "rte", kind: "rte" },
@@ -41,7 +41,7 @@
       { from: "rte", to: "wdgm", kind: "call" }, { from: "com", to: "canif", kind: "pdu" }, { from: "canif", to: "can", kind: "pdu" },
       { from: "iohwab", to: "dio", kind: "call" }, { from: "iohwab", to: "pwm", kind: "call" }, { from: "wdgm", to: "wdgif", kind: "call" },
       { from: "wdgif", to: "wdg", kind: "call" }, { from: "dio", to: "gpio", kind: "hw" }, { from: "pwm", to: "gpio", kind: "hw" },
-      { from: "can", to: "bxcan", kind: "hw" }, { from: "wdg", to: "bxcan", kind: "hw" }, { from: "ecum", to: "wdg", kind: "opt" },
+      { from: "can", to: "fdcan", kind: "hw" }, { from: "wdg", to: "fdcan", kind: "hw" }, { from: "ecum", to: "wdg", kind: "opt" },
     ],
   });
 

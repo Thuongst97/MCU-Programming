@@ -3,10 +3,12 @@
  * Spec reference : AUTOSAR CP R25-11, AUTOSAR_CP_SWS_CANDriver
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  *
- * Can-lite on bxCAN (RM0008 §24), one controller, polling mode: one HTH over the three transmit
- * mailboxes, one HRH on FIFO 0 accepting every standard ID. Can_MainFunction_Write/_Read do the
- * work and call CanIf; there is no interrupt. Not supported: extended IDs, CAN FD, wake-up,
- * Can_SetBaudrate, Can_MainFunction_Mode (mode changes complete synchronously, with a timeout).
+ * Can-lite on FDCAN1 (RM0440 "FD controller area network"), one controller, polling mode, classic
+ * CAN frames: one HTH over the three-element TX FIFO, one HRH on RX FIFO 0 accepting every standard
+ * ID. Can_MainFunction_Write/_Read do the work and call CanIf; there is no interrupt. Not supported:
+ * extended IDs, CAN FD frames (example 11 shows them), wake-up, Can_SetBaudrate,
+ * Can_MainFunction_Mode (mode changes complete synchronously, with a timeout), bus-off recovery
+ * (FDCAN sets CCCR.INIT on bus-off and stays off the bus until software clears it).
  */
 #ifndef CAN_H
 #define CAN_H
@@ -40,8 +42,8 @@
 
 typedef struct
 {
-    uint32 btr;                           /* CAN_BTR: bit timing (module 12's calculator) */
-    boolean silentLoopback;               /* self-test without a bus */
+    uint32 nbtp;                          /* FDCAN_NBTP: nominal bit timing (module 12's calculator) */
+    boolean internalLoopback;             /* self-test without a bus or transceiver */
 } Can_ConfigType;
 
 #define CAN_START_SEC_CODE

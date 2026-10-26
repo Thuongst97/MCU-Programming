@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Download the STM32F103 SVD for Cortex-Debug's peripheral view into .cache/svd/ (not committed).
+"""Download the STM32G474 SVD for Cortex-Debug's peripheral view into .cache/svd/ (not committed).
 
 The SVD is not stored in this repository because its licence is unclear (PLAN.md §2.4). This tool
 downloads it from the pinned source in tools/versions.json and checks its SHA-256.
 
-  python3 tools/fetch-svd.py          # then point Cortex-Debug's "svdFile" at .cache/svd/STM32F103.svd
+  python3 tools/fetch-svd.py          # then point Cortex-Debug's "svdFile" at .cache/svd/STM32G474.svd
 """
 import hashlib
 import json
@@ -37,7 +37,7 @@ def main():
         dest.write_bytes(data)
         print(f"saved {dest.relative_to(ROOT)} ({len(data) // 1024} KB, SHA-256 verified)")
         return
-    sys.exit("could not download a verified STM32F103.svd; see setup.html#debug for a manual download")
+    sys.exit("could not download a verified STM32G474.svd; see setup.html#debug for a manual download")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT
    =========================================================================
    MCU Academy — memory-map / linker visualizer (PLAN.md §9.7).
-   MCU.MemoryMap(host, { map: "00-bluepill-blink-uart", compare?: "00-…-hal" })
+   MCU.MemoryMap(host, { map: "00-nucleo-blink-uart", compare?: "00-…-hal" })
    Data: window.MCU_DATA.memmap[name], generated from the CI-built ELF by
    tools/elf2memmap.py. Draws FLASH and RAM at true scale (small sections get
    a minimum width), lists sections and symbols, and steps through what the

@@ -2,11 +2,11 @@ Example 04: UART shell (type help)
 > help
 Commands:
   help - list commands
-  led - led on|off|toggle (PC13)
+  led - led on|off|toggle (LD2, PA5)
   clock - show the bus clocks
-  mco - mco hse|pll|off: clock out on PA8
+  mco - mco hsi|sys|off: clock out on PA8 (D7)
   uptime - milliseconds since start
   regs - dump RCC and FLASH registers
 > clock
-SYSCLK/HCLK 72000000 Hz, PCLK1 36000000 Hz, PCLK2 72000000 Hz
+SYSCLK/HCLK 170000000 Hz, PCLK1 170000000 Hz, PCLK2 170000000 Hz
 > 

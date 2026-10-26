@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: MIT
 """Upload an application image to the example 12 bootloader.
 
-  python3 upload.py --port /dev/ttyUSB0 build/.../12-application.bin    # real board (needs pyserial)
+  python3 upload.py --port /dev/ttyACM0 build/.../12-application.bin    # NUCLEO virtual COM port (needs pyserial)
   python3 upload.py --tcp localhost:3456 12-application.bin             # Renode socket terminal
   python3 upload.py --frames-out frames.bin 12-application.bin          # only write the byte stream
 
 Reset the board (or send "r" to the running application) just before you start: the bootloader
-listens for HELLO for 500 ms after reset. Holding the button on PA0 keeps it in update mode.
+listens for HELLO for 500 ms after reset. Holding the USER button B1 keeps it in update mode.
 """
 import argparse
 import socket
@@ -83,7 +83,7 @@ def main():
         if wait_ack(link, 0.05):
             break
     else:
-        sys.exit("no answer from the bootloader: reset the board or hold the button on PA0")
+        sys.exit("no answer from the bootloader: reset the board or hold the USER button B1")
     print(f"bootloader found, sending {len(image)} bytes")
     for what, f in blproto.image_frames(image):
         link.write(f)

@@ -15,13 +15,13 @@ FUNC(void, ECUM_CODE) EcuM_Init(void)
 {
     EcuM_AL_DriverInitZero();                       /* Det: before anything can report an error */   // «1»
     Mcu_Init(&Mcu_Config);                                                                               // «2»
-    if (Mcu_InitClock(0U) == E_OK)                  /* clock setting 0: HSE 8 MHz x 9 = 72 MHz */
+    if (Mcu_InitClock(0U) == E_OK)                  /* clock setting 0: HSI16 / 4 x 85 / 2 = 170 MHz */
     {
         for (uint32 n = 0U; (n < 200000UL) && (Mcu_GetPllStatus() != MCU_PLL_LOCKED); ++n)
         {
             /* bounded wait for the PLL */
         }
-        (void)Mcu_DistributePllClock();             /* on failure the ECU keeps running on HSI */
+        (void)Mcu_DistributePllClock();             /* on failure the ECU keeps running on HSI16 */
     }
     EcuM_AL_DriverInitOne();                        /* Port, Dio, ... : everything the OS needs */  // «3»
     StartOS(OSDEFAULTAPPMODE);                      /* does not return */                           // «4»

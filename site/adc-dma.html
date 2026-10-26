@@ -31,32 +31,39 @@
 
         <section class="doc-section" id="sar" data-title="How a SAR ADC works">
           <div class="sec-head"><h2><span class="sec-num">9.1</span>How a SAR ADC works</h2></div>
-          <p>The STM32F103 has two 12-bit <b>successive-approximation</b> (SAR) ADCs (DS5319). A SAR ADC finds the input voltage by binary search: a sample-and-hold capacitor freezes the input, then for each bit from the most significant down, an internal DAC produces a trial voltage and a comparator says "higher" or "lower". Twelve comparisons give twelve bits. Move the slider:</p>
+          <p>The STM32G474 has five 12-bit <b>successive-approximation</b> (SAR) ADCs (DS12288). A SAR ADC finds the input voltage by binary search: a sample-and-hold capacitor freezes the input, then for each bit from the most significant down, an internal DAC produces a trial voltage and a comparator says "higher" or "lower". Twelve comparisons give twelve bits. Move the slider:</p>
           <div id="sar-viz" class="hd-wrap"></div>
-          <p>A conversion takes the <b>sampling time</b> you choose plus 12.5 ADC clock cycles. At the maximum ADC clock of 14 MHz and the shortest sampling time (1.5 cycles), that is 1 µs per conversion (RM0008 §11.6). The Blue Pill's 72 MHz setup gives 12 MHz (PCLK2 ÷ 6).</p>
+          <p>A 12-bit conversion takes the <b>sampling time</b> you choose plus 12.5 ADC clock cycles (RM0440, ADC). The course clocks ADC1 synchronously from HCLK ÷ 4 = 42.5 MHz (<code>ADC12_COMMON-&gt;CCR.CKMODE = 11</code>), so even the shortest sampling time (2.5 cycles) gives about 0.35 µs per conversion; DS12288 gives the maximum ADC clock and sampling rate.</p>
           <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>Guessing a number between 0 and 4095 with "higher or lower" answers: start at 2048, then 1024 or 3072, and so on. Twelve questions always find it. The sampling time is how long you let a photograph develop before you start asking: too short and the picture is blurred.</p></div></div>
         </section>
 
-        <section class="doc-section" id="config" data-title="Configuring ADC1">
-          <div class="sec-head"><h2><span class="sec-num">9.2</span>Configuring ADC1</h2></div>
-          <p>Setting up ADC1 takes four things: a clock within limits, an analog pin, a sampling time, and a calibration.</p>
-          <script type="text/plain" id="src-05-init" data-src="examples/05-adc-pot-dma/src/main.c" data-region="init" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="33" data-end="49" data-sha="087e98165953">
+        <section class="doc-section" id="config" data-title="Bringing up ADC1">
+          <div class="sec-head"><h2><span class="sec-num">9.2</span>Bringing up ADC1</h2></div>
+          <p>The G4 ADC wakes up in <b>deep power-down</b> and must be brought up in a fixed order (RM0440, ADC): leave deep power-down (<code>DEEPPWD = 0</code>), start its internal voltage regulator (<code>ADVREGEN = 1</code>) and wait for it, calibrate (<code>ADCAL</code>), then enable (<code>ADEN</code>) and wait for <code>ADRDY</code>. Skip or reorder a step and you get no conversions or wrong ones, with no error flag to tell you why.</p>
+          <script type="text/plain" id="src-05-init" data-src="examples/05-adc-pot-dma/src/main.c" data-region="init" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="39" data-end="62" data-sha="acedf8b27e42">
 static bool adc_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_ADC1EN;          /* ADC clock = PCLK2 / 6 = 12 MHz */ // «1»
-    GPIOA->CRL &= ~(GPIO_CRL_MODE1 | GPIO_CRL_CNF1);                  /* PA1: analog input (0000) */       // «2»
-    ADC1->SMPR2 = 7U << ADC_SMPR2_SMP1_Pos;                           /* 239.5 cycles for PA1 */           // «3»
-    ADC1->SMPR1 = 7U << ADC_SMPR1_SMP17_Pos;                          /* and for Vrefint */
-    ADC1->CR2 = ADC_CR2_ADON | ADC_CR2_TSVREFE                        /* power up, enable Vrefint */      // «4»
-              | (7U << ADC_CR2_EXTSEL_Pos) | ADC_CR2_EXTTRIG;         /* trigger: SWSTART bit */
-    delay_ms(1U);                                                     /* tSTAB, plus 2 ADC clocks before CAL */
-    ADC1->CR2 |= ADC_CR2_RSTCAL;                                                                           // «5»
-    if (!wait_clear(&ADC1->CR2, ADC_CR2_RSTCAL))
+    RCC->AHB2ENR |= RCC_AHB2ENR_ADC12EN;                              /* ADC1 and ADC2 share a clock */   // «1»
+    (void)RCC->AHB2ENR;
+    gpio_clock_on(GPIOA);
+    gpio_mode(GPIOA, 1U, BSP_GPIO_ANALOG);                            /* PA1: analog (also the reset state) */ // «2»
+    ADC12_COMMON->CCR = ADC_CCR_CKMODE_1 | ADC_CCR_CKMODE_0           /* clock = HCLK / 4 = 42.5 MHz */
+                      | ADC_CCR_VREFEN;                               /* switch Vrefint on */
+
+    ADC1->CR &= ~ADC_CR_DEEPPWD;                                      /* 1. leave deep power-down */      // «3»
+    ADC1->CR |= ADC_CR_ADVREGEN;                                      /* 2. start the ADC's regulator */
+    delay_ms(1U);                                                     /*    needs 20 us; 1 ms is plenty */
+    ADC1->CR &= ~ADC_CR_ADCALDIF;                                     /* 3. calibrate, single-ended */     // «4»
+    ADC1->CR |= ADC_CR_ADCAL;
+    if (!wait_flag(&ADC1->CR, ADC_CR_ADCAL, 0U))
     {
         return false;
     }
-    ADC1->CR2 |= ADC_CR2_CAL;                                         /* self-calibration */
-    return wait_clear(&ADC1->CR2, ADC_CR2_CAL);
+    ADC1->SMPR1 = 7U << ADC_SMPR1_SMP2_Pos;                           /* 640.5 cycles for PA1 */           // «5»
+    ADC1->SMPR2 = 7U << ADC_SMPR2_SMP18_Pos;                          /* and for Vrefint */
+    ADC1->ISR = ADC_ISR_ADRDY;                                        /* write 1 to clear */
+    ADC1->CR |= ADC_CR_ADEN;                                          /* 4. enable, wait until ready */
+    return wait_flag(&ADC1->ISR, ADC_ISR_ADRDY, ADC_ISR_ADRDY);
 }
 </script>
           <div id="ex-init"></div>
@@ -64,26 +71,26 @@ static bool adc_init(void)
           <div class="table-wrap"><table class="t">
             <thead><tr><th><code>SMPx</code></th><th>Cycles</th><th>Use</th></tr></thead>
             <tbody>
-              <tr><td>000</td><td>1.5</td><td>Low-impedance sources (an op-amp output)</td></tr>
-              <tr><td>011</td><td>28.5</td><td>Typical sensors with a buffer</td></tr>
-              <tr><td>111</td><td>239.5</td><td>High-impedance sources like a 10 kΩ pot, and the internal temperature sensor (needs ≥ 17.1 µs, DS5319)</td></tr>
+              <tr><td>000</td><td>2.5</td><td>Low-impedance sources (an op-amp output, the G4's internal op-amps)</td></tr>
+              <tr><td>011</td><td>24.5</td><td>Typical sensors with a buffer</td></tr>
+              <tr><td>111</td><td>640.5</td><td>High-impedance sources like a 10 kΩ pot, Vrefint and the internal temperature sensor (DS12288 gives their minimum sampling times)</td></tr>
             </tbody>
           </table></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">ADC pins are not 5 V tolerant</span><p>PA0–PA7, PB0 and PB1 carry the ADC inputs and none of them tolerates 5 V. The input range is 0 V to VREF+, which is 3.3 V on the Blue Pill (VREF+ is tied to VDDA inside the 48-pin package).</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">0 V to VREF+, never more</span><p>An input in analog mode must stay between 0 V and VREF+ (3.3 V on the NUCLEO, where VREF+ follows VDDA). A pin that is 5 V tolerant as a digital input is <b>not</b> in analog mode. The <a href="board.html#pinout">pinout</a> lists each pin&#39;s ADC channels; PA1 is <code>ADC1_IN2</code>.</p></div></div>
         </section>
 
         <section class="doc-section" id="single" data-title="Single conversion, polling">
           <div class="sec-head"><h2><span class="sec-num">9.3</span>Single conversion, polling</h2></div>
           <p>The simplest use: pick a channel, start, wait for end of conversion, read.</p>
-          <script type="text/plain" id="src-05-single" data-src="examples/05-adc-pot-dma/src/main.c" data-region="single" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="53" data-end="66" data-sha="087e98165953">
+          <script type="text/plain" id="src-05-single" data-src="examples/05-adc-pot-dma/src/main.c" data-region="single" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="66" data-end="79" data-sha="acedf8b27e42">
 static uint32_t adc_read(uint32_t channel)
 {
-    ADC1->SQR1 = 0U;                                                  /* sequence length 1 */
-    ADC1->SQR3 = channel;                                             /* SQ1 = channel */                  // «6»
-    ADC1->CR2 |= ADC_CR2_SWSTART;                                                                          // «7»
+    ADC1->SQR1 = (0U << ADC_SQR1_L_Pos)                               /* L = 0: one conversion */
+               | (channel << ADC_SQR1_SQ1_Pos);                       /* SQ1 = channel */                  // «6»
+    ADC1->CR |= ADC_CR_ADSTART;                                                                            // «7»
     for (uint32_t n = 0U; n < WAIT_LOOPS; ++n)
     {
-        if ((ADC1->SR & ADC_SR_EOC) != 0U)
+        if ((ADC1->ISR & ADC_ISR_EOC) != 0U)
         {
             return ADC1->DR & 0xFFFU;                                 /* reading DR clears EOC */          // «8»
         }
@@ -92,24 +99,27 @@ static uint32_t adc_read(uint32_t channel)
 }
 </script>
           <div id="ex-single"></div>
-          <p>The raw number means nothing until it is scaled. Example 05 also measures the internal reference <b>Vrefint</b> (about 1.20 V, channel 17), which lets it compute the real supply voltage instead of assuming exactly 3.3 V:</p>
-          <script type="text/plain" id="src-05-math" data-src="examples/05-adc-pot-dma/src/adcmath.c" data-region="math" data-lang="c" data-file="examples/05-adc-pot-dma/src/adcmath.c" data-start="5" data-end="32" data-sha="3ecaa0a3957c">
-uint32_t adc_vdda_mv(uint32_t vrefint_raw)
+          <p>The raw number means nothing until it is scaled. Example 05 also measures the internal reference <b>Vrefint</b> (ADC1 channel 18, enabled with <code>ADC12_COMMON-&gt;CCR.VREFEN</code>). ST measures it in production at VDDA = 3.0 V and stores the result, <code>VREFINT_CAL</code>, in system memory (<code>*VREFINT_CAL_ADDR</code> in the CMSIS header). Comparing today&#39;s reading with that value gives the real supply voltage instead of assuming exactly 3.3 V:</p>
+          <script type="text/plain" id="src-05-math" data-src="examples/05-adc-pot-dma/src/adcmath.c" data-region="math" data-lang="c" data-file="examples/05-adc-pot-dma/src/adcmath.c" data-start="5" data-end="35" data-sha="9069a6dcc9f4">
+uint32_t adc_vdda_mv(uint32_t vrefint_raw, uint32_t vrefint_cal)
 {
     if (vrefint_raw == 0U)
     {
         return 0U;
     }
-    return (VREFINT_MV * 4095U + (vrefint_raw / 2U)) / vrefint_raw;     /* rounded */      // «1»
+    return (VREFINT_CAL_VDDA_MV * vrefint_cal + (vrefint_raw / 2U)) / vrefint_raw;   /* rounded */ // «1»
 }
 
-uint32_t adc_pin_mv(uint32_t raw, uint32_t vrefint_raw)
+uint32_t adc_pin_mv(uint32_t raw, uint32_t vrefint_raw, uint32_t vrefint_cal)
 {
     if (vrefint_raw == 0U)
     {
         return 0U;
     }
-    return (raw * VREFINT_MV + (vrefint_raw / 2U)) / vrefint_raw;      /* VDDA cancels out */ // «2»
+    /* raw / 4095 x VDDA, with VDDA = 3000 x cal / vrefint_raw; 64-bit so nothing overflows */
+    const uint64_t num = (uint64_t)raw * VREFINT_CAL_VDDA_MV * vrefint_cal;                          // «2»
+    const uint64_t den = (uint64_t)vrefint_raw * 4095U;
+    return (uint32_t)((num + (den / 2U)) / den);
 }
 
 uint32_t adc_mean(const volatile uint16_t *buf, uint32_t len, uint32_t first, uint32_t stride)
@@ -127,43 +137,48 @@ uint32_t adc_mean(const volatile uint16_t *buf, uint32_t len, uint32_t first, ui
           <div id="po-adc"></div>
         </section>
 
-        <section class="doc-section" id="dma" data-title="DMA basics">
-          <div class="sec-head"><h2><span class="sec-num">9.4</span>DMA basics</h2></div>
-          <p>The <b>DMA controller</b> is a second bus master that copies data between peripherals and memory. DMA1 has 7 channels; each peripheral request is wired to a fixed channel (RM0008 §13.3.7): ADC1 uses channel 1, SPI1 RX and TX channels 2 and 3, USART1 TX and RX channels 4 and 5, and so on. Per channel you set:</p>
+        <section class="doc-section" id="dma" data-title="DMA and DMAMUX">
+          <div class="sec-head"><h2><span class="sec-num">9.4</span>DMA and DMAMUX</h2></div>
+          <p>The <b>DMA controller</b> is a second bus master that copies data between peripherals and memory. The G474 has two of them, DMA1 and DMA2, with 8 channels each. On the G4 no peripheral is wired to a fixed channel: the <b>DMAMUX</b> sits in between and forwards the request you choose to the channel you choose (RM0440, DMA and DMAMUX). DMAMUX channel 0 feeds DMA1 channel 1, DMAMUX channel 1 feeds DMA1 channel 2, and so on. The request numbers (ADC1 = 5, SPI2_RX = 12, …) are listed in the DMAMUX chapter of RM0440. Per DMA channel you set:</p>
           <ul>
             <li><code>CPAR</code>: the peripheral address (for example <code>&amp;ADC1-&gt;DR</code>),</li>
             <li><code>CMAR</code>: the memory address (your buffer),</li>
             <li><code>CNDTR</code>: how many items to move,</li>
             <li><code>CCR</code>: direction, sizes, increments, circular mode, priority, interrupts, enable.</li>
           </ul>
+          <div id="reg-dmamux"></div>
           <div id="reg-dmaccr"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Two classic silent failures</span><p><b>No DMAMUX request:</b> the DMA channel is enabled, configured perfectly, and never moves a byte, because nothing asks it to. <b>Buffer in CCM SRAM:</b> the DMA controllers cannot reach the 32 KB CCM SRAM at <code>0x10000000</code>, so a buffer placed there never fills. Keep DMA buffers in SRAM1/SRAM2, which is where the course&#39;s linker script puts every ordinary variable.</p></div></div>
           <div id="seq-dma"></div>
         </section>
 
         <section class="doc-section" id="adc-dma" data-title="Scan + DMA circular">
           <div class="sec-head"><h2><span class="sec-num">9.5</span>Scan + DMA circular</h2></div>
-          <p>In <b>scan mode</b> the ADC converts a list of channels in sequence (<code>SQR1</code>–<code>SQR3</code>); in <b>continuous mode</b> it starts over by itself; with <code>ADC_CR2.DMA</code> set it asks for a DMA transfer after each conversion. With DMA in <b>circular</b> mode the buffer fills forever, and the CPU just reads it when it wants a value.</p>
-          <script type="text/plain" id="src-05-dma" data-src="examples/05-adc-pot-dma/src/main.c" data-region="dma" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="70" data-end="86" data-sha="087e98165953">
+          <p>The ADC converts a <b>sequence</b> of channels (<code>ADC_SQR1</code>–<code>SQR4</code>, length in <code>SQR1.L</code>); in <b>continuous mode</b> (<code>CFGR.CONT</code>) it starts over by itself; with <code>CFGR.DMAEN</code> it asks for a DMA transfer after each conversion, and <code>DMACFG = 1</code> keeps asking forever, for a circular DMA buffer. With DMA in <b>circular</b> mode the buffer fills forever, and the CPU just reads it when it wants a value.</p>
+          <script type="text/plain" id="src-05-dma" data-src="examples/05-adc-pot-dma/src/main.c" data-region="dma" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="83" data-end="102" data-sha="acedf8b27e42">
 static void adc_dma_start(void)
 {
-    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN | RCC_AHB1ENR_DMAMUX1EN;
+    (void)RCC->AHB1ENR;
+    DMAMUX1_Channel0->CCR = DMAMUX_REQ_ADC1 << DMAMUX_CxCR_DMAREQ_ID_Pos; /* DMA1 ch1 <- ADC1 requests */  // «9»
     DMA1_Channel1->CCR = 0U;                                          /* channel off while configuring */
-    DMA1_Channel1->CPAR = (uint32_t)&ADC1->DR;                        /* from: the ADC data register */   // «9»
-    DMA1_Channel1->CMAR = (uint32_t)s_buf;                            /* to: our buffer */
+    DMA1_Channel1->CPAR = (uint32_t)&ADC1->DR;                        /* from: the ADC data register */
+    DMA1_Channel1->CMAR = (uint32_t)s_buf;                            /* to: our buffer (in SRAM1, not CCM) */
     DMA1_Channel1->CNDTR = 2U * SAMPLES;                              /* items before wrapping */
     DMA1_Channel1->CCR = DMA_CCR_MINC | DMA_CCR_CIRC                  /* memory++, circular */            // «10»
                        | DMA_CCR_PSIZE_0 | DMA_CCR_MSIZE_0            /* 16-bit both sides */
                        | DMA_CCR_EN;
 
-    ADC1->CR1 = ADC_CR1_SCAN;                                         /* convert the whole sequence */    // «11»
-    ADC1->SQR1 = 1U << ADC_SQR1_L_Pos;                                /* L = 1: two conversions */
-    ADC1->SQR3 = (1U << ADC_SQR3_SQ1_Pos) | (17U << ADC_SQR3_SQ2_Pos); /* PA1, then Vrefint */
-    ADC1->CR2 |= ADC_CR2_CONT | ADC_CR2_DMA;                          /* forever, one DMA request each */ // «12»
-    ADC1->CR2 |= ADC_CR2_SWSTART;
+    ADC1->SQR1 = (1U << ADC_SQR1_L_Pos)                               /* L = 1: two conversions */         // «11»
+               | (CH_POT << ADC_SQR1_SQ1_Pos) | (CH_VREFINT << ADC_SQR1_SQ2_Pos);
+    ADC1->CFGR = ADC_CFGR_CONT                                        /* forever */                       // «12»
+               | ADC_CFGR_DMAEN | ADC_CFGR_DMACFG                     /* one DMA request each, circular */
+               | ADC_CFGR_OVRMOD;                                     /* keep the newest on overrun */
+    ADC1->CR |= ADC_CR_ADSTART;
 }
 </script>
           <div id="ex-dma"></div>
-          <script type="text/plain" id="src-05-main" data-src="examples/05-adc-pot-dma/src/main.c" data-region="main" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="118" data-end="135" data-sha="087e98165953">
+          <script type="text/plain" id="src-05-main" data-src="examples/05-adc-pot-dma/src/main.c" data-region="main" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="136" data-end="153" data-sha="acedf8b27e42">
 for (;;)
 {
     delay_ms(500U);
@@ -177,7 +192,7 @@ for (;;)
     uart_puts("dma: PA1 mean ");
     uart_put_dec(pot);
     uart_puts(" = ");
-    uart_put_dec(adc_pin_mv(pot, vref));
+    uart_put_dec(adc_pin_mv(pot, vref, cal));
     uart_puts(" mV over ");
     uart_put_dec(SAMPLES);
     uart_puts(" samples\n");
@@ -185,7 +200,7 @@ for (;;)
 </script>
           <div id="ex-main"></div>
           <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Half-transfer: double buffering for free</span><p>Enable <code>HTIE</code> and <code>TCIE</code>: the half-transfer interrupt says "the first half is complete, process it while I fill the second", and transfer-complete says the opposite. Your code never reads a half that DMA is writing.</p></div></div>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 05)</span><p>✅ Power-up, calibration handshake and single conversions run in Renode on the course's ADC model; the Robot test "turns the pot" by setting the simulated input. ❌ The model raises no DMA requests, so part 2 reports "no DMA transfers" in simulation. ❌ No noise or sampling-time effects. Not tested on a Blue Pill yet.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (example 05)</span><p>✅ Builds in CI; the VDDA and millivolt maths pass their host tests. ⚠️ The Vrefint channel (18), the DMAMUX request ID (5) and the calibration address come from ST's CMSIS header and HAL/LL sources; their RM0440 sections are still to be checked (docs/verification.md). ❌ Not run on a NUCLEO-G474RE by the course yet.</p></div></div>
         </section>
 
         <section class="doc-section" id="noise" data-title="Noise, averaging and Vrefint">
@@ -196,7 +211,7 @@ for (;;)
             <li><b>Averaging:</b> the mean of N samples reduces random noise by about √N. Example 05 averages 32 samples from its DMA buffer.</li>
             <li><b>Hardware:</b> a 100 nF capacitor from the ADC pin to GND, short wires, and a quiet supply.</li>
           </ol>
-          <p>The internal <b>temperature sensor</b> (channel 16, enabled with <code>TSVREFE</code>) changes about 4.3 mV per °C, but its offset varies so much from chip to chip that it is only useful for detecting temperature <i>changes</i>, not for absolute measurements (RM0008 §11.10).</p>
+          <p>The internal <b>temperature sensor</b> (ADC1 channel 16, enabled with <code>ADC12_COMMON-&gt;CCR.VSENSESEL</code>) comes with two factory calibration points stored in system memory, taken at 30 °C and 130 °C (<code>TEMPSENSOR_CAL1/2</code> in ST&#39;s LL driver). Interpolating between them gives a usable absolute die temperature, which is still not the air temperature around the board.</p>
           <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The supply is your reference</span><p>Every reading is relative to VDDA. If the 3.3 V rail sags while a radio transmits, all readings rise, even though the sensor did not change. Measuring Vrefint alongside, as example 05 does, corrects for that.</p></div></div>
           <div id="ck-adc"></div>
         </section>
@@ -212,9 +227,9 @@ for (;;)
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/nucleo-pins.js?v=__BUILD__"></script>
   <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>

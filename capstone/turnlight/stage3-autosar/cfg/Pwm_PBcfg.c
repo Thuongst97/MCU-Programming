@@ -11,6 +11,6 @@ static CONST(Pwm_ChannelConfigType, PWM_CONST) Pwm_Channels[2] = {
     {3U, 1U, 0x0000U, STD_LOW},             /* PwmConf_PwmChannel_LampLeft */
     {3U, 2U, 0x0000U, STD_LOW},             /* PwmConf_PwmChannel_LampRight */
 };
-CONST(Pwm_ConfigType, PWM_CONST) Pwm_Config = {Pwm_Channels, 2U, 72000000UL, 1000000UL, 1000U};   /* 1 kHz */
+CONST(Pwm_ConfigType, PWM_CONST) Pwm_Config = {Pwm_Channels, 2U, 170000000UL, 1000000UL, 1000U};   /* TIM3 at 170 MHz (APB1 /1), 1 kHz */
 #define PWM_STOP_SEC_CONFIG_DATA_UNSPECIFIED
 #include "Pwm_MemMap.h"

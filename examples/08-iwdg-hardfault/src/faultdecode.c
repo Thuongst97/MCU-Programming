@@ -14,9 +14,11 @@ typedef struct
 static const flag_t s_cfsr[] = {
     {25U, "DIVBYZERO"}, {24U, "UNALIGNED"}, {19U, "NOCP"}, {18U, "INVPC"},                  /* UsageFault */ // «1»
     {17U, "INVSTATE"}, {16U, "UNDEFINSTR"},
-    {15U, "BFARVALID"}, {12U, "STKERR"}, {11U, "UNSTKERR"}, {10U, "IMPRECISERR"},            /* BusFault */
+    {15U, "BFARVALID"}, {13U, "LSPERR"}, {12U, "STKERR"}, {11U, "UNSTKERR"},                /* BusFault */
+    {10U, "IMPRECISERR"},
     {9U, "PRECISERR"}, {8U, "IBUSERR"},
-    {7U, "MMARVALID"}, {4U, "MSTKERR"}, {3U, "MUNSTKERR"}, {1U, "DACCVIOL"}, {0U, "IACCVIOL"},  /* MemManage */
+    {7U, "MMARVALID"}, {5U, "MLSPERR"}, {4U, "MSTKERR"}, {3U, "MUNSTKERR"},                /* MemManage */
+    {1U, "DACCVIOL"}, {0U, "IACCVIOL"},
 };
 static const flag_t s_hfsr[] = {{31U, "DEBUGEVT"}, {30U, "FORCED"}, {1U, "VECTTBL"}};                       // «2»
 // [endregion]
@@ -72,7 +74,8 @@ const char *reset_cause(uint32_t csr)
     if ((csr & (1UL << 30)) != 0U) { return "window watchdog"; }
     if ((csr & (1UL << 31)) != 0U) { return "low-power management"; }
     if ((csr & (1UL << 28)) != 0U) { return "software (SYSRESETREQ)"; }
-    if ((csr & (1UL << 27)) != 0U) { return "power-on"; }                                      // «4»
+    if ((csr & (1UL << 25)) != 0U) { return "option byte loader"; }
+    if ((csr & (1UL << 27)) != 0U) { return "power-on or brown-out"; }                         // «4»
     if ((csr & (1UL << 26)) != 0U) { return "reset pin"; }
     return "unknown";
 }

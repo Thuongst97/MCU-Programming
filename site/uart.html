@@ -39,69 +39,78 @@
             <label for="uart-stop">Stop bits <select id="uart-stop"><option>1</option><option>2</option></select></label>
             <span id="uart-out" class="mono small"></span>
           </div>
-          <p>The receiver detects the falling edge of the start bit, then samples each bit in its middle. The F1 USART oversamples by 16 and takes three samples around the middle of each bit to reject noise (RM0008 §27.3.3); disagreeing samples set the noise flag <code>NE</code>.</p>
+          <p>The receiver detects the falling edge of the start bit, then samples each bit in its middle. A G4 USART normally oversamples by 16 and takes three samples around the middle of each bit to reject noise; disagreeing samples set the noise flag <code>NE</code> (RM0440, USART). The LPUART, built to run from a slow clock in low-power modes, uses its own fractional divider instead (below).</p>
           <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>Two people agree to tap out a message at exactly one tap per second, without looking at each other's watch. The first tap says "starting now"; after that each listener counts seconds on their own watch. If one watch runs 5 % fast, by the tenth tap they are half a tap apart and start hearing the wrong taps. That is why both sides need accurate clocks.</p></div></div>
         </section>
 
         <section class="doc-section" id="baud" data-title="Baud rate and BRR">
           <div class="sec-head"><h2><span class="sec-num">8.2</span>Baud rate and BRR</h2></div>
-          <p>The USART divides its peripheral clock by 16 × USARTDIV to get the baud rate (RM0008 §27.3.4). USARTDIV is stored in <code>USART_BRR</code> as a 12-bit integer part and a 4-bit fraction in sixteenths:</p>
-          <div class="formula">USARTDIV = f<sub>PCLK</sub> ÷ (16 × baud) &nbsp;→&nbsp; BRR = mantissa &lt;&lt; 4 | round(fraction × 16)</div>
+          <p>Each serial peripheral divides its kernel clock (<code>RCC_CCIPR</code>, by default the bus clock) down to the baud rate. The G4 has two flavours with different formulas (RM0440, USART and LPUART):</p>
+          <div class="formula">USART (16× oversampling): BRR = f<sub>ck</sub> ÷ baud &nbsp;·&nbsp; LPUART: BRR = 256 × f<sub>ck</sub> ÷ baud</div>
+          <p>The ST-LINK's virtual COM port is wired to <b>LPUART1</b>, so every log line in the course goes through the second formula: 256 × 170 MHz ÷ 115 200 = 377 777.8 → <code>0x5C3B2</code>. The LPUART register has 20 bits and must hold at least <code>0x300</code>, so very low baud rates need a slower kernel clock.</p>
           <div id="calc-brr"></div>
           <div id="reg-brr"></div>
-          <p>USART1 is on APB2 (72 MHz at the course setup); USART2 and USART3 are on APB1 (36 MHz). Plugging in the wrong bus clock is the classic cause of garbage output. The receiver tolerates a total clock mismatch of a few percent between the two sides; the calculator shows the error that the divider's rounding adds.</p>
+          <p>USART1 is on APB2; USART2/3, UART4/5 and LPUART1 are on APB1. At the course setup both buses run at 170 MHz; after a change to a prescaler they would not. Plugging in the wrong clock, or the USART formula for an LPUART, is the classic cause of garbage output. The receiver tolerates a total clock mismatch of a few percent between the two sides; the calculator shows the error that the divider's rounding adds.</p>
         </section>
 
         <section class="doc-section" id="polling-irq" data-title="Polling vs interrupts">
           <div class="sec-head"><h2><span class="sec-num">8.3</span>Polling vs interrupts</h2></div>
           <p><b>Polling</b> waits on the status flags: simple, but the CPU can do nothing else, and at 115 200 baud a byte takes about 87 µs. <b>Interrupts</b> let the USART call you when it needs attention:</p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th>Flag (USART_SR)</th><th>Interrupt enable (USART_CR1)</th><th>Means</th></tr></thead>
+            <thead><tr><th>Flag (USART_ISR)</th><th>Interrupt enable (USART_CR1)</th><th>Means</th></tr></thead>
             <tbody>
-              <tr><td><code>RXNE</code></td><td><code>RXNEIE</code></td><td>A received byte waits in <code>DR</code>. Reading <code>DR</code> clears it.</td></tr>
-              <tr><td><code>ORE</code></td><td><code>RXNEIE</code></td><td>Overrun: a new byte arrived before the old one was read. The new byte is lost.</td></tr>
-              <tr><td><code>TXE</code></td><td><code>TXEIE</code></td><td><code>DR</code> is free for the next byte. Stays set while empty, so disable <code>TXEIE</code> when you have nothing to send.</td></tr>
+              <tr><td><code>RXNE</code></td><td><code>RXNEIE</code></td><td>A received byte waits in <code>RDR</code>. Reading <code>RDR</code> clears it.</td></tr>
+              <tr><td><code>ORE</code></td><td><code>RXNEIE</code></td><td>Overrun: a new byte arrived before the old one was read. The new byte is lost. Clear it by writing <code>ICR.ORECF</code>; until you do, no further byte is received.</td></tr>
+              <tr><td><code>TXE</code></td><td><code>TXEIE</code></td><td><code>TDR</code> is free for the next byte. Stays set while empty, so disable <code>TXEIE</code> when you have nothing to send.</td></tr>
               <tr><td><code>TC</code></td><td><code>TCIE</code></td><td>The last bit has left the pin. Needed before turning the USART off or switching an RS-485 driver.</td></tr>
             </tbody>
           </table></div>
+          <p>With the FIFOs off (the course's choice), the CMSIS header names these bits with both meanings, for example <code>USART_ISR_RXNE_RXFNE</code> and <code>USART_CR1_TXEIE_TXFNFIE</code>. Unlike older STM32 families, reading the status register never clears anything: errors are cleared by writing 1 to the matching bit of <code>USART_ICR</code>.</p>
           <div id="reg-sr"></div>
           <p>Example 04 enables only the receive interrupt at start-up and turns the transmit interrupt on whenever there is something to send:</p>
-          <script type="text/plain" id="src-04-init" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="init" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="17" data-end="26" data-sha="6330a97aedd6">
+          <script type="text/plain" id="src-04-init" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="init" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="20" data-end="31" data-sha="e5690058d8e2">
 static void uart_irq_init(uint32_t baud)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_USART1EN;
-    GPIOA->CRH = (GPIOA->CRH & ~(GPIO_CRH_CNF9 | GPIO_CRH_MODE9 | GPIO_CRH_CNF10 | GPIO_CRH_MODE10))
-                 | GPIO_CRH_CNF9_1 | GPIO_CRH_MODE9 | GPIO_CRH_CNF10_0;
-    USART1->BRR = (clock_pclk2() + (baud / 2U)) / baud;
-    USART1->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE;   /* RX interrupt on */ // «1»
-    NVIC_SetPriority(USART1_IRQn, 6U);                                                                // «2»
-    NVIC_EnableIRQ(USART1_IRQn);
+    RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
+    (void)RCC->APB1ENR2;
+    gpio_clock_on(BOARD_VCP_PORT);
+    gpio_af(BOARD_VCP_PORT, BOARD_VCP_TX_PIN, AF_PA2_LPUART1_TX);
+    gpio_af(BOARD_VCP_PORT, BOARD_VCP_RX_PIN, AF_PA3_LPUART1_RX);
+    LPUART1->BRR = (uint32_t)((256ULL * clock_pclk1() + (baud / 2U)) / baud);
+    LPUART1->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE_RXFNEIE;   /* RX interrupt on */ // «1»
+    NVIC_SetPriority(LPUART1_IRQn, 6U);                                                                     // «2»
+    NVIC_EnableIRQ(LPUART1_IRQn);
 }
 </script>
           <div id="ex-init"></div>
-          <script type="text/plain" id="src-04-isr" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="isr" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="30" data-end="54" data-sha="6330a97aedd6">
-void USART1_IRQHandler(void);
-void USART1_IRQHandler(void)
+          <script type="text/plain" id="src-04-isr" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="isr" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="35" data-end="64" data-sha="e5690058d8e2">
+void LPUART1_IRQHandler(void);
+void LPUART1_IRQHandler(void)
 {
-    const uint32_t sr = USART1->SR;
-    if ((sr & (USART_SR_RXNE | USART_SR_ORE)) != 0U)          /* byte received (or overrun) */      // «3»
+    const uint32_t isr = LPUART1->ISR;
+    if ((isr & USART_ISR_ORE) != 0U)                          /* overrun: a byte was lost */      // «3»
     {
-        const uint8_t b = (uint8_t)USART1->DR;                /* reading DR clears RXNE and ORE */
+        LPUART1->ICR = USART_ICR_ORECF;                       /* G4: ORE is cleared through ICR */
+        s_rx_dropped++;
+    }
+    if ((isr & USART_ISR_RXNE_RXFNE) != 0U)                   /* byte received */
+    {
+        const uint8_t b = (uint8_t)LPUART1->RDR;              /* reading RDR clears RXNE */
         if (!ringbuf_put(&s_rx, b))
         {
             s_rx_dropped++;                                   /* main() was too slow: count, don't block */
         }
     }
-    if (((USART1->CR1 & USART_CR1_TXEIE) != 0U) && ((sr & USART_SR_TXE) != 0U))                    // «4»
+    if (((LPUART1->CR1 & USART_CR1_TXEIE_TXFNFIE) != 0U) && ((isr & USART_ISR_TXE_TXFNF) != 0U))   // «4»
     {
         uint8_t b;
         if (ringbuf_get(&s_tx, &b))
         {
-            USART1->DR = b;
+            LPUART1->TDR = b;
         }
         else
         {
-            USART1->CR1 &= ~USART_CR1_TXEIE;                  /* nothing left: stop TXE interrupts */ // «5»
+            LPUART1->CR1 &= ~USART_CR1_TXEIE_TXFNFIE;         /* nothing left: stop TXE interrupts */ // «5»
         }
     }
 }
@@ -242,34 +251,34 @@ static void execute(shell_t *sh)
 </script>
           <div id="ex-exec"></div>
           <p>What a session looks like (from <code>expected-output.txt</code>):</p>
-          <script type="text/plain" data-code data-src="examples/04-uart-shell-ringbuffer/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="12" data-sha="97a4f705b42c">
+          <script type="text/plain" data-code data-src="examples/04-uart-shell-ringbuffer/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="12" data-sha="ca97b0e9e59b">
 Example 04: UART shell (type help)
 > help
 Commands:
   help - list commands
-  led - led on|off|toggle (PC13)
+  led - led on|off|toggle (LD2, PA5)
   clock - show the bus clocks
-  mco - mco hse|pll|off: clock out on PA8
+  mco - mco hsi|sys|off: clock out on PA8 (D7)
   uptime - milliseconds since start
   regs - dump RCC and FLASH registers
 > clock
-SYSCLK/HCLK 72000000 Hz, PCLK1 36000000 Hz, PCLK2 72000000 Hz
+SYSCLK/HCLK 170000000 Hz, PCLK1 170000000 Hz, PCLK2 170000000 Hz
 > 
 </script>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 04)</span><p>✅ The Robot test types commands into the simulated UART and checks the answers and the LED. ⚠️ Characters arrive without real bit timing, so overruns never happen in simulation. ❌ Not tested on a Blue Pill yet.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (example 04)</span><p>✅ Builds in CI; the ring buffer and the shell parser pass their host tests. ⚠️ No simulation (no STM32G4 model in Renode). ❌ Not run on a NUCLEO-G474RE by the course yet.</p></div></div>
         </section>
 
-        <section class="doc-section" id="lin-mode" data-title="LIN mode on the F1 USART">
-          <div class="sec-head"><h2><span class="sec-num">8.6</span>LIN mode on the F1 USART</h2></div>
-          <p><b>LIN</b> (Local Interconnect Network, ISO 17987) is a cheap single-wire bus for simple car body functions: switches, mirrors, seat motors. It is a UART frame format plus a schedule: one master asks, a slave answers. The F1's USART has a LIN mode (<code>USART_CR2.LINEN</code>) that adds what a plain UART lacks (RM0008 §27.3.8):</p>
+        <section class="doc-section" id="lin-mode" data-title="LIN mode on the G4 USART">
+          <div class="sec-head"><h2><span class="sec-num">8.6</span>LIN mode on the G4 USART</h2></div>
+          <p><b>LIN</b> (Local Interconnect Network, ISO 17987) is a cheap single-wire bus for simple car body functions: switches, mirrors, seat motors. It is a UART frame format plus a schedule: one master asks, a slave answers. The G4's USARTs (not the LPUART) have a LIN mode (<code>USART_CR2.LINEN</code>) that adds what a plain UART lacks (RM0440, USART):</p>
           <ul>
-            <li><b>Break:</b> the master starts every frame with at least 13 low bit times, longer than any valid byte. <code>USART_CR1.SBK</code> sends one.</li>
-            <li><b>Break detection:</b> a receiver with <code>LINEN</code> sets <code>LBD</code> when it sees a break of 10 or 11 bits (<code>LBDL</code>), and can interrupt (<code>LBDIE</code>).</li>
+            <li><b>Break:</b> the master starts every frame with at least 13 low bit times, longer than any valid byte. Writing <code>USART_RQR.SBKRQ</code> sends one.</li>
+            <li><b>Break detection:</b> a receiver with <code>LINEN</code> sets <code>ISR.LBDF</code> when it sees a break of 10 or 11 bits (<code>LBDL</code>), and can interrupt (<code>LBDIE</code>). Clear it with <code>ICR.LBDCF</code>.</li>
           </ul>
           <p>A frame header is: break, sync byte <code>0x55</code> (a 10101010 pattern slaves use to measure the master's baud rate), and a <b>protected identifier</b>: 6 ID bits plus 2 parity bits.</p>
           <div id="wv-lin"></div>
           <div class="wv-controls"><label for="lin-id">Frame ID (0–63) <input id="lin-id" type="number" min="0" max="63" value="18"></label><span id="lin-out" class="mono small"></span></div>
-          <p>Physically, LIN needs a transceiver that moves the signal to the car's 12 V level; the course keeps LIN to theory here and to a 3.3 V two-board demo in example 13. <a href="can.html#lin">Module 12</a> compares LIN with CAN.</p>
+          <p>Physically, LIN needs a transceiver that moves the signal to the car's 12 V level; the course keeps LIN to theory here and to a 3.3 V two-board demo on USART1 (D8/D2) in example 13. <a href="can.html#lin">Module 12</a> compares LIN with CAN.</p>
           <div id="ck-uart"></div>
         </section>
 
@@ -284,7 +293,7 @@ SYSCLK/HCLK 72000000 Hz, PCLK1 36000000 Hz, PCLK2 72000000 Hz
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
   <script src="assets/js/engines/calc.js?v=__BUILD__"></script>

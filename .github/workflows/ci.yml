@@ -40,6 +40,10 @@ jobs:
         run: python3 -m unittest discover -s tests/tools -v
       - name: Runtime and engine unit tests
         run: node --test tests/site/*.test.mjs
+      - name: Pin data is generated from ST's open pin data
+        run: python3 tools/gen-pins.py --check
+      - name: Every AF_<pin>_<signal> constant matches the pin data
+        run: python3 tools/check-pins.py
       - name: Example wiring diagrams match the pin data
         run: node tools/export-wiring.mjs --check
       - name: Example catalog and tool-version data are up to date
@@ -92,9 +96,9 @@ jobs:
       - name: Install Ninja
         run: sudo apt-get install -y -q ninja-build
       - name: Build (debug, -Og)
-        run: cmake --preset bluepill-debug && cmake --build --preset bluepill-debug
+        run: cmake --preset nucleo-debug && cmake --build --preset nucleo-debug
       - name: Build (release, -Os)
-        run: cmake --preset bluepill-release && cmake --build --preset bluepill-release
+        run: cmake --preset nucleo-release && cmake --build --preset nucleo-release
       - name: Memory maps on the site match the built ELFs
         run: python3 tools/elf2memmap.py --all --check
       - name: Upload firmware
@@ -127,32 +131,3 @@ jobs:
         run: sudo apt-get update -q && sudo apt-get install -y -q cppcheck && cppcheck --version
       - name: No new findings compared with tools/misra-baseline.json
         run: python3 tools/run-misra.py
-
-  renode-tests:
-    name: Renode simulation tests (Robot Framework)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.12"
-      - name: Cache toolchain and Renode
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/mcu-tools
-          key: mcu-tools-gcc-renode-${{ hashFiles('tools/versions.json') }}
-      - name: Install the pinned Arm GCC and Renode
-        run: python3 tools/install-tools.py --dest ~/mcu-tools gcc renode >> "$GITHUB_PATH"
-      - name: Install Ninja
-        run: sudo apt-get install -y -q ninja-build
-      - name: Build (debug)
-        run: cmake --preset bluepill-debug && cmake --build --preset bluepill-debug
-      - name: Run every Robot suite
-        run: python3 tools/run-renode-tests.py
-      - name: Upload Renode results on failure
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: renode-results
-          path: build/renode-results
-          retention-days: 7

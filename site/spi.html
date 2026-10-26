@@ -25,7 +25,7 @@
           <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 11</span><span>/</span><span>SPI</span></nav>
           <div class="eyebrow">Module 11 · Peripherals</div>
           <h1>SPI and a W25Qxx Flash</h1>
-          <p class="lead">SPI is the simple, fast one: a clock, one data line in each direction, and a chip-select per device. No addresses, no acknowledges, tens of megahertz. This module covers the four SPI modes, the F1 SPI peripheral, chip-select discipline, and a W25Qxx NOR flash, including reading it with DMA.</p>
+          <p class="lead">SPI is the simple, fast one: a clock, one data line in each direction, and a chip-select per device. No addresses, no acknowledges, tens of megahertz. This module covers the four SPI modes, the G4 SPI peripheral and its FIFO, chip-select discipline, and a W25Qxx NOR flash, including reading it with DMA through DMAMUX.</p>
           <div class="page-meta"><span>⏱ 40 min read</span><span>🎯 Intermediate</span><span>📂 examples/07-spi-flash-w25q</span></div>
         </header>
 
@@ -42,54 +42,58 @@
           <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>Two people facing each other, each passing a card with the right hand and receiving one with the left, in step with a metronome the master controls. After eight beats they have swapped a whole byte. Chip select decides who is facing the master right now.</p></div></div>
         </section>
 
-        <section class="doc-section" id="f1-spi" data-title="The F1 SPI peripheral">
-          <div class="sec-head"><h2><span class="sec-num">11.2</span>The F1 SPI peripheral</h2></div>
-          <p>The F1's SPI is configured mostly in <code>SPI_CR1</code> (RM0008 §25.5.1). SPI1 sits on APB2 and can run at up to 18 MHz (fPCLK2 ÷ 4) in master mode on this part (DS5319 SPI characteristics); example 07 uses ÷ 16 = 4.5 MHz, which is comfortable over jumper wires.</p>
+        <section class="doc-section" id="g4-spi" data-title="The G4 SPI peripheral">
+          <div class="sec-head"><h2><span class="sec-num">11.2</span>The G4 SPI peripheral</h2></div>
+          <p>The G4's SPI is configured in two registers (RM0440, SPI). <code>SPI_CR1</code> holds the mode, the clock divider and the software chip-select bits. <code>SPI_CR2</code> holds the <b>data size</b> (<code>DS</code>, 4 to 16 bits) and the receive <b>FIFO threshold</b> (<code>FRXTH</code>): unlike older STM32 SPIs, the G4's has a 32-bit FIFO in each direction. Example 07 uses <b>SPI2</b> on the Morpho header (PB12–PB15) at PCLK1 ÷ 32 = 5.3 MHz, comfortable over jumper wires; DS12288 gives the maximum SPI clock.</p>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Why not SPI1</span><p>SPI1's usual SCK pin is PA5, which also drives LD2: the LED would flicker with the clock and load the line. Its other SCK pin is PB3, the debugger's SWO output. SPI2 avoids both.</p></div></div>
           <div id="reg-spicr1"></div>
-          <script type="text/plain" id="src-07-init" data-src="examples/07-spi-flash-w25q/src/spi.c" data-region="init" data-lang="c" data-file="examples/07-spi-flash-w25q/src/spi.c" data-start="9" data-end="24" data-sha="23bd0277c948">
+          <div id="reg-spicr2"></div>
+          <script type="text/plain" id="src-07-init" data-src="examples/07-spi-flash-w25q/src/spi.c" data-region="init" data-lang="c" data-file="examples/07-spi-flash-w25q/src/spi.c" data-start="18" data-end="35" data-sha="56edd12db2c9">
 void spi_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_SPI1EN;
-    GPIOA->BSRR = GPIO_BSRR_BS4;                                     /* CS idle high before it is an output */ // «1»
-    GPIOA->CRL = (GPIOA->CRL & ~(GPIO_CRL_MODE4 | GPIO_CRL_CNF4 | GPIO_CRL_MODE5 | GPIO_CRL_CNF5
-                                 | GPIO_CRL_MODE6 | GPIO_CRL_CNF6 | GPIO_CRL_MODE7 | GPIO_CRL_CNF7))
-                 | GPIO_CRL_MODE4                                    /* PA4 CS: GPIO push-pull */
-                 | GPIO_CRL_MODE5 | GPIO_CRL_CNF5_1                  /* PA5 SCK: AF push-pull */
-                 | GPIO_CRL_CNF6_0                                   /* PA6 MISO: floating input */
-                 | GPIO_CRL_MODE7 | GPIO_CRL_CNF7_1;                 /* PA7 MOSI: AF push-pull */      // «2»
-    SPI1->CR1 = SPI_CR1_MSTR                                         /* master */                     // «3»
-              | (3U << SPI_CR1_BR_Pos)                               /* fPCLK2 / 16 = 4.5 MHz */
+    gpio_clock_on(GPIOB);
+    RCC->APB1ENR1 |= RCC_APB1ENR1_SPI2EN;
+    (void)RCC->APB1ENR1;
+    GPIOB->BSRR = GPIO_BSRR_BS12;                                    /* CS idle high before it is an output */ // «1»
+    gpio_mode(GPIOB, CS_PIN, BSP_GPIO_OUTPUT);
+    gpio_af(GPIOB, 13U, AF_PB13_SPI2_SCK);                                                          // «2»
+    gpio_af(GPIOB, 14U, AF_PB14_SPI2_MISO);
+    gpio_af(GPIOB, 15U, AF_PB15_SPI2_MOSI);
+    SPI2->CR1 = SPI_CR1_MSTR                                         /* master */                     // «3»
+              | (4U << SPI_CR1_BR_Pos)                               /* fPCLK1 / 32 = 5.3 MHz */
               | SPI_CR1_SSM | SPI_CR1_SSI;                           /* software NSS, held "high" */  // «4»
               /* CPOL = 0, CPHA = 0: mode 0, which the W25Q supports (as well as mode 3) */
-    SPI1->CR1 |= SPI_CR1_SPE;
+    SPI2->CR2 = (7U << SPI_CR2_DS_Pos)                               /* 8-bit frames (DS = 0111) */
+              | SPI_CR2_FRXTH;                                       /* RXNE as soon as 1 byte is in */
+    SPI2->CR1 |= SPI_CR1_SPE;
 }
 </script>
           <div id="ex-init"></div>
-          <script type="text/plain" id="src-07-xfer" data-src="examples/07-spi-flash-w25q/src/spi.c" data-region="xfer" data-lang="c" data-file="examples/07-spi-flash-w25q/src/spi.c" data-start="28" data-end="52" data-sha="23bd0277c948">
+          <script type="text/plain" id="src-07-xfer" data-src="examples/07-spi-flash-w25q/src/spi.c" data-region="xfer" data-lang="c" data-file="examples/07-spi-flash-w25q/src/spi.c" data-start="39" data-end="63" data-sha="56edd12db2c9">
 uint8_t spi_xfer(uint8_t out)
 {
-    for (uint32_t n = 0U; ((SPI1->SR & SPI_SR_TXE) == 0U) && (n < SPI_WAIT); ++n)
+    for (uint32_t n = 0U; ((SPI2->SR & SPI_SR_TXE) == 0U) && (n < SPI_WAIT); ++n)
     {
     }
-    *(volatile uint8_t *)&SPI1->DR = out;                            /* 8-bit write: one frame */      // «5»
-    for (uint32_t n = 0U; ((SPI1->SR & SPI_SR_RXNE) == 0U) && (n < SPI_WAIT); ++n)
+    *(volatile uint8_t *)&SPI2->DR = out;      /* 8-bit write: one frame (a 16-bit write would queue two) */ // «5»
+    for (uint32_t n = 0U; ((SPI2->SR & SPI_SR_RXNE) == 0U) && (n < SPI_WAIT); ++n)
     {
     }
-    return (uint8_t)SPI1->DR;                                        /* every sent byte clocks one in */ // «6»
+    return *(volatile uint8_t *)&SPI2->DR;     /* every sent byte clocks one in */                   // «6»
 }
 
 void spi_select(void)
 {
-    GPIOA->BSRR = GPIO_BSRR_BR4;
+    GPIOB->BSRR = GPIO_BSRR_BR12;
 }
 
 void spi_deselect(void)
 {
-    for (uint32_t n = 0U; ((SPI1->SR & SPI_SR_BSY) != 0U) && (n < SPI_WAIT); ++n)
+    for (uint32_t n = 0U; ((SPI2->SR & SPI_SR_BSY) != 0U) && (n < SPI_WAIT); ++n)
     {
         /* the last byte may still be shifting out: raising CS now would cut it off */                // «7»
     }
-    GPIOA->BSRR = GPIO_BSRR_BS4;
+    GPIOB->BSRR = GPIO_BSRR_BS12;
 }
 </script>
           <div id="ex-xfer"></div>
@@ -99,8 +103,8 @@ void spi_deselect(void)
           <div class="sec-head"><h2><span class="sec-num">11.3</span>Chip select discipline</h2></div>
           <p>Chip select frames a command. For most SPI devices a falling CS starts a new command and a rising CS ends it, and some commands (erase, program) only start executing when CS rises. Three rules:</p>
           <ol>
-            <li><b>Drive CS from a GPIO</b> under software control (<code>SSM = 1</code>, <code>SSI = 1</code>), so one transaction can span many bytes. The hardware NSS output of the F1 is awkward for multi-byte transactions.</li>
-            <li><b>Wait for <code>BSY</code> = 0 before raising CS.</b> <code>TXE</code> only means the data register is free; the last byte may still be shifting out.</li>
+            <li><b>Drive CS from a GPIO</b> under software control (<code>SSM = 1</code>, <code>SSI = 1</code>), so one transaction can span any number of bytes and you decide exactly when it ends.</li>
+            <li><b>Wait for <code>BSY</code> = 0 before raising CS.</b> <code>TXE</code> only means there is room in the TX FIFO; the last byte may still be shifting out.</li>
             <li><b>Set CS high before configuring it as an output</b>, so the device never sees a spurious select during start-up.</li>
           </ol>
           <div id="po-spi"></div>
@@ -180,8 +184,8 @@ bool w25q_program_page(uint32_t addr, const uint8_t *data, uint32_t len)
 }
 </script>
           <div id="ex-ep"></div>
-          <script type="text/plain" data-code data-src="examples/07-spi-flash-w25q/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="7" data-sha="fbc198510af9">
-Example 07: SPI1 + W25Qxx flash (CS on PA4)
+          <script type="text/plain" data-code data-src="examples/07-spi-flash-w25q/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="7" data-sha="719123eb178a">
+Example 07: SPI2 + W25Qxx flash (CS on PB12)
 JEDEC ID EF 40 16: Winbond, 4096 KB
 erase sector 0x001000: OK
 erased bytes read 0xFF: OK
@@ -193,23 +197,27 @@ verify (DMA): 0 mismatches
 
         <section class="doc-section" id="dma-spi" data-title="SPI with DMA">
           <div class="sec-head"><h2><span class="sec-num">11.5</span>SPI with DMA</h2></div>
-          <p>Reading a whole page byte by byte keeps the CPU busy for every byte. With DMA, two channels do it: channel 3 feeds dummy bytes into <code>DR</code> (each one clocks a byte in), and channel 2 copies every received byte into the buffer. The receive channel gets the higher priority so it never falls behind.</p>
-          <script type="text/plain" id="src-07-dma" data-src="examples/07-spi-flash-w25q/src/spi.c" data-region="dma" data-lang="c" data-file="examples/07-spi-flash-w25q/src/spi.c" data-start="56" data-end="85" data-sha="23bd0277c948">
+          <p>Reading a whole page byte by byte keeps the CPU busy for every byte. With DMA, two channels do it: DMA1 channel 3 feeds dummy bytes into <code>DR</code> (each one clocks a byte in), and DMA1 channel 2 copies every received byte into the buffer. On the G4 neither channel is wired to SPI2 until DMAMUX connects them: request SPI2_RX (12) to DMAMUX channel 1 → DMA1 channel 2, request SPI2_TX (13) to DMAMUX channel 2 → DMA1 channel 3. The receive channel gets the higher priority so it never falls behind.</p>
+          <script type="text/plain" id="src-07-dma" data-src="examples/07-spi-flash-w25q/src/spi.c" data-region="dma" data-lang="c" data-file="examples/07-spi-flash-w25q/src/spi.c" data-start="67" data-end="100" data-sha="56edd12db2c9">
 bool spi_read_dma(uint8_t *buf, uint32_t len)
 {
     static const uint8_t dummy = 0xFFU;
-    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
-    DMA1_Channel2->CCR = 0U;                                         /* ch2 = SPI1_RX */               // «8»
-    DMA1_Channel3->CCR = 0U;                                         /* ch3 = SPI1_TX */
-    DMA1_Channel2->CPAR = (uint32_t)&SPI1->DR;
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN | RCC_AHB1ENR_DMAMUX1EN;
+    (void)RCC->AHB1ENR;
+    DMA1_Channel2->CCR = 0U;
+    DMA1_Channel3->CCR = 0U;
+    DMAMUX1_Channel1->CCR = DMAMUX_REQ_SPI2_RX << DMAMUX_CxCR_DMAREQ_ID_Pos;   /* DMA1 ch2 <- SPI2_RX */ // «8»
+    DMAMUX1_Channel2->CCR = DMAMUX_REQ_SPI2_TX << DMAMUX_CxCR_DMAREQ_ID_Pos;   /* DMA1 ch3 <- SPI2_TX */
+    DMA1_Channel2->CPAR = (uint32_t)&SPI2->DR;
     DMA1_Channel2->CMAR = (uint32_t)buf;
     DMA1_Channel2->CNDTR = len;
     DMA1_Channel2->CCR = DMA_CCR_MINC | DMA_CCR_PL_1 | DMA_CCR_EN;   /* peripheral -> memory, 8-bit, high priority */
-    DMA1_Channel3->CPAR = (uint32_t)&SPI1->DR;
+    DMA1_Channel3->CPAR = (uint32_t)&SPI2->DR;
     DMA1_Channel3->CMAR = (uint32_t)&dummy;
     DMA1_Channel3->CNDTR = len;
     DMA1_Channel3->CCR = DMA_CCR_DIR | DMA_CCR_EN;                   /* memory -> peripheral, no MINC */ // «9»
-    SPI1->CR2 = SPI_CR2_RXDMAEN | SPI_CR2_TXDMAEN;                   /* RX first, then TX (RM0008) */  // «10»
+    SPI2->CR2 |= SPI_CR2_RXDMAEN;                                    /* RX first, then TX (RM0440) */  // «10»
+    SPI2->CR2 |= SPI_CR2_TXDMAEN;
     bool ok = false;
     for (uint32_t n = 0U; n < SPI_WAIT * 10U; ++n)
     {
@@ -220,14 +228,14 @@ bool spi_read_dma(uint8_t *buf, uint32_t len)
         }
     }
     DMA1->IFCR = DMA_IFCR_CGIF2 | DMA_IFCR_CGIF3;
-    SPI1->CR2 = 0U;
+    SPI2->CR2 &= ~(SPI_CR2_RXDMAEN | SPI_CR2_TXDMAEN);
     DMA1_Channel2->CCR = 0U;
     DMA1_Channel3->CCR = 0U;
     return ok;
 }
 </script>
           <div id="ex-dma"></div>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 07)</span><p>✅ Command framing, erase, program, polled read and verify run in Renode against its Micron MT25Q flash model (same basic commands, Micron JEDEC ID). ⚠️ The DMA read times out in simulation, because Renode's SPI model drops received bytes when the TX DMA channel runs ahead. ❌ No SPI timing or erase/program durations. Not tested on a Blue Pill yet.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (example 07)</span><p>✅ Builds in CI; JEDEC ID decoding and address packing pass their host tests; the SPI2 AF numbers are checked against ST's pin data. ⚠️ The DMAMUX request IDs (12, 13) come from ST's HAL sources; their RM0440 table is still to be checked. ❌ Not run on a NUCLEO-G474RE with a W25Q module by the course yet.</p></div></div>
           <div id="ck-spi"></div>
         </section>
 
@@ -242,9 +250,9 @@ bool spi_read_dma(uint8_t *buf, uint32_t len)
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/nucleo-pins.js?v=__BUILD__"></script>
   <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>

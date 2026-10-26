@@ -3,7 +3,8 @@
  * Spec reference : AUTOSAR CP R25-11, AUTOSAR_CP_SWS_MCUDriver
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  *
- * Mcu-lite for the STM32F103: clock tree (HSE -> PLL -> SYSCLK, RM0008 §7), reset reason
+ * Mcu-lite for the STM32G474: clock tree (HSI16 -> PLL -> SYSCLK at 170 MHz, range 1 boost, RM0440
+ * "RCC" and "PWR"), reset reason
  * (RCC_CSR) and software reset. Not supported (listed, not stubbed): Mcu_InitRamSection,
  * Mcu_SetMode (low-power modes), Mcu_GetRamState.
  */
@@ -45,11 +46,14 @@ typedef enum
 
 typedef struct
 {
-    uint8 pllMul;          /* PLLMUL multiplier, 2..16: 9 gives 72 MHz from the 8 MHz crystal */
+    uint8 pllM;            /* PLL input divider M, 1..16 (HSI16 / M) */
+    uint8 pllN;            /* VCO multiplier N, 8..127 */
+    uint8 pllR;            /* system output divider R: 2, 4, 6 or 8 */
     uint8 ahbDiv;          /* RCC_CFGR HPRE value */
-    uint8 apb1Div;         /* RCC_CFGR PPRE1 value: APB1 must stay <= 36 MHz */
+    uint8 apb1Div;         /* RCC_CFGR PPRE1 value */
     uint8 apb2Div;         /* RCC_CFGR PPRE2 value */
-    uint8 flashLatency;    /* FLASH_ACR LATENCY: 2 wait states above 48 MHz */
+    uint8 flashLatency;    /* FLASH_ACR LATENCY: 4 wait states at 170 MHz in boost mode */
+    boolean boost;         /* regulator range 1 boost (PWR_CR5.R1MODE = 0): needed above 150 MHz */
 } Mcu_ClockSettingConfigType;
 
 typedef struct

@@ -1,5 +1,6 @@
-Example 11 node B: bxCAN 500 kbit/s on PB8/PB9
-self-test (silent loopback): OK
-rx id 0x00000100 dlc 2 data0 0
-tx 10 rx 10 TEC 0 REC 0 error active
-rx id 0x00000100 dlc 2 data0 1
+Example 11 node B: FDCAN1 500 kbit/s + 1 Mbit/s data on PA11/PA12
+self-test (internal loopback, CAN FD): OK
+rx id 0x00000100 classic len 2 data0 0
+rx id 0x00000102 FD+BRS len 16 data0 5
+tx 10 rx 11 TEC 0 REC 0 error active
+rx id 0x00000100 classic len 2 data0 1

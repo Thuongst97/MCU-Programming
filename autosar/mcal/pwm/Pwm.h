@@ -3,7 +3,7 @@
  * Spec reference : AUTOSAR CP R25-11, AUTOSAR_CP_SWS_PWMDriver
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  *
- * Pwm-lite on the general-purpose timers TIM2..TIM4 (RM0008 §15), fixed-period channels.
+ * Pwm-lite on the general-purpose timers TIM2..TIM4 (RM0440 "General-purpose timers"), fixed-period channels.
  * Duty cycles use the SWS scale: 0x0000 = 0 %, 0x8000 = 100 %.
  * Not supported: Pwm_SetPeriodAndDuty (variable period), notifications, Pwm_GetOutputState.
  */
@@ -48,7 +48,7 @@ typedef struct
 {
     P2CONST(Pwm_ChannelConfigType, TYPEDEF, PWM_APPL_CONST) channels;
     uint8 numChannels;
-    uint32 timerClockHz;                  /* TIMxCLK from the Mcu clock setting (x2 rule on APB1) */
+    uint32 timerClockHz;                  /* TIMxCLK from the Mcu clock setting (x2 only if APB1 is divided) */
     uint32 countHz;                       /* timer count rate */
     Pwm_PeriodType period;                /* counts per period (ARR + 1) */
 } Pwm_ConfigType;

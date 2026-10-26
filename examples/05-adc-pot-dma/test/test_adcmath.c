@@ -6,20 +6,23 @@
 void setUp(void) {}
 void tearDown(void) {}
 
+/* A chip whose Vrefint read 1655 at the factory (VDDA = 3.0 V): Vrefint is 1655/4095 x 3.0 = 1.212 V.
+ * At VDDA = 3.3 V the same reference reads 1.212 / 3.3 x 4095 = 1504. */
+#define CAL 1655U
+
 static void test_vdda_from_vrefint(void)
 {
-    /* 1.20 V at VDDA = 3.30 V reads 1.2 / 3.3 * 4095 = 1489 */
-    TEST_ASSERT_UINT32_WITHIN(2U, 3300U, adc_vdda_mv(1489U));
-    TEST_ASSERT_UINT32_WITHIN(2U, 3000U, adc_vdda_mv(1638U));
-    TEST_ASSERT_EQUAL_UINT32(0U, adc_vdda_mv(0U));
+    TEST_ASSERT_UINT32_WITHIN(2U, 3300U, adc_vdda_mv(1504U, CAL));
+    TEST_ASSERT_EQUAL_UINT32(3000U, adc_vdda_mv(CAL, CAL));          /* same as at the factory */
+    TEST_ASSERT_EQUAL_UINT32(0U, adc_vdda_mv(0U, CAL));
 }
 
 static void test_pin_millivolts(void)
 {
-    TEST_ASSERT_UINT32_WITHIN(2U, 1650U, adc_pin_mv(2048U, 1489U));   /* half scale at 3.3 V */
-    TEST_ASSERT_EQUAL_UINT32(0U, adc_pin_mv(0U, 1489U));
-    TEST_ASSERT_UINT32_WITHIN(2U, 3300U, adc_pin_mv(4095U, 1489U));
-    TEST_ASSERT_EQUAL_UINT32(0U, adc_pin_mv(100U, 0U));
+    TEST_ASSERT_UINT32_WITHIN(2U, 1650U, adc_pin_mv(2048U, 1504U, CAL));   /* half scale at 3.3 V */
+    TEST_ASSERT_EQUAL_UINT32(0U, adc_pin_mv(0U, 1504U, CAL));
+    TEST_ASSERT_UINT32_WITHIN(2U, 3300U, adc_pin_mv(4095U, 1504U, CAL));
+    TEST_ASSERT_EQUAL_UINT32(0U, adc_pin_mv(100U, 0U, CAL));
 }
 
 static void test_mean_of_interleaved_channel(void)

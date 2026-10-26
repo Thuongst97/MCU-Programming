@@ -1,15 +1,17 @@
 /* SPDX-License-Identifier: MIT
- * Example 10: FreeRTOS on the Blue Pill. Five tasks, a queue, a mutex around the UART, a binary
+ * Example 10: FreeRTOS on the NUCLEO-G474RE. Five tasks, a queue, a mutex around the UART, a binary
  * semaphore given from an interrupt, stack high-water marks and overflow detection.
- * Every kernel object is allocated statically. RM0008 for the peripherals, FreeRTOS reference
+ * Every kernel object is allocated statically. RM0440 for the peripherals, FreeRTOS reference
  * manual for the kernel API.
  */
 #include <stdint.h>
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "semphr.h"
 #include "task.h"
+#include "board.h"
+#include "gpio.h"
 #include "timers.h"
 #include "clock.h"
 #include "led.h"
@@ -100,7 +102,7 @@ static void button_task(void *arg)
     {
         if (xSemaphoreTake(s_button_sem, portMAX_DELAY) == pdTRUE)   /* woken by the ISR */        // «6»
         {
-            log_line("button: press ", ++presses, " (semaphore given from EXTI0 ISR)\n");
+            log_line("button: press ", ++presses, " (semaphore given from the EXTI13 ISR)\n");
         }
     }
 }
@@ -127,10 +129,10 @@ static void monitor_task(void *arg)
 // [endregion]
 
 // [region:isr]
-void EXTI0_IRQHandler(void);
-void EXTI0_IRQHandler(void)
+void EXTI15_10_IRQHandler(void);
+void EXTI15_10_IRQHandler(void)
 {
-    EXTI->PR = EXTI_PR_PR0;
+    EXTI->PR1 = EXTI_PR1_PIF13;                             /* B1 on PC13: EXTI line 13 */
     BaseType_t woken = pdFALSE;
     xSemaphoreGiveFromISR(s_button_sem, &woken);            /* only FromISR APIs in an ISR */     // «8»
     portYIELD_FROM_ISR(woken);                              /* switch now if a task got ready */   // «9»
@@ -139,15 +141,17 @@ void EXTI0_IRQHandler(void)
 
 static void button_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_AFIOEN;
-    GPIOA->CRL = (GPIOA->CRL & ~(GPIO_CRL_CNF0 | GPIO_CRL_MODE0)) | GPIO_CRL_CNF0_1;
-    GPIOA->BSRR = GPIO_BSRR_BS0;
-    AFIO->EXTICR[0] = (AFIO->EXTICR[0] & ~AFIO_EXTICR1_EXTI0) | AFIO_EXTICR1_EXTI0_PA;
-    EXTI->FTSR |= EXTI_FTSR_TR0;
-    EXTI->PR = EXTI_PR_PR0;
-    EXTI->IMR |= EXTI_IMR_MR0;
-    NVIC_SetPriority(EXTI0_IRQn, 6U);                       /* 6 >= configMAX_SYSCALL (5): may use FromISR */ // «10»
-    NVIC_EnableIRQ(EXTI0_IRQn);
+    gpio_clock_on(BOARD_BTN_PORT);
+    gpio_mode(BOARD_BTN_PORT, BOARD_BTN_PIN, BSP_GPIO_INPUT);
+    gpio_pull(BOARD_BTN_PORT, BOARD_BTN_PIN, BSP_GPIO_PULLDOWN);
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+    (void)RCC->APB2ENR;
+    SYSCFG->EXTICR[3] = (SYSCFG->EXTICR[3] & ~SYSCFG_EXTICR4_EXTI13) | SYSCFG_EXTICR4_EXTI13_PC;
+    EXTI->RTSR1 |= EXTI_RTSR1_RT13;                         /* press = rising edge (ST BSP) */
+    EXTI->PR1 = EXTI_PR1_PIF13;
+    EXTI->IMR1 |= EXTI_IMR1_IM13;
+    NVIC_SetPriority(EXTI15_10_IRQn, 6U);                   /* 6 >= configMAX_SYSCALL (5): may use FromISR */ // «10»
+    NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 static void start(task_slot_t *t, TaskFunction_t fn, const char *name, UBaseType_t prio)
@@ -158,7 +162,7 @@ static void start(task_slot_t *t, TaskFunction_t fn, const char *name, UBaseType
 // [region:main]
 int main(void)
 {
-    (void)clock_init_72mhz();
+    (void)clock_init_170mhz();
     uart_log_init(115200U);
     led_init();
     NVIC_SetPriorityGrouping(0U);                           /* all 4 bits = preemption priority */ // «11»

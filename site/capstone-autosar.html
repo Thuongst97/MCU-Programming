@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Capstone 3: Refactoring into AUTOSAR Layers — MCU Academy</title>
-  <meta name="description" content="Turning the ECU into an application SWC with runnables over a hand-written RTE, BSW-lite and MCAL on the STM32F103.">
+  <meta name="description" content="Turning the ECU into an application SWC with runnables over a hand-written RTE, BSW-lite and MCAL on the STM32G474.">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,7 +34,7 @@
           <div class="callout warn"><div class="ci">🔎</div><div><span class="ct">Verification status</span><p>Every API, type and rule on this page names its AUTOSAR R25-11 document. The requirement IDs and exact values are still being checked against the R25-11 PDFs; until then they come from the R4.x-era specifications, and no requirement ID is quoted, because the course never makes one up. Progress is tracked in <a href="https://github.com/Thuongst97/MCU-Programming/blob/main/docs/autosar-self-review.md">the self-review log</a>.</p></div></div>
           <p>Every box is a file you can open in <code>stage3-autosar/</code> or <code>autosar/</code>:</p>
           <div id="lg-tl3" class="lg-host"></div>
-          <p>The dashed box is the one item that is not a file in this repository: a CAN FD controller, which the Blue Pill does not have. <a href="#can-fd">26.5</a> shows what moving TurnLight to CAN FD would change, layer by layer.</p>
+          <p>The dashed box is the one item that is not configured in this repository: CAN FD mode. The G474's FDCAN1 can do it (example 11 sends FD frames), but stage 3's Can driver runs it with classic frames only. <a href="#can-fd">26.5</a> shows what moving TurnLight to CAN FD would change, layer by layer.</p>
           <div class="table-wrap"><table class="t">
             <thead><tr><th>Folder</th><th>Role</th><th>In production</th></tr></thead>
             <tbody>
@@ -45,14 +45,14 @@
               <tr><td><code>autosar/</code></td><td>BSW, MCAL, OS shim</td><td>vendor-supplied</td></tr>
             </tbody>
           </table></div>
-          <p>Flash and RAM grow again (about 28 KB / 8.7 KB in the debug build): the price of standard interfaces and run-time checks. On an automotive microcontroller with 1–4 MB of flash this is noise; on the 64 KB Blue Pill it is a third of the chip.</p>
+          <p>Flash and RAM grow again (about 30 KB / 9.5 KB in the debug build, against 23 KB / 9.6 KB for stage 2): the price of standard interfaces and run-time checks. On the G474's 512 KB that is about 6 % of the flash; on a small 64 KB part it would be half the chip.</p>
         </section>
 
         <section class="doc-section" id="swc" data-title="The TurnLight SWC">
           <div class="sec-head"><h2><span class="sec-num">26.2</span>The TurnLight SWC</h2></div>
           <p>Each refactoring step is shown as before (stage 1), after (stage 3) and why.</p>
           <div class="cmp-host" id="cmp-in"></div>
-          <script type="text/plain" id="src-c-in-before" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="input" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="44" data-end="60" data-sha="6868106ee151">
+          <script type="text/plain" id="src-c-in-before" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="input" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="53" data-end="69" data-sha="69a94f80a4e5">
 static void job_input(void)            /* 10 ms: debounce the three buttons (TL-REQ-001) */
 {
     const uint32_t now = millis();
@@ -150,7 +150,7 @@ FUNC(void, LAMPMONITOR_CODE) RE_LampMonitor_10ms(void)
           <div class="sec-head"><h2><span class="sec-num">26.3</span>The RTE layer</h2></div>
           <p>The RTE replaces the global variables and direct calls of stage 1. Lamp output is the clearest case:</p>
           <div class="cmp-host" id="cmp-lamp"></div>
-          <script type="text/plain" id="src-c-lamp-before" data-src="capstone/turnlight/hw/tl_hw.c" data-region="ramp" data-lang="c" data-file="hw/tl_hw.c" data-start="83" data-end="102" data-sha="dca21b9eddab">
+          <script type="text/plain" id="src-c-lamp-before" data-src="capstone/turnlight/hw/tl_hw.c" data-region="ramp" data-lang="c" data-file="hw/tl_hw.c" data-start="96" data-end="115" data-sha="babacb3823ff">
 void tl_hw_lamp_ramp(const bool on[TL_SIDES], uint32_t dt_ms)
 {
     const uint32_t step = (TL_PWM_TOP * dt_ms) / TL_RAMP_MS;               /* full scale in 20 ms */   // «1»
@@ -238,7 +238,7 @@ TASK(Task50ms)
           <div class="sec-head"><h2><span class="sec-num">26.4</span>BSW-lite and MCAL</h2></div>
           <p>Communication moves from a hand-written job to configuration. Stage 1 packs and sends the frame itself; stage 3 writes signals and lets Com, PduR, CanIf and Can do the rest according to <code>Com_PBcfg.c</code>:</p>
           <div class="cmp-host" id="cmp-can"></div>
-          <script type="text/plain" id="src-c-can-before" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="can" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="111" data-end="144" data-sha="6868106ee151">
+          <script type="text/plain" id="src-c-can-before" data-src="capstone/turnlight/stage1-baremetal/src/main.c" data-region="can" data-lang="c" data-file="stage1-baremetal/src/main.c" data-start="120" data-end="153" data-sha="69a94f80a4e5">
 static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLightStatus TX */
 {
     static uint32_t since_tx_ms;
@@ -246,7 +246,7 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
     can_frame_t rx;
     while (can_receive(&rx))
     {
-        ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.dlc >= 1U));
+        ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.len >= 1U));
     }
     if (tl_comm_step(&s_comm, ack, 10U))                                  /* TL-REQ-007 */   // «5»
     {
@@ -265,9 +265,9 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
         s_status.out_right = s_mon.failed[TL_RIGHT];
         s_status.cluster_lost = s_comm.lost;
         s_status.alive++;
-        can_frame_t tx = {.id = TL_CAN_ID_STATUS, .dlc = TL_STATUS_DLC, .data = {0}};
+        can_frame_t tx = {.id = TL_CAN_ID_STATUS, .len = TL_STATUS_DLC, .data = {0}};
         tl_status_pack(&s_status, tx.data);   // «7»
-        (void)can_send(&tx);           /* a full mailbox drops this frame; the next cycle repeats it */
+        (void)can_send(&tx);           /* a full TX FIFO drops this frame; the next cycle repeats it */
         s_status_changed = false;
         since_tx_ms = 0U;
     }
@@ -336,7 +336,7 @@ FUNC(void, WDGM_CODE) WdgM_MainFunction(void)
 
         <section class="doc-section" id="can-fd" data-title="Upgrade path: CAN FD">
           <div class="sec-head"><h2><span class="sec-num">26.5</span>Upgrade path: CAN FD</h2></div>
-          <p>CAN FD (<a href="can.html#can-fd">12.9</a>) arbitrates at the classic bit rate, then switches to a faster data phase and carries up to 64 bytes per frame. The F103's bxCAN speaks classic CAN only, so everything in this section is <b>on paper</b>: it is what you would change to move TurnLight to an automotive MCU with a CAN FD controller, such as the families in <a href="automotive-mcus.html">Appendix C</a>. Nothing here runs on the Blue Pill or in Renode.</p>
+          <p>CAN FD (<a href="can.html#can-fd">12.9</a>) arbitrates at the classic bit rate, then switches to a faster data phase and carries up to 64 bytes per frame. The G474's FDCAN1 is FD-capable, and example 11 already sends FD frames bare metal. Stage 3 deliberately stays classic, so this section is <b>a plan, not code in the repository</b>: what you would change to move TurnLight's AUTOSAR stack to CAN FD on the same NUCLEO boards.</p>
           <p>TurnLight itself doesn't need it: <code>TurnLightStatus</code> is 4 bytes. CAN FD pays off when frames grow: authenticated messages that carry a MAC and a freshness value, bulk sensor data, and software download over UDS, where 64-byte frames and a faster data phase cut flashing time.</p>
           <div class="callout analogy"><div class="ci">🚚</div><div><span class="ct">Same gate, bigger truck</span><p>Every vehicle queues at the same toll gate at the same speed: that is arbitration, and it works exactly as in classic CAN. Once through the gate, a CAN FD frame switches to the fast lane and carries a container instead of an envelope. Anyone who only knows envelopes, a classic node, sees something illegal and blocks the road.</p></div></div>
           <h3>Payload, DLC and padding</h3>
@@ -352,11 +352,11 @@ FUNC(void, WDGM_CODE) WdgM_MainFunction(void)
               <tr><td>Com</td><td><code>Com_PBcfg.c</code>, <code>Com.c</code></td><td>The I-PDU length may grow up to 64 bytes in the configuration. Our Com-lite would need more: it keeps 8 bytes per I-PDU (<code>data[8]</code>) and packs signals into bytes 0–3 only.</td></tr>
               <tr><td>PduR</td><td><code>PduR_PBcfg.c</code></td><td>No change. It routes by PDU ID, not by length or frame format.</td></tr>
               <tr><td>CanIf</td><td><code>CanIf_PBcfg.c</code></td><td>Each TX PDU is configured as a classic or an FD frame, and its length may exceed 8 bytes. The CAN IDs (<code>0x3A0</code>, <code>0x3A1</code>, hypothetical) stay.</td></tr>
-              <tr><td>Can driver</td><td><code>Can.c</code>, <code>Can_PBcfg.c</code></td><td>A new driver for the FD controller. Its configuration holds two bit timings, arbitration phase and data phase, instead of one <code>CAN_BTR</code> value. Our <code>Can_Write</code> rejects any length above 8 today.</td></tr>
-              <tr><td>Hardware</td><td>board</td><td>An FD-capable controller, and a transceiver rated for the data-phase rate. The SN65HVD230 is specified for signalling rates up to 1 Mbit/s (SLOS346): fine for classic CAN, not for a 2 or 5 Mbit/s data phase.</td></tr>
+              <tr><td>Can driver</td><td><code>Can.c</code>, <code>Can_PBcfg.c</code></td><td>The same FDCAN1 driver in FD mode: <code>CCCR.FDOE</code> (and <code>BRSE</code> for a faster data phase), a second bit timing in <code>DBTP</code> next to <code>NBTP</code>, 64-byte message RAM elements, and DLC padding (example 11's <code>canfd.c</code> has the DLC table). Our <code>Can_Write</code> rejects any length above 8 today.</td></tr>
+              <tr><td>Hardware</td><td>board</td><td>The controller is already there. The transceiver must be rated for the data-phase rate: a part specified only up to 1 Mbit/s, such as the SN65HVD230 (SLOS346), is fine for classic CAN but not for a 2 or 5 Mbit/s data phase.</td></tr>
             </tbody>
           </table></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">One classic node breaks an FD bus</span><p>A classic CAN controller treats an FD frame as an error and destroys it with an error frame. Every node on the bus must be FD-capable (or FD-tolerant): here that includes the cluster node, which is a second Blue Pill. Migrate the whole network, not one ECU.</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">One classic node breaks an FD bus</span><p>A classic CAN controller treats an FD frame as an error and destroys it with an error frame. Every node on the bus must be FD-capable (or FD-tolerant): here the cluster node is a second NUCLEO-G474RE, so its FDCAN1 can follow, but its firmware must switch too. Migrate the whole network, not one ECU.</p></div></div>
         </section>
 
         <section class="doc-section" id="review" data-title="Self-review against the checklist">
@@ -371,7 +371,7 @@ FUNC(void, WDGM_CODE) WdgM_MainFunction(void)
               <tr><td>DET only under <code>&lt;MA&gt;_DEV_ERROR_DETECT</code>; production errors to Dem</td><td>✅ machine + review</td></tr>
               <tr><td>SWCs include only their RTE header</td><td>✅ <code>check-autosar.py</code></td></tr>
               <tr><td>MISRA: no finding without a recorded deviation</td><td>✅ <code>run-misra.py</code>, DEV-001..005</td></tr>
-              <tr><td>Same acceptance tests as stages 1 and 2</td><td>✅ Renode, 7 tests × 3 stages</td></tr>
+              <tr><td>Same acceptance as stages 1 and 2</td><td>✅ host tests (shared logic); ⏳ hardware checklist not yet run</td></tr>
               <tr><td>Every API, type and value traced to an R25-11 requirement ID</td><td>⏳ pending: see <code>docs/autosar-self-review.md</code></td></tr>
               <tr><td>Simplifications listed in each module header</td><td>✅</td></tr>
             </tbody>
@@ -381,7 +381,7 @@ FUNC(void, WDGM_CODE) WdgM_MainFunction(void)
 
         <section class="doc-section" id="next" data-title="Where to go next">
           <div class="sec-head"><h2><span class="sec-num">26.7</span>Where to go next</h2></div>
-          <p>Where to go from the Blue Pill:</p>
+          <p>Where to go from the NUCLEO:</p>
           <ul>
             <li><b>Real tools.</b> Vector DaVinci Configurator and Developer, Elektrobit tresos, ETAS ISOLAR, and the silicon vendors' MCAL configurators generate exactly the files <code>cfg/</code> and <code>rte/</code> imitate. Student and evaluation licences exist for some of them.</li>
             <li><b>Real automotive microcontrollers.</b> NXP S32K1/S32K3, Infineon AURIX TC3xx and Renesas RH850 come with AUTOSAR MCALs from their vendors and evaluation boards in the price range of a good multimeter. <a href="automotive-mcus.html">Appendix C</a> maps each course module onto them.</li>

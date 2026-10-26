@@ -25,110 +25,127 @@
           <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Reference B</span><span>/</span><span>Troubleshooting</span></nav>
           <div class="eyebrow">Reference B · Reference</div>
           <h1>Troubleshooting</h1>
-          <p class="lead">Start from what you see. Each entry lists the likely causes in the order worth checking, and the fix. Most problems are wiring, power or a setting in the debugger configuration.</p>
+          <p class="lead">Start from what you see. Each entry lists the likely causes in the order worth checking, and the fix. Most problems are wiring, a pin the board already uses, or a setting in the debugger configuration.</p>
           <div class="page-meta"><span>⏱ Reference</span><span>🎯 All levels</span><span>🔎 Symptom first</span></div>
         </header>
 
-        <section class="doc-section" id="no-stlink" data-title="No ST-Link detected">
-          <div class="sec-head"><h2><span class="sec-num">B.1</span>No ST-Link detected</h2></div>
+        <section class="doc-section" id="no-stlink" data-title="ST-LINK not detected">
+          <div class="sec-head"><h2><span class="sec-num">B.1</span>ST-LINK not detected</h2></div>
           <p><b>You see:</b> <code>Error: open failed</code>, <code>LIBUSB_ERROR_ACCESS</code>, or <code>No ST-Link detected</code>.</p>
           <ol>
-            <li><b>Is the probe on the bus at all?</b> Linux: <code>lsusb</code> should list <code>0483:3748</code> (STMicroelectronics ST-LINK/V2). Windows: Device Manager should show it under <i>Universal Serial Bus devices</i>. If not, try another cable or port: charge-only cables are common.</li>
-            <li><b>Linux permissions.</b> The <code>openocd</code> package installs udev rules that give the logged-in user access. Reload them and replug the probe:
+            <li><b>Is the ST-LINK on the bus at all?</b> Linux: <code>lsusb</code> should list a <code>0483:37xx</code> device from STMicroelectronics (an STLINK-V3). Windows: Device Manager should show it under <i>Universal Serial Bus devices</i>, plus a COM port for the virtual COM port. If not, try another cable or port: charge-only cables are common. The ST-LINK's communication LED should light when the board is plugged in.</li>
+            <li><b>Linux permissions.</b> The <code>openocd</code> package installs udev rules that give the logged-in user access. Reload them and replug the board:
               <script type="text/plain" data-code data-lang="console">$ sudo udevadm control --reload-rules && sudo udevadm trigger</script></li>
-            <li><b>Windows driver.</b> Install ST's ST-Link driver package (STSW-LINK009) and replug. If another tool replaced the driver, reinstall ST's.</li>
-            <li><b>Another program holds the probe.</b> Only one tool can own the ST-Link: close STM32CubeIDE, CubeProgrammer or a running OpenOCD.</li>
+            <li><b>Windows driver.</b> Install ST's ST-LINK driver package (STSW-LINK009, which covers the V3) and replug. If another tool replaced the driver, reinstall ST's.</li>
+            <li><b>Another program holds the probe.</b> Only one tool can own the ST-LINK: close STM32CubeIDE, CubeProgrammer or a running OpenOCD. (A serial terminal on the virtual COM port is fine.)</li>
           </ol>
         </section>
 
-        <section class="doc-section" id="idcode" data-title="UNEXPECTED idcode on clone chips">
-          <div class="sec-head"><h2><span class="sec-num">B.2</span>UNEXPECTED idcode on clone chips</h2></div>
-          <p><b>You see:</b> <code>UNEXPECTED idcode: 0x2ba01477</code> and <code>expected 1 of 1: 0x1ba01477</code>.</p>
-          <p>The probe works and the chip answers. It is just not an ST chip: many Blue Pills carry a compatible clone (CKS32, CS32, APM32) whose debug port reports a different ID. OpenOCD's STM32F1 script checks the ID and stops. Tell it what to expect with the clone configuration, which sets <code>CPUTAPID</code> and then loads the normal one:</p>
-          <script type="text/plain" data-code data-src="examples/common/openocd/bluepill-clone.cfg" data-lang="tcl" data-file="examples/common/openocd/bluepill-clone.cfg" data-start="1" data-end="5" data-sha="6ead01701d45">
-# SPDX-License-Identifier: MIT
-# Same as bluepill.cfg, for clone MCUs (CKS32F103, CS32F103) whose SW-DP reports IDCODE 0x2ba01477
-# instead of the genuine STM32F1 value 0x1ba01477. Never edit OpenOCD's installed scripts for this.
-set CPUTAPID 0x2ba01477
-source [file join [file dirname [info script]] bluepill.cfg]
+        <section class="doc-section" id="stlink-fw" data-title="Old ST-LINK firmware or wrong OpenOCD target">
+          <div class="sec-head"><h2><span class="sec-num">B.2</span>Old ST-LINK firmware or wrong OpenOCD target</h2></div>
+          <p><b>You see:</b> OpenOCD finds the ST-LINK but warns that its firmware is old, or fails with an unknown device or flash bank error.</p>
+          <ul>
+            <li><b>Firmware.</b> OpenOCD and IDEs expect a recent ST-LINK firmware. Update it with STM32CubeProgrammer (Firmware upgrade) or ST's stand-alone ST-LINK upgrade tool, then replug.</li>
+            <li><b>Target script.</b> The G474 needs <code>target/stm32g4x.cfg</code>; an STM32F1 or L4 script talks to the wrong flash controller. Use the course's configuration, which loads the right one:</li>
+          </ul>
+          <script type="text/plain" data-code data-src="examples/common/openocd/nucleo-g474re.cfg" data-region="cfg" data-lang="tcl" data-file="examples/common/openocd/nucleo-g474re.cfg" data-start="6" data-end="10" data-sha="96e5dcc79019">
+source [find interface/stlink.cfg]       ;# ST-LINK driver (V2 and V3)  # «1»
+transport select hla_swd                 ;# SWD, not JTAG  # «2»
+source [find target/stm32g4x.cfg]        ;# STM32G4 flash driver: reads the size from the chip  # «3»
+reset_config srst_only                   ;# the ST-LINK's NRST line is wired on the NUCLEO  # «4»
+adapter speed 4000                       ;# kHz; ST-LINK/V3 handles more, 4 MHz is plenty  # «5»
 </script>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Don't edit OpenOCD's installed scripts</span><p>Editing <code>target/stm32f1x.cfg</code> fixes it on your machine only and is undone by the next update. Keep the difference in the project: <code>bluepill-clone.cfg</code>, and the matching entry in <code>.vscode/launch.json</code>.</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Don't edit OpenOCD's installed scripts</span><p>Editing <code>target/stm32g4x.cfg</code> fixes it on your machine only and is undone by the next update. Keep any difference in the project: <code>nucleo-g474re.cfg</code>, and the matching entry in <code>.vscode/launch.json</code>.</p></div></div>
         </section>
 
         <section class="doc-section" id="cannot-halt" data-title="Cannot halt target / SWD locked out">
           <div class="sec-head"><h2><span class="sec-num">B.3</span>Cannot halt target / SWD locked out</h2></div>
           <p><b>You see:</b> the first flash worked, but now <code>Error: init mode failed (unable to connect to the target)</code> or <code>timed out while waiting for target halted</code>.</p>
-          <p>The probe can only talk to the chip while PA13/PA14 are debug pins and the core is awake. Your program probably took that away right after reset: it wrote <code>SWJ_CFG = DISABLE</code>, reconfigured PA13/PA14 as GPIO, entered Stop/Standby mode immediately, or crashed into a loop with the clocks misconfigured.</p>
-          <div id="reg-mapr-ts"></div>
-          <h3>Fix 1: boot into the system bootloader (always works)</h3>
+          <p>The probe can only talk to the chip while PA13/PA14 are in their debug alternate function (AF0) and the core is awake. Your program probably took that away right after reset: it changed <code>MODER13</code>/<code>MODER14</code> or <code>AFRH</code> of GPIOA, entered Stop/Standby/Shutdown immediately, or crashed into a loop with the clocks misconfigured.</p>
+          <div id="reg-moder-ts"></div>
+          <h3>Fix 1: connect under reset</h3>
+          <p>On the NUCLEO, the ST-LINK drives NRST, so OpenOCD can hold the chip in reset while it connects, before your program runs:</p>
+          <script type="text/plain" data-code data-lang="console">$ openocd -f examples/common/openocd/nucleo-g474re.cfg -c "reset_config srst_only srst_nogate connect_assert_srst" -c "init; reset halt"</script>
+          <p>Then erase or reflash a fixed program. STM32CubeProgrammer offers the same as "Mode: Under reset".</p>
+          <h3>Fix 2: boot into the system bootloader</h3>
           <ol>
-            <li>Set the <b>BOOT0 jumper to 1</b> and press reset. The chip now runs ST's ROM bootloader instead of your program, so SWD stays free.</li>
+            <li>Pull <b>PB8 (BOOT0, Arduino D15) to 3.3 V</b> with a jumper wire and press B2 (RESET). With the factory option bits (<code>nSWBOOT0</code> = 1, <code>nBOOT1</code> = 1) the chip now runs ST's ROM bootloader instead of your program, so SWD stays free.</li>
             <li>Connect and erase everything:
-              <script type="text/plain" data-code data-lang="console">$ openocd -f examples/common/openocd/bluepill.cfg -c "init; reset halt; stm32f1x mass_erase 0; exit"</script></li>
-            <li>Set <b>BOOT0 back to 0</b>, fix the program, flash again.</li>
+              <script type="text/plain" data-code data-lang="console">$ openocd -f examples/common/openocd/nucleo-g474re.cfg -c "init; reset halt; stm32l4x mass_erase 0; exit"</script>
+              (the G4 uses OpenOCD's <code>stm32l4x</code> flash driver)</li>
+            <li>Remove the wire, fix the program, flash again.</li>
           </ol>
-          <h3>Fix 2: connect under reset</h3>
-          <p>If the ST-Link's RST pin is wired to the Blue Pill's <code>R</code> pin, OpenOCD can hold the chip in reset while it connects, before your program runs:</p>
-          <script type="text/plain" data-code data-lang="console">$ openocd -f examples/common/openocd/bluepill.cfg -c "reset_config srst_only srst_nogate connect_assert_srst" -c "init; reset halt"</script>
-          <p>On some ST-Link clones the RST pin does not drive NRST; check yours. Without the wire, holding the reset button, starting the command and releasing the button a moment later often works too.</p>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">RDP level 2 cannot be undone</span><p>If the option bytes were set to read-out protection level 2, the debug port is closed for good and neither fix works. That is why the course never sets it (<a href="bootloader.html#protection">module 16</a>).</p></div></div>
         </section>
 
-        <section class="doc-section" id="led" data-title="LED inverted or dim">
-          <div class="sec-head"><h2><span class="sec-num">B.4</span>LED inverted or dim</h2></div>
-          <p><b>You see:</b> the LED is on when your code says "off", or it glows dimly.</p>
+        <section class="doc-section" id="boots-bootloader" data-title="The board starts ST&#39;s bootloader">
+          <div class="sec-head"><h2><span class="sec-num">B.4</span>The board starts ST's bootloader</h2></div>
+          <p><b>You see:</b> after a reset or power-up your program does not run (no LD2, no output), but the debugger connects and the PC is somewhere around <code>0x1FFF0000</code>.</p>
           <ul>
-            <li><b>Inverted:</b> expected. The on-board LED lights when PC13 is <b>low</b>. Write <code>GPIO_BSRR_BR13</code> to turn it on and <code>GPIO_BSRR_BS13</code> to turn it off.</li>
-            <li><b>Dim:</b> PC13 is probably still an input with its pull-up or pull-down, so only a tiny current flows. Check that <code>MODE13</code> in <code>GPIOC_CRH</code> is not <code>00</code>:</li>
+            <li><b>Something pulls PB8 high at reset.</b> PB8 (Arduino D15) is BOOT0 while <code>nSWBOOT0</code> = 1. An I2C module with pull-ups on D14/D15, a shield, or a wire left from Fix 2 above is enough. Move the signal (example 06 uses I2C2 on PA9/PA8 for exactly this reason) or remove the wire.</li>
+            <li><b>Option bits.</b> Check <code>nSWBOOT0</code>, <code>nBOOT0</code> and <code>nBOOT1</code> in <code>FLASH_OPTR</code> (<a href="board.html#quirks">board reference</a>). Setting <code>nSWBOOT0</code> = 0 and <code>nBOOT0</code> = 1 makes the chip ignore PB8 and always boot from flash.</li>
+            <li><b>Empty flash.</b> A chip that was mass-erased has nothing to run; flash a program.</li>
           </ul>
-          <div id="reg-crh-ts"></div>
+        </section>
+
+        <section class="doc-section" id="led" data-title="LD2 does not light">
+          <div class="sec-head"><h2><span class="sec-num">B.5</span>LD2 does not light</h2></div>
+          <p><b>You see:</b> the program runs (the UART prints), but LD2 stays dark, glows dimly, or does the opposite of what you expect.</p>
           <ul>
-            <li><b>Never lights:</b> the port clock is off (<code>RCC_APB2ENR.IOPCEN</code>), or the code configures CRL instead of CRH (pins 8–15 are in CRH).</li>
+            <li><b>Port clock off:</b> GPIOA needs <code>RCC_AHB2ENR.GPIOAEN</code> before any GPIOA register write takes effect.</li>
+            <li><b>Still analog:</b> after reset PA5 is in analog mode (<code>MODE5</code> = 11). It must be <code>01</code> (output):</li>
+          </ul>
+          <div id="reg-moder5-ts"></div>
+          <ul>
+            <li><b>Inverted:</b> LD2 is <b>active-high</b>: <code>GPIO_BSRR_BS5</code> turns it on. If yours behaves the other way round, you are probably looking at a different board's code (a Blue Pill's PC13 LED is active-low).</li>
+            <li><b>Flickers or stays off with SPI running:</b> PA5 is also <code>SPI1_SCK</code>. The course uses SPI2 on PB13–PB15 to keep PA5 for the LED.</li>
           </ul>
         </section>
 
         <section class="doc-section" id="uart-garbage" data-title="Garbage on the UART">
-          <div class="sec-head"><h2><span class="sec-num">B.5</span>Garbage on the UART</h2></div>
+          <div class="sec-head"><h2><span class="sec-num">B.6</span>Garbage on the UART</h2></div>
           <p><b>You see:</b> random characters, or text only before or after a certain point.</p>
           <ol>
             <li><b>Baud rate:</b> the terminal and the firmware must both use 115200 8N1, with no flow control.</li>
-            <li><b>The clock the firmware assumed:</b> <code>BRR</code> is computed from the peripheral clock. If the code assumes 72 MHz but the switch failed (the chip still runs at 8 MHz), every bit is 9 times too long. Print the clock status, as example 00 does.</li>
-            <li><b>APB1 vs APB2:</b> USART1 is on APB2; USART2 and USART3 are on APB1, which runs at half speed at 72 MHz. Using the wrong bus clock halves or doubles the baud rate.</li>
-            <li><b>Wiring:</b> TX → RX, RX → TX, and a common ground. Without GND the signal has no reference and turns into noise.</li>
+            <li><b>LPUART is not USART:</b> the virtual COM port is LPUART1, whose <code>BRR</code> is <b>256 ×</b> f<sub>ck</sub> / baud, not f<sub>ck</sub> / baud. Using the USART formula gives a rate 256 times off: nothing readable at all (<a href="uart.html">module 08</a>).</li>
+            <li><b>The clock the firmware assumed:</b> <code>BRR</code> is computed from LPUART1's kernel clock. If the code assumes 170 MHz but the PLL switch failed (the chip still runs at 16 MHz on HSI16), every bit is more than ten times too long. Print the clock status, as example 00 does, and check <code>RCC_CCIPR.LPUART1SEL</code>.</li>
+            <li><b>Wrong pins:</b> the ST-LINK listens on PA2/PA3 with AF12. D0/D1 on the Arduino header are PC5/PC4, not the virtual COM port.</li>
           </ol>
-          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Measure, don't guess</span><p>Send <code>U</code> (0x55) in a loop: on a logic analyser it is a clean square wave whose bit time tells you the real baud rate.</p></div></div>
-        </section>
-
-        <section class="doc-section" id="flash-size" data-title="Flash size mismatch">
-          <div class="sec-head"><h2><span class="sec-num">B.6</span>Flash size mismatch</h2></div>
-          <p><b>You see:</b> OpenOCD reports 128 KB on a "64 KB" chip, or a program that grew past 64 KB behaves strangely.</p>
-          <p>Many C8 chips report 128 KB in their flash size register at <code>0x1FFFF7E0</code> (RM0008 §30). OpenOCD's stock Blue Pill board file assumes 128 KB as well. The course's <code>bluepill.cfg</code> sets <code>FLASH_SIZE 0x10000</code> before loading the target, and the linker script declares 64 KB, so a program that does not fit fails at link time with <code>region `FLASH' overflowed</code>. Don't "fix" that by declaring 128 KB: the upper half is not guaranteed. Shrink the program (<code>bluepill-release</code> builds with <code>-Os</code>) instead.</p>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Measure, don't guess</span><p>Send <code>U</code> (0x55) in a loop: on a logic analyser on PA2 it is a clean square wave whose bit time tells you the real baud rate.</p></div></div>
         </section>
 
         <section class="doc-section" id="hangs-at-clock" data-title="Hangs during clock setup">
           <div class="sec-head"><h2><span class="sec-num">B.7</span>Hangs during clock setup</h2></div>
-          <p><b>You see:</b> the program never gets past clock setup, or reports a non-zero clock status.</p>
+          <p><b>You see:</b> the program never gets past clock setup, reports a non-zero clock status, or crashes right after switching to 170 MHz.</p>
           <ul>
-            <li><b>No crystal oscillation:</b> a cracked or missing 8 MHz crystal never sets <code>HSERDY</code>. Code without a timeout hangs forever; the course's code gives up and stays on HSI. Route SYSCLK to PA8 with <code>MCO</code> to check it with a scope.</li>
-            <li><b>PLL never locks or the switch never happens:</b> the PLL output must stay within the limits in DS5319, and <code>PLLMUL</code>/<code>PLLSRC</code> may only change while the PLL is off.</li>
-            <li><b>In Renode:</b> the stock STM32F103 platform does not model the clock controller's status bits, so code waits for <code>SWS</code> in vain (our firmware times out with status 3). Use the course's <code>bluepill.repl</code>, which does.</li>
+            <li><b>Not enough wait states:</b> raise <code>FLASH_ACR.LATENCY</code> to 4 (<code>FLASH_ACR_LATENCY_4WS</code>) <i>before</i> switching to 170 MHz. Too few wait states read wrong instructions from flash: random HardFaults.</li>
+            <li><b>Boost mode off:</b> above 150 MHz, range 1 boost (<code>PWR_CR5.R1MODE</code> = 0) is required.</li>
+            <li><b>No AHB ÷2 step:</b> switching SYSCLK above 80 MHz needs the AHB prescaler at ÷2 for at least 1 µs, then ÷1 (<a href="clocks.html#switching">module 04</a>).</li>
+            <li><b>PLL never locks:</b> the VCO input and output must stay within their limits (HSI16 / M between 2.66 and 16 MHz, VCO between 64 and 344 MHz), and <code>RCC_PLLCFGR</code> may only change while the PLL is off. The course's code gives up after a timeout and stays on HSI16. Route SYSCLK to PA8 with <code>MCO</code> to check it with a scope.</li>
           </ul>
         </section>
 
-        <section class="doc-section" id="usb" data-title="USB not enumerating">
-          <div class="sec-head"><h2><span class="sec-num">B.8</span>USB not enumerating</h2></div>
-          <p><b>You see:</b> the PC does not detect the Blue Pill as a USB device, or only sometimes.</p>
-          <p>A full-speed USB device announces itself with a 1.5 kΩ pull-up on D+ (PA12). Many Blue Pills fit 10 kΩ (R10) instead, which some hosts tolerate and others ignore, on most boards; check yours. The common fix is an extra resistor of about 1.8 kΩ from PA12 to 3.3 V, giving roughly 1.5 kΩ in parallel. USB examples are not part of this course; remember that USB and CAN cannot run at the same time on this chip.</p>
+        <section class="doc-section" id="flash-errors" data-title="Flash programming errors">
+          <div class="sec-head"><h2><span class="sec-num">B.8</span>Flash programming errors</h2></div>
+          <p><b>You see:</b> your own flash code (a bootloader, a data logger) fails with an error flag in <code>FLASH_SR</code>, or OpenOCD reports a flash write error.</p>
+          <ul>
+            <li><b><code>PGSERR</code>, <code>PGAERR</code>, <code>SIZERR</code>:</b> the G4 programs 64-bit double words, 8-byte aligned, low word first. A lone 32-bit write or a misaligned address sets one of these.</li>
+            <li><b><code>PROGERR</code>:</b> the double word was not erased. Each double word can be programmed once per erase (it carries ECC).</li>
+            <li><b><code>WRPERR</code>:</b> the page is write-protected by the option bytes.</li>
+            <li><b>Stale flags:</b> error flags stay set until written with 1. Clear them before starting an operation, as example 12's <code>wait_done()</code> does.</li>
+            <li><b>Wrong page number:</b> the page size is 2 KB with <code>DBANK</code> = 1 (factory default) and 4 KB with <code>DBANK</code> = 0; in dual-bank mode, bank 2 also needs <code>BKER</code> (<a href="bootloader.html#flash-prog">module 16</a>).</li>
+          </ul>
         </section>
 
         <section class="doc-section" id="can-silent" data-title="CAN sends nothing">
           <div class="sec-head"><h2><span class="sec-num">B.9</span>CAN sends nothing</h2></div>
-          <p><b>You see:</b> nothing on the bus, the transmit mailbox never empties, or the error counters climb.</p>
+          <p><b>You see:</b> nothing on the bus, transmit requests never complete, or the error counters climb.</p>
           <ol>
-            <li><b>No other node:</b> every CAN frame must be acknowledged by at least one other node. Alone on a bus, the controller resends forever and its transmit error counter rises. Test alone with <b>loopback + silent</b> mode (<code>CAN_BTR.LBKM</code> and <code>SILM</code>) first.</li>
-            <li><b>Stuck in initialization mode:</b> bxCAN leaves initialization only after it sees 11 recessive bits on CAN_RX. A floating or shorted RX pin (no transceiver, wrong pin) keeps it there.</li>
-            <li><b>Wrong pins:</b> on the Blue Pill, CAN is remapped to PB8/PB9 with <code>AFIO_MAPR.CAN_REMAP = 10</code> so that PA11/PA12 stay free.</li>
-            <li><b>Physical layer:</b> both boards need a transceiver (SN65HVD230 at 3.3 V), a twisted pair, a common ground and 120 Ω at each end of the bus.</li>
-            <li><b>Bit timing:</b> both nodes must agree on the bit rate and use a similar sample point. <a href="can.html#bit-timing">Module 12</a> has a calculator.</li>
+            <li><b>No other node:</b> every CAN frame must be acknowledged by at least one other node. Alone on a bus, the controller resends forever and its transmit error counter rises. Test alone with FDCAN's <b>internal loopback</b> mode (<code>CCCR.TEST</code> + <code>TEST.LBCK</code> with <code>CCCR.MON</code>) first.</li>
+            <li><b>Stuck in initialization:</b> after <code>CCCR.INIT</code> is cleared, FDCAN waits for 11 recessive bits on FDCAN1_RX before it takes part in bus traffic. A floating or shorted RX pin (no transceiver, wrong pin) keeps it waiting. After bus-off, <code>INIT</code> is set again and software must clear it.</li>
+            <li><b>Wrong pins or AF:</b> the course uses PA11 (RX) and PA12 (TX) with AF9. They are on the Morpho header, not the Arduino header.</li>
+            <li><b>Physical layer:</b> the NUCLEO has no CAN transceiver. Both boards need one (3.3 V, rated for the CAN FD data rate if you use FD), a twisted pair, a common ground and 120 Ω at each end of the bus.</li>
+            <li><b>Bit timing:</b> both nodes must agree on the bit rate and use a similar sample point, in <code>NBTP</code> (and <code>DBTP</code> for the FD data phase). <a href="can.html#bit-timing">Module 12</a> has a calculator.</li>
           </ol>
         </section>
 
@@ -143,7 +160,7 @@ source [file join [file dirname [info script]] bluepill.cfg]
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/pages/troubleshooting.js?v=__BUILD__"></script>
 </body>

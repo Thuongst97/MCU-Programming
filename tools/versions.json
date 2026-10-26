@@ -1,6 +1,6 @@
 {
   "_comment": "Single source of truth for every pinned version (CLAUDE.md rule 4). Pages render tool versions from this file; third_party/ is (re)vendored from the 'third_party' entries by tools/update-third-party.py. Entries with \"verified\": false still have to be confirmed in Phase 0.",
-  "checked": "2026-10-24",
+  "checked": "2026-10-25",
   "tools": {
     "arm-gnu-toolchain": {
       "name": "Arm GNU Toolchain (arm-none-eabi)",
@@ -55,28 +55,6 @@
       "url": "https://www.st.com/en/development-tools/stm32cubeprog.html",
       "verified": false
     },
-    "stm32cubef1": {
-      "name": "STM32F1 HAL/LL drivers (examples/00 hal + ll variants only)",
-      "version": "stm32f1xx-hal-driver v1.1.10",
-      "url": "https://github.com/STMicroelectronics/stm32f1xx-hal-driver",
-      "commit": "77fbb30b7a1d02533980400083e48c559aae5a4f",
-      "verified": true
-    },
-    "renode": {
-      "name": "Renode",
-      "version": "1.17.0",
-      "url": "https://github.com/renode/renode/releases",
-      "verified": true,
-      "linux_x64_url": "https://github.com/renode/renode/releases/download/v1.17.0/renode-1.17.0.linux-portable.tar.gz",
-      "linux_x64_dir": "renode_1.17.0-portable",
-      "python_requirements": [
-        "robotframework==6.1",
-        "robotframework-retryfailed==0.2.0",
-        "psutil",
-        "pyyaml",
-        "telnetlib3==2.0.*"
-      ]
-    },
     "cppcheck": {
       "name": "Cppcheck (Ubuntu 24.04 package in CI)",
       "version": "2.13",
@@ -96,15 +74,16 @@
       "verified": true
     },
     "stlink-firmware": {
-      "name": "ST-LINK/V2 firmware",
-      "version": ">= V2J24",
+      "name": "ST-LINK/V3E firmware (on the NUCLEO-G474RE)",
+      "version": "latest from STM32CubeProgrammer",
       "url": "https://www.st.com/en/development-tools/stsw-link007.html",
       "verified": false
     },
-    "robotframework": {
-      "name": "Robot Framework (Renode tests)",
-      "version": "6.1",
-      "url": "https://robotframework.org/",
+    "stm32cubeg4": {
+      "name": "STM32G4 HAL/LL drivers (examples/00 hal + ll variants only)",
+      "version": "stm32g4xx_hal_driver v1.2.7",
+      "url": "https://github.com/STMicroelectronics/stm32g4xx_hal_driver",
+      "commit": "f5929f431f9effe45fbe18f5337e4753ced9ac92",
       "verified": true
     }
   },
@@ -120,16 +99,16 @@
     }
   },
   "svd": {
-    "file": "STM32F103.svd",
-    "dest": ".cache/svd/STM32F103.svd",
+    "file": "STM32G474.svd",
+    "dest": ".cache/svd/STM32G474.svd",
     "sources": [
       {
-        "name": "modm-io/cmsis-svd-stm32 (fallback mirror)",
-        "url": "https://raw.githubusercontent.com/modm-io/cmsis-svd-stm32/e79021accd49bf19bd0b16065f5471fb073ff3ac/stm32f1/STM32F103.svd"
+        "name": "modm-io/cmsis-svd-stm32 (mirror of ST's SVD, Apache-2.0 header)",
+        "url": "https://raw.githubusercontent.com/modm-io/cmsis-svd-stm32/e79021accd49bf19bd0b16065f5471fb073ff3ac/stm32g4/STM32G474.svd"
       }
     ],
-    "sha256": "ff632bd0d75d0bc807d787967cdf62512d6438be53d6a77d2d78ab8ba2110015",
-    "_note": "Not committed: licence unclear (PLAN.md section 2.4). Downloaded by tools/fetch-svd.py and verified against sha256."
+    "sha256": "b9d75d8f197df0ecd11d60885862da166f31878cf18d1b5c5e126ab675130281",
+    "_note": "Not committed (CLAUDE.md rule 10a). Downloaded by tools/fetch-svd.py and verified against sha256. This copy carries an Apache-2.0 header from ST."
   },
   "third_party": {
     "cmsis_core": {
@@ -145,7 +124,7 @@
         "cmsis_version.h",
         "cmsis_gcc.h",
         "cmsis_clang.h",
-        "core_cm3.h",
+        "core_cm4.h",
         "m-profile/cmsis_gcc_m.h",
         "m-profile/cmsis_clang_m.h",
         "m-profile/armv7m_mpu.h"
@@ -156,36 +135,34 @@
         "cmsis_version.h": "2d562b242ef2ea52061a046fbc8cc77f07c2453e9fbff4f7a8cd5d24cf5dcf0a",
         "cmsis_gcc.h": "d8910101d0fe12d702bc88b9b9fd06ed0b969a0a52d8a7650cc8d36e628346aa",
         "cmsis_clang.h": "4baa9ae2202b66f2a38cb681ccbf4d744e9e2167b57d97c1c3cb193d8e89377f",
-        "core_cm3.h": "00c9f5f9b9244661549e0ee7d4fa0e82de049f40c17902c201c1eb00fce70936",
+        "core_cm4.h": "5d6f71c32258821ebf371045a5670fe74a1cab49318f8df75344adfe4813de04",
         "m-profile/cmsis_gcc_m.h": "56241ce5b4798048f84429e28c1949d30bb907155f0b8351cb36aaaa9cbbeabb",
         "m-profile/cmsis_clang_m.h": "caefd92894f51703a229a06ea159eb905b7771b1f818392d95bccb1cd4130c20",
         "m-profile/armv7m_mpu.h": "44294dc3e331deb8daae269793e579cc10920a9b88d133bbaf3a7af65d29f9e4"
       }
     },
-    "cmsis_device_f1": {
-      "name": "CMSIS device headers for STM32F1",
-      "repo": "https://github.com/STMicroelectronics/cmsis-device-f1",
-      "tag": "v4.3.5",
-      "commit": "8a76309ed1250d817e9c888c4417171d2ba3ba63",
+    "cmsis_device_g4": {
+      "name": "CMSIS device headers for STM32G4",
+      "repo": "https://github.com/STMicroelectronics/cmsis-device-g4",
+      "tag": "v1.2.6",
+      "commit": "25664ddc3a7624ae9627ae8c4c672073dc5b2539",
       "licence": "Apache-2.0",
-      "licence_file": "License.md",
+      "licence_file": "LICENSE.md",
       "base": ".",
       "files": [
-        "Include/stm32f1xx.h",
-        "Include/stm32f103xb.h",
-        "Include/system_stm32f1xx.h",
-        "Source/Templates/gcc/startup_stm32f103xb.s",
-        "Source/Templates/gcc/linker/STM32F103XB_FLASH.ld",
-        "Source/Templates/system_stm32f1xx.c"
+        "Include/stm32g4xx.h",
+        "Include/stm32g474xx.h",
+        "Include/system_stm32g4xx.h",
+        "Source/Templates/gcc/startup_stm32g474xx.s",
+        "Source/Templates/system_stm32g4xx.c"
       ],
       "dest": ".",
       "sha256": {
-        "Include/stm32f1xx.h": "05e93fa3ddefb2e83d762b9ca4de36e3bba9cd8e9690400fe9f2c11fc0a3cef5",
-        "Include/stm32f103xb.h": "d9c7c613d9fea74220892b4fbc3e80617493acad82a04bafadab2b4a7198399c",
-        "Include/system_stm32f1xx.h": "a54dfbb3480c672f532d472a6e84bcf34df6551771d2e9966c5a3503c676b6ab",
-        "Source/Templates/gcc/startup_stm32f103xb.s": "a9a5fc7ed5ff617527dd98b3092830f4d17ed4bf57c99eac2c53bdb514ce138c",
-        "Source/Templates/gcc/linker/STM32F103XB_FLASH.ld": "ab4ff980794c0f9ea8935a4a3e0c20a9102c7f2ccbc33cad4deab159703563e9",
-        "Source/Templates/system_stm32f1xx.c": "6f13b57054f33b4dcb8f3f23fa05b2942d9dca8abd9a2a08ecde6f99693505a5"
+        "Include/stm32g4xx.h": "493603c55af538bc431713b4f9880b5e242447cea232ca7459d3ca59c71dd48d",
+        "Include/stm32g474xx.h": "e7e5851721452c415c627e233d0a617b72ba891718a4f12a495b20dee25d82b0",
+        "Include/system_stm32g4xx.h": "36304c07e9cee84064015ebd7ae517af6f466c466c1bbf5e342c57a296601db2",
+        "Source/Templates/gcc/startup_stm32g474xx.s": "2d1952a86701643338fbe284341c9099f96a52608d40cbda35212bf14375ad2a",
+        "Source/Templates/system_stm32g4xx.c": "1de96c381d922635dabc0836d315d66c99b4e9d4a407fef6ee6f5c4e32b0791a"
       }
     },
     "unity": {
@@ -242,8 +219,8 @@
         "include/stream_buffer.h",
         "include/task.h",
         "include/timers.h",
-        "portable/GCC/ARM_CM3/port.c",
-        "portable/GCC/ARM_CM3/portmacro.h"
+        "portable/GCC/ARM_CM4F/port.c",
+        "portable/GCC/ARM_CM4F/portmacro.h"
       ],
       "dest": ".",
       "sha256": {
@@ -272,8 +249,28 @@
         "include/stream_buffer.h": "7befd8b5857f215fe5acae33e0d5fc61edb8c3867f989da8aaa1a6ef78ee51ec",
         "include/task.h": "463d29016b1c11dd7c5f9e67b41bf8c1897d9c2dcc510cdc37e3158f32584222",
         "include/timers.h": "aff317a330935160abbd00a3a60a973653921e3a022216dcb04d804678c375b8",
-        "portable/GCC/ARM_CM3/port.c": "93bf85385a2679aa1b4e3086db909ed078835d89d359b82b7db6c74f4a2a67e3",
-        "portable/GCC/ARM_CM3/portmacro.h": "748eafdd960e73bbc90c05bed486ac725676076d9acd063480ca01ce41e5e1d5"
+        "portable/GCC/ARM_CM4F/port.c": "cb0e7781892fd01f3bf016199ce2dcf00b4c173e1732e255b6ae394500ea6386",
+        "portable/GCC/ARM_CM4F/portmacro.h": "dbc747c591443d2ec3627bfd4b55f5f84346c351469247d4cbd4dfe8353614b1"
+      }
+    },
+    "stm32_open_pin_data": {
+      "name": "STM32 open pin data (CubeMX MCU database: pins, signals, AF numbers)",
+      "repo": "https://github.com/STMicroelectronics/STM32_open_pin_data",
+      "tag": "STM32CubeMX-DB.6.0.90",
+      "commit": "c8a321a8715113c90658ef843853169f7f600302",
+      "licence": "BSD-3-Clause",
+      "licence_file": "LICENSE",
+      "base": "mcu",
+      "files": [
+        "STM32G474R(B-C-E)Tx.xml",
+        "STM32G474V(B-C-E)Tx.xml",
+        "IP/GPIO-STM32G47x_gpio_v1_0_Modes.xml"
+      ],
+      "dest": ".",
+      "sha256": {
+        "STM32G474R(B-C-E)Tx.xml": "8866d1f3b9bcaff91c0b8d9fe1efe489ad5da34769ec5c60ccdca18a8a7cfa3b",
+        "STM32G474V(B-C-E)Tx.xml": "4144d2569c7798ab86c5086aa636ab8cbb62cd4ba99bfff4021606965ff98525",
+        "IP/GPIO-STM32G47x_gpio_v1_0_Modes.xml": "201aef96428b57635e88f896660549f59424d1ebed353ee2f9c101fefb906eab"
       }
     }
   }

@@ -1,10 +1,13 @@
 /* SPDX-License-Identifier: MIT
- * Example 04: an interrupt-driven USART1 with lock-free ring buffers, and a command shell on top.
- * Type "help" in your terminal (115200 8N1). RM0008 §27 (USART), PM0056 §4.3 (NVIC).
+ * Example 04: an interrupt-driven LPUART1 (the NUCLEO's virtual COM port) with lock-free ring
+ * buffers, and a command shell on top. Type "help" in your terminal (115200 8N1).
+ * RM0440 "LPUART"; PM0214 "NVIC".
  */
 #include <stdint.h>
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
+#include "board.h"
 #include "clock.h"
+#include "gpio.h"
 #include "led.h"
 #include "ringbuf.h"
 #include "shell.h"
@@ -16,39 +19,46 @@ static volatile uint32_t s_rx_dropped;
 // [region:init]
 static void uart_irq_init(uint32_t baud)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_USART1EN;
-    GPIOA->CRH = (GPIOA->CRH & ~(GPIO_CRH_CNF9 | GPIO_CRH_MODE9 | GPIO_CRH_CNF10 | GPIO_CRH_MODE10))
-                 | GPIO_CRH_CNF9_1 | GPIO_CRH_MODE9 | GPIO_CRH_CNF10_0;
-    USART1->BRR = (clock_pclk2() + (baud / 2U)) / baud;
-    USART1->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE;   /* RX interrupt on */ // «1»
-    NVIC_SetPriority(USART1_IRQn, 6U);                                                                // «2»
-    NVIC_EnableIRQ(USART1_IRQn);
+    RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
+    (void)RCC->APB1ENR2;
+    gpio_clock_on(BOARD_VCP_PORT);
+    gpio_af(BOARD_VCP_PORT, BOARD_VCP_TX_PIN, AF_PA2_LPUART1_TX);
+    gpio_af(BOARD_VCP_PORT, BOARD_VCP_RX_PIN, AF_PA3_LPUART1_RX);
+    LPUART1->BRR = (uint32_t)((256ULL * clock_pclk1() + (baud / 2U)) / baud);
+    LPUART1->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE_RXFNEIE;   /* RX interrupt on */ // «1»
+    NVIC_SetPriority(LPUART1_IRQn, 6U);                                                                     // «2»
+    NVIC_EnableIRQ(LPUART1_IRQn);
 }
 // [endregion]
 
 // [region:isr]
-void USART1_IRQHandler(void);
-void USART1_IRQHandler(void)
+void LPUART1_IRQHandler(void);
+void LPUART1_IRQHandler(void)
 {
-    const uint32_t sr = USART1->SR;
-    if ((sr & (USART_SR_RXNE | USART_SR_ORE)) != 0U)          /* byte received (or overrun) */      // «3»
+    const uint32_t isr = LPUART1->ISR;
+    if ((isr & USART_ISR_ORE) != 0U)                          /* overrun: a byte was lost */      // «3»
     {
-        const uint8_t b = (uint8_t)USART1->DR;                /* reading DR clears RXNE and ORE */
+        LPUART1->ICR = USART_ICR_ORECF;                       /* G4: ORE is cleared through ICR */
+        s_rx_dropped++;
+    }
+    if ((isr & USART_ISR_RXNE_RXFNE) != 0U)                   /* byte received */
+    {
+        const uint8_t b = (uint8_t)LPUART1->RDR;              /* reading RDR clears RXNE */
         if (!ringbuf_put(&s_rx, b))
         {
             s_rx_dropped++;                                   /* main() was too slow: count, don't block */
         }
     }
-    if (((USART1->CR1 & USART_CR1_TXEIE) != 0U) && ((sr & USART_SR_TXE) != 0U))                    // «4»
+    if (((LPUART1->CR1 & USART_CR1_TXEIE_TXFNFIE) != 0U) && ((isr & USART_ISR_TXE_TXFNF) != 0U))   // «4»
     {
         uint8_t b;
         if (ringbuf_get(&s_tx, &b))
         {
-            USART1->DR = b;
+            LPUART1->TDR = b;
         }
         else
         {
-            USART1->CR1 &= ~USART_CR1_TXEIE;                  /* nothing left: stop TXE interrupts */ // «5»
+            LPUART1->CR1 &= ~USART_CR1_TXEIE_TXFNFIE;         /* nothing left: stop TXE interrupts */ // «5»
         }
     }
 }
@@ -64,7 +74,7 @@ static void tx_put(uint8_t b)
     /* CR1 is also written by the ISR, so this read-modify-write must not be interrupted. */
     const uint32_t primask = __get_PRIMASK();
     __disable_irq();                                                                            // «7»
-    USART1->CR1 |= USART_CR1_TXEIE;
+    LPUART1->CR1 |= USART_CR1_TXEIE_TXFNFIE;
     __set_PRIMASK(primask);
 }
 
@@ -152,13 +162,13 @@ static void cmd_mco(uint32_t argc, const char *const argv[])
 {
     if ((argc >= 2U) && (argv[1][0] == 'h'))
     {
-        clock_mco(CLOCK_MCO_HSE);
-        uart_write("MCO on PA8: HSE (8 MHz)\n");
+        clock_mco(CLOCK_MCO_HSI16);
+        uart_write("MCO on PA8 (D7): HSI16 (16 MHz)\n");
     }
-    else if ((argc >= 2U) && (argv[1][0] == 'p'))
+    else if ((argc >= 2U) && (argv[1][0] == 's'))
     {
-        clock_mco(CLOCK_MCO_PLL_DIV2);
-        uart_write("MCO on PA8: PLL / 2 (36 MHz)\n");
+        clock_mco(CLOCK_MCO_SYSCLK_DIV16);
+        uart_write("MCO on PA8 (D7): SYSCLK / 16 (10.625 MHz)\n");
     }
     else
     {
@@ -185,8 +195,8 @@ static void cmd_regs(uint32_t argc, const char *const argv[])
     write_hex(RCC->CR);
     uart_write("\nRCC_CFGR    ");
     write_hex(RCC->CFGR);
-    uart_write("\nRCC_APB2ENR ");
-    write_hex(RCC->APB2ENR);
+    uart_write("\nRCC_PLLCFGR ");
+    write_hex(RCC->PLLCFGR);
     uart_write("\nFLASH_ACR   ");
     write_hex(FLASH->ACR);
     uart_write("\n");
@@ -194,9 +204,9 @@ static void cmd_regs(uint32_t argc, const char *const argv[])
 
 static const shell_cmd_t s_cmds[] = {
     {"help", "list commands", cmd_help},
-    {"led", "led on|off|toggle (PC13)", cmd_led},
+    {"led", "led on|off|toggle (LD2, PA5)", cmd_led},
     {"clock", "show the bus clocks", cmd_clock},
-    {"mco", "mco hse|pll|off: clock out on PA8", cmd_mco},
+    {"mco", "mco hsi|sys|off: clock out on PA8 (D7)", cmd_mco},
     {"uptime", "milliseconds since start", cmd_uptime},
     {"regs", "dump RCC and FLASH registers", cmd_regs},
 };
@@ -204,7 +214,7 @@ static const shell_cmd_t s_cmds[] = {
 // [region:main]
 int main(void)
 {
-    (void)clock_init_72mhz();
+    (void)clock_init_170mhz();
     systick_init_1ms();
     led_init();
     led_off();

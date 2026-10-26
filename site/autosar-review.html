@@ -34,7 +34,7 @@
           <div class="callout warn"><div class="ci">🔎</div><div><span class="ct">Verification status</span><p>Every API, type and rule on this page names its AUTOSAR R25-11 document. The requirement IDs and exact values are still being checked against the R25-11 PDFs; until then they come from the R4.x-era specifications, and no requirement ID is quoted, because the course never makes one up. Progress is tracked in <a href="https://github.com/Thuongst97/MCU-Programming/blob/main/docs/autosar-self-review.md">the self-review log</a>.</p></div></div>
           <p>A review checklist turns "is this good code?" into questions with yes/no answers. This one combines the AUTOSAR conventions of modules 18–22 with the embedded rules of the whole course. Tick through it for the capstone's stage 3; it remembers your progress in this browser:</p>
           <div id="ck-review-list"></div>
-          <p>Several items are checked by machine on every push: <code>tools/check-autosar.py</code> (naming, version macros, MemMap pairs, DET guards, SWC includes, banners), <code>tools/run-misra.py</code> (MISRA C:2012 via cppcheck, with recorded deviations), the compiler with <code>-Werror</code>, and the acceptance tests in Renode. The rest needs a person.</p>
+          <p>Several items are checked by machine on every push: <code>tools/check-autosar.py</code> (naming, version macros, MemMap pairs, DET guards, SWC includes, banners), <code>tools/run-misra.py</code> (MISRA C:2012 via cppcheck, with recorded deviations), the compiler with <code>-Werror</code>, and the host tests of the TurnLight logic. The hardware acceptance checklist and the rest need a person.</p>
           <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>A review checklist is a pilot's pre-flight checklist: experienced pilots use it precisely because experience makes you skip steps. It does not make the flight safe by itself; it makes forgetting the obvious unlikely.</p></div></div>
         </section>
 
@@ -43,11 +43,11 @@
           <p>Two findings that come up in almost every first review, with the version from this repository that passes:</p>
           <div class="cmp-host" id="cmp-swc"></div>
           <div class="cmp-host" id="cmp-wait"></div>
-          <script type="text/plain" id="src-r-swc-bad" data-src="autosar/gallery/gallery.c" data-region="swc-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="62" data-end="66" data-sha="1d96068ded30">
+          <script type="text/plain" id="src-r-swc-bad" data-src="autosar/gallery/gallery.c" data-region="swc-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="62" data-end="66" data-sha="f3d6e96c93f6">
 /* An "application" function that reads pins itself: tied to this ECU, untestable on a PC */
 boolean TurnLight_StalkLeftPressed(void)
 {
-    return ((GPIOB->IDR & GPIO_IDR_IDR12) == 0U) ? TRUE : FALSE;
+    return ((GPIOB->IDR & GPIO_IDR_ID12) == 0U) ? TRUE : FALSE;
 }
 </script>
           <script type="text/plain" id="src-r-swc-good" data-src="capstone/turnlight/stage3-autosar/asw/TurnLight/TurnLight.c" data-region="runnable" data-lang="c" data-file="asw/TurnLight/TurnLight.c" data-start="38" data-end="80" data-sha="a6d13e30ed98">
@@ -95,7 +95,7 @@ FUNC(void, TURNLIGHT_CODE) RE_TurnLight_10ms(void)
     (void)Rte_Call_Alive_CheckpointReached(0U);                               /* WdgM alive supervision */   // «8»
 }
 </script>
-          <script type="text/plain" id="src-r-wait-bad" data-src="autosar/gallery/gallery.c" data-region="wait-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="70" data-end="77" data-sha="1d96068ded30">
+          <script type="text/plain" id="src-r-wait-bad" data-src="autosar/gallery/gallery.c" data-region="wait-bad" data-lang="c" data-file="autosar/gallery/gallery.c" data-start="70" data-end="77" data-sha="f3d6e96c93f6">
 /* Waits forever if the crystal is missing: the ECU hangs before the watchdog is even running */
 void Clock_Start(void)
 {
@@ -105,7 +105,7 @@ void Clock_Start(void)
     }
 }
 </script>
-          <script type="text/plain" id="src-r-wait-good" data-src="autosar/mcal/mcu/Mcu.c" data-region="wait" data-lang="c" data-file="autosar/mcal/mcu/Mcu.c" data-start="36" data-end="46" data-sha="ca5f4354da21">
+          <script type="text/plain" id="src-r-wait-good" data-src="autosar/mcal/mcu/Mcu.c" data-region="wait" data-lang="c" data-file="autosar/mcal/mcu/Mcu.c" data-start="37" data-end="47" data-sha="efe18a465bd0">
 static FUNC(boolean, MCU_CODE) Mcu_WaitSet(volatile uint32 *reg, uint32 mask, uint32 value)
 {
     for (uint32 n = 0U; n < MCU_WAIT_LOOPS; ++n)
@@ -173,7 +173,7 @@ FUNC(void, LAMPMONITOR_CODE) RE_LampMonitor_10ms(void)
           <p>The ASIL comes from a hazard analysis that rates severity, exposure and controllability of each failure. It then sets requirements across the whole lifecycle: methods for requirements, design, coding (MISRA C, defensive programming), verification (coverage targets), and the hardware itself.</p>
           <ul>
             <li><b>Freedom from interference</b>: software of a lower ASIL must not corrupt software of a higher one, in memory, timing or communication. AUTOSAR's OS-Applications with memory protection, timing protection and E2E-protected messages exist for this.</li>
-            <li><b>Hardware matters</b>: ASIL C/D microcontrollers have lockstep cores, ECC on RAM and flash, and self-tests. The STM32F103 has none of these, which is one reason it is not an automotive part (<a href="automotive-mcus.html">appendix C</a>).</li>
+            <li><b>Hardware matters</b>: ASIL C/D microcontrollers have lockstep cores, ECC on RAM and flash, and self-tests. The STM32G474 has ECC on flash and parity on part of its SRAM (DS12288), but no lockstep core, which is one reason it is not an automotive safety part (<a href="automotive-mcus.html">appendix C</a>).</li>
           </ul>
           <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">This course is QM</span><p>Nothing in this course is developed to ISO 26262, and the TurnLight capstone is not a safety-qualified turn-signal function. The point here is to know where the standard applies and what it asks for.</p></div></div>
         </section>

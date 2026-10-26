@@ -19,7 +19,7 @@ Vendored copy. **Do not edit these files**; update them only with
 | `Include/cmsis_version.h` | `2d562b242ef2ea52…` |
 | `Include/cmsis_gcc.h` | `d8910101d0fe12d7…` |
 | `Include/cmsis_clang.h` | `4baa9ae2202b66f2…` |
-| `Include/core_cm3.h` | `00c9f5f9b9244661…` |
+| `Include/core_cm4.h` | `5d6f71c32258821e…` |
 | `Include/m-profile/cmsis_gcc_m.h` | `56241ce5b4798048…` |
 | `Include/m-profile/cmsis_clang_m.h` | `caefd92894f51703…` |
 | `Include/m-profile/armv7m_mpu.h` | `44294dc3e331deb8…` |

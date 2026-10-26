@@ -40,5 +40,5 @@ Vendored copy. **Do not edit these files**; update them only with
 | `./include/stream_buffer.h` | `7befd8b5857f215f…` |
 | `./include/task.h` | `463d29016b1c11dd…` |
 | `./include/timers.h` | `aff317a330935160…` |
-| `./portable/GCC/ARM_CM3/port.c` | `93bf85385a2679aa…` |
-| `./portable/GCC/ARM_CM3/portmacro.h` | `748eafdd960e73bb…` |
+| `./portable/GCC/ARM_CM4F/port.c` | `cb0e7781892fd01f…` |
+| `./portable/GCC/ARM_CM4F/portmacro.h` | `dbc747c591443d2e…` |

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Diagnostics (DCM/DEM, UDS) and NvM — MCU Academy</title>
-  <meta name="description" content="UDS services, DTCs and event debouncing in DEM, the DCM request path, and storing data with NvM over Fee on the F1 flash.">
+  <meta name="description" content="UDS services, DTCs and event debouncing in DEM, the DCM request path, and storing data with NvM over Fee on the G4 flash.">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -113,7 +113,7 @@ FUNC(Std_ReturnType, DEM_CODE) Dem_SetEventStatus(Dem_EventIdType EventId, Dem_E
 }
 </script>
           <div id="ex-dem-set"></div>
-          <p>A status change reaches the integration through a configured callback; the capstone prints it, which is how the Renode tests see <code>dem: TL_E_LAMP_OUT_R failed</code>:</p>
+          <p>A status change reaches the integration through a configured callback; the capstone prints it, which is how the hardware acceptance check sees <code>dem: TL_E_LAMP_OUT_R failed</code> on the virtual COM port:</p>
           <script type="text/plain" id="src-dem-cb" data-src="capstone/turnlight/stage3-autosar/integration/main.c" data-region="callouts" data-lang="c" data-file="capstone/turnlight/stage3-autosar/integration/main.c" data-start="89" data-end="139" data-sha="3bfbe1f6131d">
 boolean Integration_TurnLightStatusTxCallout(PduIdType id, PduInfoType *pdu)
 {
@@ -202,7 +202,7 @@ void Rte_WriteHook_TurnLight_TurnStatus_Hazard_Start(boolean data)
         <section class="doc-section" id="nvm" data-title="NvM, MemIf, Fee, Fls">
           <div class="sec-head"><h2><span class="sec-num">22.5</span>NvM, MemIf, Fee, Fls</h2></div>
           <p>Stored DTCs, odometer copies and learned values must survive power-off. AUTOSAR stacks that path in four modules: <b>NvM</b> (blocks with RAM mirrors, CRCs and redundancy) → <b>MemIf</b> (which device) → <b>Fee</b> (Flash EEPROM Emulation) → <b>Fls</b> (the flash driver, the same erase/program work as module 16).</p>
-          <p>Flash can only be erased in pages, and each page survives about 10 000 erase cycles (DS5319). Fee therefore never rewrites in place: it appends new versions of a block to the active page and, when the page is full, copies the latest version of every block to the other page, then erases the old one. Walk through the cycle with two 1 KB pages:</p>
+          <p>Flash can only be erased in pages, and each page survives about 10 000 erase cycles (DS12288). Fee therefore never rewrites in place: it appends new versions of a block to the active page and, when the page is full, copies the latest version of every block to the other page, then erases the old one. Walk through the cycle with two 2 KB pages (the G474's page size in its default dual-bank mode):</p>
           <div id="sm-fee"></div>
           <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">Power loss in the middle</span><p>Every step of the cycle must leave a recoverable state: page status markers are written in a fixed order, and at start-up Fee scans both pages to decide which one holds valid data. This is the same reasoning as the bootloader's image record in module 16, applied to data.</p></div></div>
           <div id="ck-diag"></div>

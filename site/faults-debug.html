@@ -25,20 +25,20 @@
           <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 15</span><span>/</span><span>Faults &amp; Debugging</span></nav>
           <div class="eyebrow">Module 15 · Embedded engineering</div>
           <h1>Fault Handling and Debugging</h1>
-          <p class="lead">Sooner or later your program stops in <code>HardFault_Handler</code>, or resets "for no reason". This module turns that from a mystery into a routine: what the Cortex-M3 records when it faults, how to get the faulting instruction back, how to keep the evidence across a reset, and the debugger techniques that find the bug faster than adding prints.</p>
+          <p class="lead">Sooner or later your program stops in <code>HardFault_Handler</code>, or resets "for no reason". This module turns that from a mystery into a routine: what the Cortex-M4 records when it faults, how to get the faulting instruction back, how to keep the evidence across a reset, and the debugger techniques that find the bug faster than adding prints.</p>
           <div class="page-meta"><span>⏱ 45 min read</span><span>🎯 Intermediate</span><span>📂 examples/08-iwdg-hardfault</span></div>
         </header>
 
-        <section class="doc-section" id="fault-types" data-title="Fault types on Cortex-M3">
-          <div class="sec-head"><h2><span class="sec-num">15.1</span>Fault types on Cortex-M3</h2></div>
-          <p>The Cortex-M3 has four fault exceptions (PM0056 §2.4, ARMv7-M ARM B1.5):</p>
+        <section class="doc-section" id="fault-types" data-title="Fault types on Cortex-M4">
+          <div class="sec-head"><h2><span class="sec-num">15.1</span>Fault types on Cortex-M4</h2></div>
+          <p>The Cortex-M4 has four fault exceptions (PM0214, "Fault handling"; ARMv7-M ARM B1.5):</p>
           <div class="table-wrap"><table class="t">
             <thead><tr><th>Fault</th><th>Priority</th><th>Typical causes</th></tr></thead>
             <tbody>
               <tr><td><b>HardFault</b></td><td>fixed −1 (above every configurable exception)</td><td>escalated faults, bus error reading the vector table, BKPT without a debugger</td></tr>
               <tr><td><b>MemManage</b></td><td>configurable</td><td>MPU violation, executing from an execute-never region</td></tr>
               <tr><td><b>BusFault</b></td><td>configurable</td><td>access to an address with no memory or peripheral behind it, a stack running off the end of RAM</td></tr>
-              <tr><td><b>UsageFault</b></td><td>configurable</td><td>undefined instruction, ARM-state jump (bit 0 of a function pointer clear), divide by zero and unaligned access if trapping is enabled</td></tr>
+              <tr><td><b>UsageFault</b></td><td>configurable</td><td>undefined instruction, ARM-state jump (bit 0 of a function pointer clear), divide by zero and unaligned access if trapping is enabled, and <code>NOCP</code>: a floating-point instruction while the FPU is still disabled in <code>CPACR</code></td></tr>
             </tbody>
           </table></div>
           <p>After reset the three configurable handlers are <b>disabled</b>. Their faults <b>escalate</b> to HardFault, which then sets <code>HFSR.FORCED</code>. A fault also escalates when its handler cannot run because the code that faulted already runs at the same or a higher priority. A fault inside the HardFault handler itself puts the core into <b>lockup</b>: it stops executing until a reset or the debugger intervenes. Try the paths:</p>
@@ -50,28 +50,30 @@
 
         <section class="doc-section" id="decode" data-title="Decoding CFSR and HFSR">
           <div class="sec-head"><h2><span class="sec-num">15.2</span>Decoding CFSR and HFSR</h2></div>
-          <p>Two registers explain almost every fault. <code>CFSR</code> (PM0056 §4.4.14) combines the UsageFault, BusFault and MemManage status bits; <code>HFSR</code> (§4.4.15) says why HardFault was taken. When <code>BFARVALID</code> or <code>MMARVALID</code> is set, <code>BFAR</code> or <code>MMFAR</code> holds the address that was accessed. Pick one of example 08's faults to see what it leaves behind:</p>
+          <p>Two registers explain almost every fault. <code>CFSR</code> (PM0214, SCB chapter, "Configurable fault status register") combines the UsageFault, BusFault and MemManage status bits; <code>HFSR</code> ("HardFault status register") says why HardFault was taken. When <code>BFARVALID</code> or <code>MMARVALID</code> is set, <code>BFAR</code> or <code>MMFAR</code> holds the address that was accessed. Pick one of example 08's faults to see what it leaves behind:</p>
           <div class="btn-row" id="fault-presets"></div>
           <div id="reg-cfsr"></div>
           <div id="reg-hfsr"></div>
           <p id="fault-why" class="muted"></p>
-          <script type="text/plain" id="src-08-tables" data-src="examples/08-iwdg-hardfault/src/faultdecode.c" data-region="tables" data-lang="c" data-file="examples/08-iwdg-hardfault/src/faultdecode.c" data-start="14" data-end="21" data-sha="224370312755">
+          <script type="text/plain" id="src-08-tables" data-src="examples/08-iwdg-hardfault/src/faultdecode.c" data-region="tables" data-lang="c" data-file="examples/08-iwdg-hardfault/src/faultdecode.c" data-start="14" data-end="23" data-sha="e2560f02385e">
 static const flag_t s_cfsr[] = {
     {25U, "DIVBYZERO"}, {24U, "UNALIGNED"}, {19U, "NOCP"}, {18U, "INVPC"},                  /* UsageFault */ // «1»
     {17U, "INVSTATE"}, {16U, "UNDEFINSTR"},
-    {15U, "BFARVALID"}, {12U, "STKERR"}, {11U, "UNSTKERR"}, {10U, "IMPRECISERR"},            /* BusFault */
+    {15U, "BFARVALID"}, {13U, "LSPERR"}, {12U, "STKERR"}, {11U, "UNSTKERR"},                /* BusFault */
+    {10U, "IMPRECISERR"},
     {9U, "PRECISERR"}, {8U, "IBUSERR"},
-    {7U, "MMARVALID"}, {4U, "MSTKERR"}, {3U, "MUNSTKERR"}, {1U, "DACCVIOL"}, {0U, "IACCVIOL"},  /* MemManage */
+    {7U, "MMARVALID"}, {5U, "MLSPERR"}, {4U, "MSTKERR"}, {3U, "MUNSTKERR"},                /* MemManage */
+    {1U, "DACCVIOL"}, {0U, "IACCVIOL"},
 };
 static const flag_t s_hfsr[] = {{31U, "DEBUGEVT"}, {30U, "FORCED"}, {1U, "VECTTBL"}};                       // «2»
 </script>
           <div id="ex-tables"></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">IMPRECISERR: the PC is not the culprit</span><p>The Cortex-M3 buffers stores. When a buffered write fails, the core has already moved on, so the stacked PC points somewhere after the bad instruction and <code>BFAR</code> is not valid. While hunting such a bug, set <code>DISDEFWBUF</code> in the auxiliary control register (<code>SCnSCB-&gt;ACTLR</code>, ARM DDI 0337 §4.3.1): every store then completes before the next instruction and the error becomes precise. It costs speed, so remove it afterwards.</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">IMPRECISERR: the PC is not the culprit</span><p>The Cortex-M4 buffers stores. When a buffered write fails, the core has already moved on, so the stacked PC points somewhere after the bad instruction and <code>BFAR</code> is not valid. While hunting such a bug, set <code>DISDEFWBUF</code> in the auxiliary control register (<code>SCnSCB-&gt;ACTLR</code>, ARM DDI 0439, "Auxiliary Control Register"): every store then completes before the next instruction and the error becomes precise. It costs speed, so remove it afterwards.</p></div></div>
         </section>
 
         <section class="doc-section" id="stack-frame" data-title="Recovering the faulting PC">
           <div class="sec-head"><h2><span class="sec-num">15.3</span>Recovering the faulting PC</h2></div>
-          <p>On exception entry the core pushes eight words onto the stack that was in use (PM0056 §2.3.7). The handler can read the faulting program counter from that frame:</p>
+          <p>On exception entry the core pushes eight words onto the stack that was in use (PM0214, "Exception entry and return"). The handler can read the faulting program counter from that frame:</p>
           <div class="table-wrap"><table class="t">
             <thead><tr><th>Offset</th><th>Word</th><th>Why you want it</th></tr></thead>
             <tbody>
@@ -82,8 +84,9 @@ static const flag_t s_hfsr[] = {{31U, "DEBUGEVT"}, {30U, "FORCED"}, {1U, "VECTTB
               <tr><td>+0x1C</td><td>xPSR</td><td>flags; bit 9 says the core inserted a padding word to align the stack</td></tr>
             </tbody>
           </table></div>
+          <p>If the interrupted code had used the FPU, the frame is 26 words instead: the same eight, then S0–S15, FPSCR and a reserved word. The first eight words, and so the PC at <code>+0x18</code>, are in the same place either way. (A fault while the lazy FPU state is being stacked sets <code>LSPERR</code> or <code>MLSPERR</code> in <code>CFSR</code>.)</p>
           <p>Which stack? The value in <code>LR</code> at handler entry is not a return address but <code>EXC_RETURN</code>; its bit 2 is 0 when the frame is on the main stack (MSP) and 1 when it is on the process stack (PSP, used by RTOS tasks). That test has to happen before any C code touches the stack, so the first part of the handler is three instructions of assembly:</p>
-          <script type="text/plain" id="src-08-handler" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="handler" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="49" data-end="78" data-sha="5aee32d3acad">
+          <script type="text/plain" id="src-08-handler" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="handler" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="50" data-end="79" data-sha="b8b58166f430">
 void HardFault_Handler(void) __attribute__((naked));
 void HardFault_Handler(void)
 {
@@ -122,11 +125,11 @@ void hardfault_c(const uint32_t *frame)
         <section class="doc-section" id="handler" data-title="A fault handler that logs">
           <div class="sec-head"><h2><span class="sec-num">15.4</span>A fault handler that logs</h2></div>
           <p>A fault handler in a product should do three things: record, report, recover. Example 08 records into a struct placed in the <code>.noinit</code> section, which the startup code neither copies nor zeroes, so it survives the reset that follows:</p>
-          <script type="text/plain" id="src-08-record" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="record" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="22" data-end="22" data-sha="5aee32d3acad">
+          <script type="text/plain" id="src-08-record" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="record" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="23" data-end="23" data-sha="b8b58166f430">
 __attribute__((section(".noinit"))) static fault_record_t s_last_fault;   /* survives a reset */  // «1»
 </script>
           <div id="ex-record"></div>
-          <script type="text/plain" id="src-08-boot2" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="boot" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="122" data-end="135" data-sha="5aee32d3acad">
+          <script type="text/plain" id="src-08-boot2" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="boot" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="123" data-end="136" data-sha="b8b58166f430">
 uart_puts("\nExample 08 boot, reset cause: ");
 uart_puts(reset_cause(RCC->CSR));                                                              // «14»
 uart_puts("\n");
@@ -143,8 +146,8 @@ if (s_last_fault.magic == FAULT_MAGIC)
 }
 </script>
           <div id="ex-boot2"></div>
-          <script type="text/plain" data-code data-src="examples/08-iwdg-hardfault/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="11" data-sha="43f765c1ee24">
-Example 08 boot, reset cause: power-on
+          <script type="text/plain" data-code data-src="examples/08-iwdg-hardfault/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="11" data-sha="66e5100a922d">
+Example 08 boot, reset cause: power-on or brown-out
 keys: d = divide by 0, u = undefined instruction, i = invalid state, b = bus fault,
       w = stop feeding the watchdog, h = this help
 
@@ -157,7 +160,7 @@ keys: d = divide by 0, u = undefined instruction, i = invalid state, b = bus fau
       w = stop feeding the watchdog, h = this help
 </script>
           <p>The four faults example 08 can trigger, one key each:</p>
-          <script type="text/plain" id="src-08-faults" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="faults" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="82" data-end="105" data-sha="5aee32d3acad">
+          <script type="text/plain" id="src-08-faults" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="faults" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="83" data-end="106" data-sha="b8b58166f430">
 static void fault_div0(void)
 {
     SCB->CCR |= SCB_CCR_DIV_0_TRP_Msk;              /* by default x / 0 silently gives 0 */        // «10»
@@ -179,19 +182,19 @@ static void fault_invstate(void)
 
 static void fault_bus(void)
 {
-    volatile uint32_t v = *(volatile uint32_t *)0x60000000U;   /* no memory there on the C8 */      // «13»
+    volatile uint32_t v = *(volatile uint32_t *)0x10008000U;   /* just past CCM SRAM: reserved */  // «13»
     (void)v;
 }
 </script>
           <div id="ex-faults"></div>
           <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Keep the handler simple</span><p>The fault may have been caused by a corrupted stack or a broken UART driver. A handler that calls into complex code can fault again (and lock up). Copy the registers first, print with the simplest polling code you have, and reset. In a product without a UART, store the record and let the next boot report it.</p></div></div>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 08)</span><p>✅ The divide-by-zero, undefined-instruction and invalid-state faults, the handler, the <code>.noinit</code> record and the watchdog reset run in Renode. ⚠️ Renode does not raise bus faults for unmapped addresses (the <kbd>b</kbd> key prints nothing there) and always reports "power-on" as the reset cause in the course's RCC model. ❌ Not tested on a Blue Pill yet.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (example 08)</span><p>✅ Builds in CI; <code>fault_describe()</code> and <code>reset_cause()</code> pass their host tests with the register values each fault should leave. ⚠️ Those values, and the output above, come from PM0214 and the Armv7-M ARM, not from a capture on hardware. ❌ Not run on a NUCLEO-G474RE by the course yet.</p></div></div>
         </section>
 
         <section class="doc-section" id="gdb" data-title="GDB and Cortex-Debug techniques">
           <div class="sec-head"><h2><span class="sec-num">15.5</span>GDB and Cortex-Debug techniques</h2></div>
           <p>A debugger stops the CPU and lets you look at everything. Beyond breakpoint-and-step, a few techniques find bugs much faster. This GDB script prints the fault registers and the stacked frame and lists the faulting source line:</p>
-          <script type="text/plain" id="src-gdb-fault" data-src="examples/08-iwdg-hardfault/debug/fault.gdb" data-region="fault" data-lang="sh" data-file="examples/08-iwdg-hardfault/debug/fault.gdb" data-start="7" data-end="25" data-sha="327a533d5fb1">
+          <script type="text/plain" id="src-gdb-fault" data-src="examples/08-iwdg-hardfault/debug/fault.gdb" data-region="fault" data-lang="sh" data-file="examples/08-iwdg-hardfault/debug/fault.gdb" data-start="8" data-end="26" data-sha="6237c7583b84">
 define fault
   printf "CFSR  0x%08x\n", *(unsigned int *)0xE000ED28
   printf "HFSR  0x%08x\n", *(unsigned int *)0xE000ED2C
@@ -213,7 +216,7 @@ Print the fault status registers and the stacked exception frame, then show the 
 end
 </script>
           <div id="ex-gdb-fault"></div>
-          <script type="text/plain" id="src-gdb-watch" data-src="examples/08-iwdg-hardfault/debug/fault.gdb" data-region="watch" data-lang="sh" data-file="examples/08-iwdg-hardfault/debug/fault.gdb" data-start="29" data-end="35" data-sha="327a533d5fb1">
+          <script type="text/plain" id="src-gdb-watch" data-src="examples/08-iwdg-hardfault/debug/fault.gdb" data-region="watch" data-lang="sh" data-file="examples/08-iwdg-hardfault/debug/fault.gdb" data-start="30" data-end="36" data-sha="6237c7583b84">
 # Stop when anything writes the fault record (a hardware watchpoint: DWT, 4 comparators)
 # watch s_last_fault.magic                                                     # «3»
 # Stop on the 100th call only: skip the first 99 hits of breakpoint 2
@@ -224,30 +227,30 @@ end
 </script>
           <div id="ex-gdb-watch"></div>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th>Need</th><th>Tool</th><th>Cortex-M3 resource</th></tr></thead>
+            <thead><tr><th>Need</th><th>Tool</th><th>Cortex-M4 resource</th></tr></thead>
             <tbody>
               <tr><td>Stop at a line</td><td>hardware breakpoint</td><td>6 instruction comparators in the FPB (code in flash cannot hold software breakpoints)</td></tr>
               <tr><td>Who writes this variable?</td><td>watchpoint (<code>watch</code>, <code>rwatch</code>)</td><td>4 DWT comparators</td></tr>
               <tr><td>How did I get here?</td><td><code>bt</code> (backtrace)</td><td>needs debug info (<code>-g3</code>) and unwinding through the exception frame, which Cortex-Debug and recent GDB do</td></tr>
               <tr><td>What is in memory?</td><td><code>x/16wx 0x20000000</code></td><td>reads over SWD while halted, or live in Cortex-Debug's memory view</td></tr>
-              <tr><td>Peripheral registers</td><td>Cortex-Debug <i>XPERIPHERALS</i> with the SVD</td><td><a href="setup.html#debug">set up in module 02</a></td></tr>
+              <tr><td>Peripheral registers</td><td>Cortex-Debug <i>XPERIPHERALS</i> with the SVD</td><td><a href="setup.html#debug">set up in module 02</a> (<code>tools/fetch-svd.py</code>)</td></tr>
             </tbody>
           </table></div>
-          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Debugging a watchdog reset</span><p>Example 08 sets <code>DBGMCU_CR.DBG_IWDG_STOP</code> so the watchdog pauses while the core is halted. Without it, every breakpoint held longer than the timeout ends in a reset, and the debugger loses the session (<a href="power-wdg.html#debug-lowpower">module 13</a>).</p></div></div>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Debugging a watchdog reset</span><p>Example 08 sets <code>DBGMCU_APB1FZR1.DBG_IWDG_STOP</code> so the watchdog pauses while the core is halted. Without it, every breakpoint held longer than the timeout ends in a reset, and the debugger loses the session (<a href="power-wdg.html#debug-lowpower">module 13</a>).</p></div></div>
         </section>
 
         <section class="doc-section" id="semihosting-swo" data-title="printf: UART, semihosting, SWO">
           <div class="sec-head"><h2><span class="sec-num">15.6</span>printf: UART, semihosting, SWO</h2></div>
           <p>Three ways to get text out of the chip:</p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th>Method</th><th>How it works</th><th>Cost</th><th>On a Blue Pill</th></tr></thead>
+            <thead><tr><th>Method</th><th>How it works</th><th>Cost</th><th>On the NUCLEO-G474RE</th></tr></thead>
             <tbody>
-              <tr><td><b>UART</b></td><td>bytes on PA9 to a USB-UART adapter</td><td>a pin pair and ~87 µs per character at 115200 baud, or a buffer and an interrupt</td><td>the course's default</td></tr>
-              <tr><td><b>Semihosting</b></td><td>a <code>BKPT 0xAB</code> instruction; the debugger reads the request and prints on the host</td><td>the CPU halts for every call (milliseconds); no debugger attached means the BKPT ends in a HardFault (<code>HFSR.DEBUGEVT</code>)</td><td>works with any ST-Link, but never leave it in production code</td></tr>
-              <tr><td><b>SWO / ITM</b></td><td>the core's trace unit sends bytes on the TRACESWO pin (PB3) while running</td><td>very low; the CPU does not stop</td><td>needs the SWO line to the probe: the original ST-LINK/V2 has it, on most clone dongles it is not wired (check yours)</td></tr>
+              <tr><td><b>UART</b></td><td>LPUART1 on PA2/PA3 to the ST-LINK's virtual COM port</td><td>~87 µs per character at 115200 baud, or a buffer and an interrupt</td><td>the course's default: no extra hardware, same USB cable</td></tr>
+              <tr><td><b>Semihosting</b></td><td>a <code>BKPT 0xAB</code> instruction; the debugger reads the request and prints on the host</td><td>the CPU halts for every call (milliseconds); no debugger attached means the BKPT ends in a HardFault (<code>HFSR.DEBUGEVT</code>)</td><td>works through the ST-LINK/V3E; never leave it in production code</td></tr>
+              <tr><td><b>SWO / ITM</b></td><td>the core's trace unit sends bytes on the TRACESWO pin (PB3) while running</td><td>very low; the CPU does not stop</td><td>PB3 goes to the ST-LINK's SWO input on NUCLEO-64 boards (UM2505; check the solder bridges on yours). PB3 is also Arduino D3</td></tr>
             </tbody>
           </table></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">PB3 is a JTAG pin</span><p>TRACESWO shares PB3 with JTDO. The course frees PB3/PB4/PA15 with <code>SWJ_CFG = JTAGDISABLE</code>; that keeps SWD but also gives up SWO. If you want SWO, keep PB3 for it and use another pin for your application (<a href="gpio.html#swj">module 05</a>).</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">PB3 is the SWO pin</span><p>After reset PB3 is in its debug alternate function (JTDO / TRACESWO, AF0). You can use it as an ordinary GPIO, since the course debugs over SWD (PA13/PA14) and never needs JTAG, but then SWO is gone. If you want SWO, leave PB3 alone and use another pin for your application (<a href="gpio.html#swd">module 05</a>).</p></div></div>
           <div id="ck-faults"></div>
         </section>
 
@@ -262,7 +265,7 @@ end
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
   <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>

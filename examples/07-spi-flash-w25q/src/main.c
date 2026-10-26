@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
- * Example 07: talk to a W25Qxx SPI NOR flash on SPI1: read its JEDEC ID, erase a 4 KB sector,
- * program a page, read it back by polling and with DMA, and verify. RM0008 chapters 25 and 13.
+ * Example 07: talk to a W25Qxx SPI NOR flash on SPI2: read its JEDEC ID, erase a 4 KB sector,
+ * program a page, read it back by polling and with DMA, and verify. RM0440 "SPI", "DMA", "DMAMUX".
  */
 #include <stdbool.h>
 #include <stdint.h>
@@ -34,10 +34,10 @@ static uint32_t mismatches(const uint8_t *a, const uint8_t *b, uint32_t n)
 
 int main(void)
 {
-    (void)clock_init_72mhz();
+    (void)clock_init_170mhz();
     systick_init_1ms();
     uart_log_init(115200U);
-    uart_puts("Example 07: SPI1 + W25Qxx flash (CS on PA4)\n");
+    uart_puts("Example 07: SPI2 + W25Qxx flash (CS on PB12)\n");
     spi_init();
 
     // [region:main]
@@ -56,7 +56,7 @@ int main(void)
     uart_puts(" KB\n");
     if ((id[0] == 0x00U) || (id[0] == 0xFFU))
     {
-        uart_puts("no flash answering: check CS (PA4), wiring and 3.3 V supply\n");           // «6»
+        uart_puts("no flash answering: check CS (PB12), wiring and 3.3 V supply\n");           // «6»
         for (;;)
         {
         }

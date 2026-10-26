@@ -9,17 +9,15 @@
     id: "pyramid",
     label: "The course's test pyramid: many fast checks at the bottom, few slow ones at the top",
     nodeH: 52,
-    toneLabels: { cdd: "On the board (slow, few)", mcal: "In simulation (Renode)", svc: "On the host (fast, many)", tool: "Without running (every build)" },
+    toneLabels: { cdd: "On the board (slow, few)", svc: "On the host (fast, many)", tool: "Without running (every build)" },
     bands: [
-      { key: "hw", tag: "HW", title: ["Blue Pill"], sub: ["manual"], tone: "cdd" },
-      { key: "sim", tag: "Sim", title: ["Renode"], sub: ["Robot tests"], tone: "mcal" },
+      { key: "hw", tag: "HW", title: ["NUCLEO-G474RE"], sub: ["manual"], tone: "cdd" },
       { key: "host", tag: "Host", title: ["Unity"], sub: ["CTest"], tone: "svc" },
       { key: "static", tag: "Static", title: ["Compiler", "cppcheck"], sub: ["every push"], tone: "tool" },
     ],
     nodes: [
-      { id: "hw1", band: "hw", at: [0.35, 0.65], title: "\"You are done when…\"", sub: "timing, analog, power, OLED", tip: "Checks only real hardware can answer: real timing, analog values, current, pixels, CAN bit timing" },
-      { id: "sim1", band: "sim", at: [0.2, 0.5], title: "UART output, LED", sub: "examples 00–12", tip: "Renode runs the real firmware ELF; Robot tests check its UART output and pins" },
-      { id: "sim2", band: "sim", at: [0.5, 0.8], title: "buttons, CAN hub", sub: "virtual time", tip: "Inputs are injected from the test; time is virtual, so tests are fast and repeatable" },
+      { id: "hw1", band: "hw", at: [0.2, 0.5], title: "\"You are done when…\"", sub: "UART output, LED, buttons", tip: "Each hands-on module ends with a checklist you tick off on the board, comparing the virtual COM port output with expected-output.txt" },
+      { id: "hw2", band: "hw", at: [0.5, 0.8], title: "timing, analog, CAN", sub: "scope, meter, 2 boards", tip: "Checks only real hardware can answer: real timing, analog values, current, pixels, CAN bit timing. There is no simulator for the G474 (PLAN.md D13)" },
       { id: "host1", band: "host", at: [0.08, 0.36], title: "debounce, scheduler", sub: "ring buffer, shell" },
       { id: "host2", band: "host", at: [0.36, 0.64], title: "ADC math, font, JEDEC", sub: "fault decoder" },
       { id: "host3", band: "host", at: [0.64, 0.92], title: "bootloader protocol", sub: "bad-vs-good gallery" },
@@ -29,8 +27,7 @@
     ],
     edges: [
       { from: "st2", to: "host2", label: "compiles clean" },
-      { from: "host2", to: "sim1", label: "logic proven" },
-      { from: "sim1", to: "hw1", label: "firmware runs" },
+      { from: "host2", to: "hw1", label: "logic proven" },
     ],
   });
 

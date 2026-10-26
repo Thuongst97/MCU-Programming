@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * 1 ms time base on the Cortex-M SysTick timer (PM0056 §4.5). */
+ * 1 ms time base on the Cortex-M SysTick timer (PM0214, "SysTick timer"). */
 #ifndef BSP_SYSTICK_H
 #define BSP_SYSTICK_H
 

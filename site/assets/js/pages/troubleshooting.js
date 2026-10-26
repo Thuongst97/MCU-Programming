@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT
-   Reference B · Troubleshooting: register views for the SWD lock-out and the LED pin. */
+   Reference B · Troubleshooting: register views for the SWD pins and the LED pin. */
 (function () {
   "use strict";
   const { $, Register } = window.MCU;
-  Register($("#reg-mapr-ts"), { reg: "AFIO_MAPR", value: 0x04000000, show: ["SWJ_CFG"] });
-  Register($("#reg-crh-ts"), { reg: "GPIOx_CRH", port: "GPIOC", value: 0x44844444, show: ["MODE13", "CNF13"] });
+  Register($("#reg-moder-ts"), { reg: "GPIOx_MODER", port: "GPIOA", value: 0xABFFFFFF, show: ["MODE13", "MODE14", "MODE15"] });
+  Register($("#reg-moder5-ts"), { reg: "GPIOx_MODER", port: "GPIOA", value: 0xABFFF7FF, show: ["MODE5"] });
 })();

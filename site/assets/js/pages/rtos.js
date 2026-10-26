@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
-   Module 14 · Bare Metal vs RTOS: FreeRTOS on Cortex-M3. */
+   Module 14 · Bare Metal vs RTOS: FreeRTOS on Cortex-M4. */
 (function () {
   "use strict";
   const { $, renderCodeExplorer, embedded, SequenceDiagram, StateMachine, Waveform, Checklist } = window.MCU;
@@ -21,7 +21,7 @@
     title: "Example 10, first 24 ms (run times not to scale)",
     hscale: 30,
     signals: [
-      { name: "EXTI0 ISR", wave: row([8]) },
+      { name: "EXTI15_10 ISR", wave: row([8]) },
       { name: "sensor (3)", wave: row([0, 10, 20]) },
       { name: "button (2)", wave: row([9]) },
       { name: "logger (1)", wave: row([1, 11, 21]) },
@@ -32,7 +32,7 @@
   });
 
   SequenceDiagram($("#seq-switch"), {
-    ariaLabel: "A FreeRTOS context switch on Cortex-M3",
+    ariaLabel: "A FreeRTOS context switch on Cortex-M4",
     laneW: 165,
     lanes: [
       { title: "Task A", sub: "Thread mode, PSP", tone: "asw" },
@@ -43,20 +43,20 @@
     ],
     steps: [
       { from: 1, to: 0, kind: "irq", label: "tick", title: "The tick interrupts task A",
-        detail: "<p>The core pushes R0–R3, R12, LR, PC and xPSR onto task A's stack (PSP) by itself, then runs the SysTick handler on the main stack (MSP).</p>" },
+        detail: "<p>The core pushes R0–R3, R12, LR, PC and xPSR onto task A's stack (PSP) by itself, then runs the SysTick handler on the main stack (MSP). If task A has used the FPU, 18 more words are reserved for S0–S15 and FPSCR (written lazily, only if needed).</p>" },
       { from: 1, to: 3, kind: "call", label: "xTaskIncrementTick()", title: "Count the tick",
         detail: "<p>The kernel advances its tick count and moves tasks whose delay has expired from Blocked to Ready. If one of them has a higher priority than task A, a switch is needed.</p>" },
       { from: 1, to: 2, kind: "irq", label: "set PENDSVSET", title: "Request a switch, don't do it",
         detail: "<p>SysTick only sets the PendSV pending bit in <code>SCB-&gt;ICSR</code> and returns. PendSV has the lowest priority, so it runs once no other interrupt is active (tail-chained if nothing else is pending).</p>" },
       { from: 2, to: 0, kind: "bus", label: "push R4–R11", title: "Save the rest of task A",
-        detail: "<p>The handler reads PSP and pushes the eight registers the hardware did not save. Task A's stack now holds its complete context. The resulting stack pointer is stored in task A's control block (TCB).</p>",
+        detail: "<p>The handler reads PSP and pushes the eight registers the hardware did not save, plus S16–S31 if <code>EXC_RETURN</code> says task A has an FPU frame. Task A's stack now holds its complete context. The resulting stack pointer is stored in task A's control block (TCB).</p>",
         analogy: "Putting a bookmark in the book and writing the page number on the cover." },
       { from: 2, to: 3, kind: "call", label: "pick next", title: "Choose the next task",
         detail: "<p>With <code>BASEPRI</code> raised to <code>configMAX_SYSCALL_INTERRUPT_PRIORITY</code>, the scheduler selects the highest-priority Ready task and makes its TCB current. Interrupts more urgent than that limit still run.</p>" },
       { from: 2, to: 4, kind: "bus", label: "pop R4–R11", title: "Restore task B",
-        detail: "<p>Load task B's saved stack pointer from its TCB, pop R4–R11, and write the result to PSP.</p>" },
+        detail: "<p>Load task B's saved stack pointer from its TCB, pop R4–R11 (and S16–S31 if task B used the FPU), and write the result to PSP.</p>" },
       { from: 2, to: 4, kind: "irq", label: "exception return", title: "Return into task B",
-        detail: "<p>Returning with <code>EXC_RETURN = 0xFFFFFFFD</code> (Thread mode, use PSP) makes the core pop the other eight registers from task B's stack. Task B continues exactly where it was interrupted, unaware that anything happened.</p>" },
+        detail: "<p>Returning with <code>EXC_RETURN = 0xFFFFFFFD</code> (Thread mode, PSP, no FPU frame) or <code>0xFFFFFFED</code> (the same with an FPU frame) makes the core pop the other eight registers from task B's stack. Task B continues exactly where it was interrupted, unaware that anything happened.</p>" },
     ],
   });
 
@@ -80,7 +80,7 @@
   });
 
   explore("#ex-config", "src-10-config", {
-    1: ["CPU clock", "The port programs SysTick from this value. It is read when the scheduler starts, so the 72 MHz clock must be set up before."],
+    1: ["CPU clock", "The port programs SysTick from this value. It is read when the scheduler starts, so the 170 MHz clock must be set up before."],
     2: ["Preemption", "A task that becomes ready with a higher priority runs immediately, not at the next yield."],
     3: ["Words, not bytes", "FreeRTOS stack sizes count <code>StackType_t</code> units: 32-bit words on Cortex-M. 128 words = 512 bytes."],
     4: ["Static allocation only", "Every TCB, stack and queue buffer is an array we declare. No heap, so no fragmentation and the linker reports the real RAM use."],
@@ -95,7 +95,7 @@
     3: ["Don't block a periodic task", "Timeout 0: if the queue is full, the sample is dropped rather than delaying the next period."],
     4: ["Block until data", "<code>portMAX_DELAY</code>: the logger sleeps until the sensor sends something."],
     5: ["vTaskDelay", "Relative delay: fine for a blinking LED, where drift does not matter."],
-    6: ["Wait for the ISR", "The task sleeps on the semaphore; the EXTI0 handler gives it."],
+    6: ["Wait for the ISR", "The task sleeps on the semaphore; the EXTI15_10 handler (B1 on PC13) gives it."],
     7: ["High-water mark", "The minimum free stack space ever seen, in words."],
     8: ["FromISR", "Never blocks. Reports through <code>woken</code> whether a higher-priority task became ready."],
     9: ["Yield on exit", "If so, PendSV is set and the switch happens right after the ISR returns, so the button task runs without waiting for the next tick."],
@@ -127,7 +127,7 @@
   Checklist($("#ck-rtos"), [
     "You can explain why the switch happens in PendSV and not in SysTick.",
     "You know which registers the hardware saves and which the port saves.",
-    "Example 10 prints the logger means and the stack high-water marks, and pressing the button prints a line from the button task.",
+    "Example 10 prints the logger means and the stack high-water marks, and pressing B1 (blue) prints a line from the button task.",
     "You can say which NVIC priorities may call <code>xSemaphoreGiveFromISR()</code> with our configuration, and why priority 0 may not.",
     "You can explain priority inversion and why the UART lock is a mutex, not a binary semaphore.",
   ], { key: "rtos" });

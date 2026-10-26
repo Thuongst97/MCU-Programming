@@ -4,7 +4,7 @@
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  */
 #include "Dio.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 #if (DIO_DEV_ERROR_DETECT == STD_ON)
 #include "Det.h"
 #define DIO_DET(api, err) ((void)Det_ReportError(DIO_MODULE_ID, 0U, (api), (err)))
@@ -17,14 +17,14 @@
 #error "Dio.c: AUTOSAR release of Std_Types.h does not match"
 #endif
 
-#define DIO_NUM_PORTS 3U
+#define DIO_NUM_PORTS 7U
 
 #define DIO_START_SEC_CODE
 #include "Dio_MemMap.h"
 
 static FUNC(GPIO_TypeDef *, DIO_CODE) Dio_Gpio(uint8 port)
 {
-    static GPIO_TypeDef *const gpio[DIO_NUM_PORTS] = {GPIOA, GPIOB, GPIOC};
+    static GPIO_TypeDef *const gpio[DIO_NUM_PORTS] = {GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG};
     return gpio[port];
 }
 

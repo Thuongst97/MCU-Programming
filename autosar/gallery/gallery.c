@@ -9,7 +9,7 @@
  */
 #include "Std_Types.h"
 #include "Det.h"
-#include "stm32f103xb.h"
+#include "stm32g474xx.h"
 
 void Gallery_Use(void);   /* keeps every example referenced */
 
@@ -62,7 +62,7 @@ Std_ReturnType Lamp_Init(const uint8 *config)
 /* An "application" function that reads pins itself: tied to this ECU, untestable on a PC */
 boolean TurnLight_StalkLeftPressed(void)
 {
-    return ((GPIOB->IDR & GPIO_IDR_IDR12) == 0U) ? TRUE : FALSE;
+    return ((GPIOB->IDR & GPIO_IDR_ID12) == 0U) ? TRUE : FALSE;
 }
 // [endregion]
 

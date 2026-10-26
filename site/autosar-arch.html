@@ -113,27 +113,27 @@
           <div class="callout prod" data-doc="AUTOSAR R4.3.1 / R4.4.0"><div class="ci">🏭</div><div><span class="ct">In production (R4.x)</span><p>ECUs on R4.x use the older document names without the <code>CP_</code> part (for example <code>AUTOSAR_SWS_DIODriver</code>) and slightly different APIs in several modules. The AUTOSAR pages point out the differences you are likely to meet.</p></div></div>
         </section>
 
-        <section class="doc-section" id="on-bluepill" data-title="How we do AUTOSAR on a Blue Pill">
-          <div class="sec-head"><h2><span class="sec-num">18.6</span>How we do AUTOSAR on a Blue Pill</h2></div>
-          <p>Real AUTOSAR stacks need licences, configuration tools and a certified OS, and they target automotive microcontrollers. The course builds a small, honest imitation on the Blue Pill so you can read and step through every line:</p>
+        <section class="doc-section" id="on-nucleo" data-title="How we do AUTOSAR on a NUCLEO">
+          <div class="sec-head"><h2><span class="sec-num">18.6</span>How we do AUTOSAR on a NUCLEO</h2></div>
+          <p>Real AUTOSAR stacks need licences, configuration tools and a certified OS, and they target automotive microcontrollers. The course builds a small, honest imitation on the NUCLEO-G474RE so you can read and step through every line:</p>
           <ul>
-            <li><code>autosar/</code>: MCAL drivers (Mcu, Port, Dio, Pwm, Adc, Wdg, Can) over the STM32F1 registers you know, and "-lite" versions of CanIf, PduR, Com, Dem, WdgM, EcuM, IoHwAb and Det. Each header lists what was left out.</li>
+            <li><code>autosar/</code>: MCAL drivers (Mcu, Port, Dio, Pwm, Adc, Wdg, Can) over the STM32G4 registers you know (FDCAN1 for Can), and "-lite" versions of CanIf, PduR, Com, Dem, WdgM, EcuM, IoHwAb and Det. Each header lists what was left out.</li>
             <li><code>autosar/os_shim</code>: an OSEK/AUTOSAR-OS-like API over FreeRTOS. <b>It is not a real AUTOSAR OS</b>, and module 21 lists the differences.</li>
             <li><code>capstone/turnlight/stage3-autosar</code>: two SWCs, a hand-written RTE that mirrors generated code, and the configuration files.</li>
           </ul>
           <p>Start-up shows the layering at work: EcuM, a service, initialises the drivers below it in a fixed order, then hands over to the OS:</p>
-          <script type="text/plain" id="src-ar-ecum" data-src="autosar/services/ecum/EcuM.c" data-region="init" data-lang="c" data-file="autosar/services/ecum/EcuM.c" data-start="14" data-end="33" data-sha="5f898148ef50">
+          <script type="text/plain" id="src-ar-ecum" data-src="autosar/services/ecum/EcuM.c" data-region="init" data-lang="c" data-file="autosar/services/ecum/EcuM.c" data-start="14" data-end="33" data-sha="2f3955c53170">
 FUNC(void, ECUM_CODE) EcuM_Init(void)
 {
     EcuM_AL_DriverInitZero();                       /* Det: before anything can report an error */   // «1»
     Mcu_Init(&Mcu_Config);                                                                               // «2»
-    if (Mcu_InitClock(0U) == E_OK)                  /* clock setting 0: HSE 8 MHz x 9 = 72 MHz */
+    if (Mcu_InitClock(0U) == E_OK)                  /* clock setting 0: HSI16 / 4 x 85 / 2 = 170 MHz */
     {
         for (uint32 n = 0U; (n < 200000UL) && (Mcu_GetPllStatus() != MCU_PLL_LOCKED); ++n)
         {
             /* bounded wait for the PLL */
         }
-        (void)Mcu_DistributePllClock();             /* on failure the ECU keeps running on HSI */
+        (void)Mcu_DistributePllClock();             /* on failure the ECU keeps running on HSI16 */
     }
     EcuM_AL_DriverInitOne();                        /* Port, Dio, ... : everything the OS needs */  // «3»
     StartOS(OSDEFAULTAPPMODE);                      /* does not return */                           // «4»

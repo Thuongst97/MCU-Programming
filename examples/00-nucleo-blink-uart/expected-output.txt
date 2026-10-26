@@ -1,0 +1,5 @@
+Hello from NUCLEO-G474RE @ 170 MHz
+clock status: 0 (0 = OK)
+uptime 1 s
+uptime 2 s
+uptime 3 s

@@ -22,8 +22,8 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "site/assets/js/data/memmap"
 # ELFs shown on the site (relative to the build directory) -> JSON name.
 TARGETS = {
-    "examples/00-bluepill-blink-uart/bare/00-bluepill-blink-uart.elf": "00-bluepill-blink-uart",
-    "examples/00-bluepill-blink-uart/hal/00-bluepill-blink-uart-hal.elf": "00-bluepill-blink-uart-hal",
+    "examples/00-nucleo-blink-uart/bare/00-nucleo-blink-uart.elf": "00-nucleo-blink-uart",
+    "examples/00-nucleo-blink-uart/hal/00-nucleo-blink-uart-hal.elf": "00-nucleo-blink-uart-hal",
     "examples/12-uart-bootloader/12-bootloader.elf": "12-bootloader",
     "examples/12-uart-bootloader/12-application.elf": "12-application",
 }
@@ -107,7 +107,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--check", action="store_true")
-    ap.add_argument("--build-dir", default="build/bluepill-debug")
+    ap.add_argument("--build-dir", default="build/nucleo-debug")
     a = ap.parse_args()
     if not a.all:
         ap.error("use --all")

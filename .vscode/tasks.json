@@ -2,16 +2,16 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build: bluepill-debug",
+      "label": "build: nucleo-debug",
       "type": "shell",
-      "command": "cmake --preset bluepill-debug && cmake --build --preset bluepill-debug",
+      "command": "cmake --preset nucleo-debug && cmake --build --preset nucleo-debug",
       "group": { "kind": "build", "isDefault": true },
       "problemMatcher": ["$gcc"]
     },
     {
       "label": "flash: example 00",
       "type": "shell",
-      "command": "cmake --build --preset bluepill-debug --target flash-00-bluepill-blink-uart",
+      "command": "cmake --build --preset nucleo-debug --target flash-00-nucleo-blink-uart",
       "problemMatcher": []
     }
   ]

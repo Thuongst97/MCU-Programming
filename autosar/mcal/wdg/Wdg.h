@@ -3,7 +3,7 @@
  * Spec reference : AUTOSAR CP R25-11, AUTOSAR_CP_SWS_WatchdogDriver
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  *
- * Wdg-lite on the independent watchdog IWDG (RM0008 §19). Simplification: a real Wdg driver
+ * Wdg-lite on the independent watchdog IWDG (RM0440 "IWDG"). Simplification: a real Wdg driver
  * keeps triggering the hardware from a Gpt notification until the time window given to
  * Wdg_SetTriggerCondition() runs out. Wdg-lite triggers once per call instead, so WdgM must
  * call it at least once per IWDG timeout. WDGIF_OFF_MODE is refused: the IWDG cannot be stopped.

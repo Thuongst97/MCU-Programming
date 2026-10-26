@@ -3,13 +3,13 @@
 (function () {
   "use strict";
   const { $, renderCodeExplorer, embedded, SequenceDiagram, Diagram } = window.MCU;
-  renderCodeExplorer($("#explorer"), { ...embedded("src-demo"), notes: { 1: ["LED on", "PC13 is active-low."], 2: ["LED off", "Set the bit."] } });
+  renderCodeExplorer($("#explorer"), { ...embedded("src-demo"), notes: { 1: ["LED on", "LD2 on PA5 is active-high."], 2: ["LED off", "Reset the bit."] } });
   SequenceDiagram($("#seq-demo"), {
-    lanes: [{ title: "EXTI", sub: "line 0", tone: "hw" }, { title: "NVIC", sub: "Cortex-M3", tone: "hw" }, { title: "ISR", sub: "EXTI0_IRQHandler", tone: "asw" }],
+    lanes: [{ title: "EXTI", sub: "line 0", tone: "hw" }, { title: "NVIC", sub: "Cortex-M4", tone: "hw" }, { title: "ISR", sub: "EXTI15_10_IRQHandler", tone: "asw" }],
     steps: [
-      { from: 0, to: 1, kind: "irq", label: "pending", detail: "<p>Edge on PA0.</p>" },
-      { from: 1, to: 2, kind: "call", label: "vector", code: "void EXTI0_IRQHandler(void) {}", analogy: "Triage desk." },
-      { from: 2, to: 0, kind: "ret", label: "clear PR0" },
+      { from: 0, to: 1, kind: "irq", label: "pending", detail: "<p>Edge on PC13.</p>" },
+      { from: 1, to: 2, kind: "call", label: "vector", code: "void EXTI15_10_IRQHandler(void) {}", analogy: "Triage desk." },
+      { from: 2, to: 0, kind: "ret", label: "clear PIF13" },
     ],
   });
   Diagram.layered($("#lg-demo"), {
@@ -25,9 +25,9 @@
     ],
     edges: [{ from: "swc", to: "dio", kind: "rte", label: "Rte_Write" }],
   });
-  window.MCU.Pinout($("#po-demo"), { board: "bluepill", mode: "wiring", ...window.MCU_DATA.wiring["01"] });
-  window.MCU.Register($("#reg-demo"), { reg: "RCC_CFGR", value: 0x001d0402 });
-  window.MCU.MemoryMap($("#mm-demo"), { map: "00-bluepill-blink-uart" });
+  window.MCU.Pinout($("#po-demo"), { board: "nucleo", mode: "wiring", ...window.MCU_DATA.wiring["tl-ecu"] });
+  window.MCU.Register($("#reg-demo"), { reg: "RCC_CFGR", value: 0x0000000F });
+  window.MCU.MemoryMap($("#mm-demo"), { map: "00-nucleo-blink-uart" });
   window.MCU.Checklist($("#ck-demo"), ["one", "two"], { key: "fixture" });
   window.MCU.Waveform($("#wv-demo"), window.MCU.Wave.can({ id: 0x3a0, data: [5, 0] }));
   const reg = window.MCU.Register(document.createElement("div"), { reg: "RCC_CFGR" });

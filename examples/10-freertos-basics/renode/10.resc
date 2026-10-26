@@ -1,4 +1,0 @@
-# SPDX-License-Identifier: MIT
-$name?="blue-pill-10"
-include $ORIGIN/../../common/renode/bluepill.resc
-start

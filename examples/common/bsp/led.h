@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT
- * The Blue Pill's on-board LED on PC13. It is wired from 3.3 V through a resistor to the pin,
- * so the pin must SINK current: writing 0 turns the LED on (active-low). PC13 can sink only
- * about 3 mA, must run at <= 2 MHz and must never source current (DS5319 pin notes). */
+ * LD2, the NUCLEO-G474RE's green user LED on PA5 (Arduino D13). The pin drives the LED through
+ * a resistor to GND, so the pin SOURCES current: writing 1 turns the LED on (active-high).
+ * ST's NUCLEO BSP (stm32g4xx_nucleo.c) does the same. */
 #ifndef BSP_LED_H
 #define BSP_LED_H
 

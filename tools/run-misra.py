@@ -40,13 +40,13 @@ SCOPED = [
     ("8.6", r".*", r"^\s*int main\(void\)", "docs/misra/compliance.md#tool-artefacts"),   # every example has a main()
 ]
 SOURCES = [
-    "examples/common/bsp/*.c", "examples/common/startup/*.c", "examples/00-bluepill-blink-uart/bare/src/*.c",
+    "examples/common/bsp/*.c", "examples/common/startup/*.c", "examples/00-nucleo-blink-uart/bare/src/*.c",
     "examples/[0-9][0-9]-*/src/*.c", "examples/common/gallery/src/good.c",
     "autosar/**/*.c", "capstone/**/*.c",
 ]
 INCLUDES = [
-    "examples/common/bsp", "third_party/cmsis_core/Include", "third_party/cmsis_device_f1/Include",
-    "third_party/freertos_kernel/include", "third_party/freertos_kernel/portable/GCC/ARM_CM3",
+    "examples/common/bsp", "third_party/cmsis_core/Include", "third_party/cmsis_device_g4/Include",
+    "third_party/freertos_kernel/include", "third_party/freertos_kernel/portable/GCC/ARM_CM4F",
 ]
 
 
@@ -66,7 +66,7 @@ def run():
     incs += [str(p.relative_to(ROOT)) for p in sorted(ROOT.glob("autosar/**/include")) + sorted(ROOT.glob("autosar/**/config"))]
     with tempfile.TemporaryDirectory() as build:
         cmd = [cpp, "--addon=misra", "--enable=style,warning,performance,portability", "--std=c11", "--platform=unix32",
-               "-DSTM32F103xB", "--inline-suppr", "--suppress=missingIncludeSystem", "--suppress=*:*third_party/*",
+               "-DSTM32G474xx", "--inline-suppr", "--suppress=missingIncludeSystem", "--suppress=*:*third_party/*",
                "--suppress=unusedFunction", f"--cppcheck-build-dir={build}", "-q",
                "--template={file}:{line}:{id}:{message}"]
         cmd += [f"--suppress=misra-c2012-{r}" for r in DISAPPLIED]

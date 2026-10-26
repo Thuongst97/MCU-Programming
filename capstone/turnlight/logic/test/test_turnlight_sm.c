@@ -81,7 +81,8 @@ static void test_hazard_overrides_and_is_in_phase(void)       /* TL-REQ-003 */
     TEST_ASSERT_FALSE(out.indicating[TL_RIGHT]);
 }
 
-static void test_tap_gives_exactly_three_flashes(void)        /* TL-REQ-004 */
+// [region:tap]
+static void test_tap_gives_exactly_three_flashes(void)        /* TL-REQ-004 */  // «1»
 {
     in.stalk[TL_LEFT] = true;
     run(200U);
@@ -90,6 +91,7 @@ static void test_tap_gives_exactly_three_flashes(void)        /* TL-REQ-004 */
     TEST_ASSERT_EQUAL_UINT32(3U, edges[TL_LEFT]);
     TEST_ASSERT_FALSE(out.indicating[TL_LEFT]);
 }
+// [endregion]
 
 static void test_long_hold_stops_at_release(void)
 {

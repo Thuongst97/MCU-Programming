@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * FreeRTOS configuration for example 10 (Cortex-M3 port, 72 MHz Blue Pill).
+ * FreeRTOS configuration for example 10 (Cortex-M4F port, 170 MHz NUCLEO-G474RE).
  * Every setting is explained on rtos.html#port. Static allocation only: no heap. */
 #ifndef FREERTOS_CONFIG_H
 #define FREERTOS_CONFIG_H
@@ -35,7 +35,7 @@ void rtos_assert_failed(const char *file, int line);
 #define configUSE_TICK_HOOK                     0
 #define configUSE_MALLOC_FAILED_HOOK            0
 
-/* Cortex-M interrupt priorities: the F103 implements 4 priority bits (stm32f103xb.h). */
+/* Cortex-M interrupt priorities: the G474 implements 4 priority bits (__NVIC_PRIO_BITS in stm32g474xx.h). */
 #define configPRIO_BITS                         4
 #define configKERNEL_INTERRUPT_PRIORITY         (15U << (8U - configPRIO_BITS))   /* lowest */     // «6»
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY    (5U << (8U - configPRIO_BITS))    /* 0..4: never masked, no FreeRTOS API */ // «7»

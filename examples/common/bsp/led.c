@@ -1,35 +1,35 @@
 /* SPDX-License-Identifier: MIT */
 #include "led.h"
-#include "stm32f103xb.h"
+#include "board.h"
+#include "gpio.h"
 
 void led_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;   /* clock the GPIOC block */
-    /* PC13: CRH bits 23:20. MODE = 10 (output, 2 MHz max), CNF = 00 (push-pull). */
-    GPIOC->CRH = (GPIOC->CRH & ~(GPIO_CRH_MODE13 | GPIO_CRH_CNF13)) | GPIO_CRH_MODE13_1;
-    led_off();
+    gpio_clock_on(BOARD_LED_PORT);                               /* RCC_AHB2ENR.GPIOAEN */
+    led_off();                                                   /* set the level first ... */
+    gpio_mode(BOARD_LED_PORT, BOARD_LED_PIN, BSP_GPIO_OUTPUT);   /* ... then drive the pin */
 }
 
 void led_on(void)
 {
-    GPIOC->BSRR = GPIO_BSRR_BR13;   /* reset = drive low = LED on (active-low) */
+    BOARD_LED_PORT->BSRR = GPIO_BSRR_BS5;   /* set = drive high = LED on (active-high) */
 }
 
 void led_off(void)
 {
-    GPIOC->BSRR = GPIO_BSRR_BS13;   /* set = drive high = LED off */
+    BOARD_LED_PORT->BSRR = GPIO_BSRR_BR5;   /* reset = drive low = LED off */
 }
 
 // [region:toggle]
 void led_toggle(void)
 {
-    if ((GPIOC->ODR & GPIO_ODR_ODR13) != 0U)   /* read back what we last drove */  // «1»
+    if ((BOARD_LED_PORT->ODR & GPIO_ODR_OD5) != 0U)   /* read back what we last drove */  // «1»
     {
-        led_on();
+        led_off();
     }
     else
     {
-        led_off();
+        led_on();
     }
 }
 // [endregion]

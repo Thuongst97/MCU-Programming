@@ -7,6 +7,6 @@
 
 #define WDG_START_SEC_CONFIG_DATA_UNSPECIFIED
 #include "Wdg_MemMap.h"
-CONST(Wdg_ConfigType, WDG_CONST) Wdg_Config = {0U, 999U, 1000U};   /* LSI / 4, 1000 counts: 100 ms at 40 kHz */
+CONST(Wdg_ConfigType, WDG_CONST) Wdg_Config = {0U, 799U, 1000U};   /* LSI / 4, 800 counts: about 100 ms at 32 kHz */
 #define WDG_STOP_SEC_CONFIG_DATA_UNSPECIFIED
 #include "Wdg_MemMap.h"

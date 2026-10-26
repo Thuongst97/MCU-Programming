@@ -2,18 +2,22 @@
 #include "tl_hw.h"
 
 #include "clock.h"
-#include "stm32f103xb.h"
+#include "gpio.h"
+#include "stm32g474xx.h"
 #include "tl_msg.h"
 
 #define WAIT_LOOPS 100000U
+#define CH_LAMP    2U          /* PA1 = ADC1_IN2 (DS12288 pinout) */
+#define AF_PA6_TIM3_CH1 2U     /* DS12288 alternate functions; checked by tools/check-pins.py */
+#define AF_PA7_TIM3_CH2 2U
 
 static uint16_t s_duty[TL_SIDES];
 
-static bool wait_clear(volatile uint32_t *reg, uint32_t mask)
+static bool wait_flag(volatile uint32_t *reg, uint32_t mask, uint32_t want)
 {
     for (uint32_t n = 0U; n < WAIT_LOOPS; ++n)
     {
-        if ((*reg & mask) == 0U)
+        if ((*reg & mask) == want)
         {
             return true;
         }
@@ -23,20 +27,22 @@ static bool wait_clear(volatile uint32_t *reg, uint32_t mask)
 
 static void buttons_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
-    GPIOB->CRH = (GPIOB->CRH & ~(GPIO_CRH_MODE12 | GPIO_CRH_CNF12 | GPIO_CRH_MODE13 | GPIO_CRH_CNF13 |
-                                 GPIO_CRH_MODE14 | GPIO_CRH_CNF14)) |
-                 GPIO_CRH_CNF12_1 | GPIO_CRH_CNF13_1 | GPIO_CRH_CNF14_1;   /* input with pull-up/down */
-    GPIOB->BSRR = GPIO_BSRR_BS12 | GPIO_BSRR_BS13 | GPIO_BSRR_BS14;      /* ... pull-up */
+    gpio_clock_on(GPIOB);
+    for (uint32_t pin = 12U; pin <= 14U; ++pin)
+    {
+        gpio_mode(GPIOB, pin, BSP_GPIO_INPUT);
+        gpio_pull(GPIOB, pin, BSP_GPIO_PULLUP);                            /* switch to GND */
+    }
 }
 
 static void lamps_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
-    RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
-    GPIOA->CRL = (GPIOA->CRL & ~(GPIO_CRL_MODE6 | GPIO_CRL_CNF6 | GPIO_CRL_MODE7 | GPIO_CRL_CNF7)) |
-                 GPIO_CRL_MODE6_1 | GPIO_CRL_CNF6_1 | GPIO_CRL_MODE7_1 | GPIO_CRL_CNF7_1;   /* AF push-pull, 2 MHz */
-    TIM3->PSC = (uint16_t)((2U * clock_pclk1() / 1000000U) - 1U);          /* 1 MHz count */
+    gpio_clock_on(GPIOA);
+    RCC->APB1ENR1 |= RCC_APB1ENR1_TIM3EN;
+    (void)RCC->APB1ENR1;
+    gpio_af(GPIOA, 6U, AF_PA6_TIM3_CH1);
+    gpio_af(GPIOA, 7U, AF_PA7_TIM3_CH2);
+    TIM3->PSC = (uint16_t)((clock_pclk1() / 1000000U) - 1U);              /* APB1 / 1: timer clock = PCLK1; 1 MHz count */
     TIM3->ARR = TL_PWM_TOP - 1U;                                           /* 1 kHz */
     TIM3->CCR1 = 0U;
     TIM3->CCR2 = 0U;
@@ -49,21 +55,28 @@ static void lamps_init(void)
 
 static bool adc_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_ADC1EN;
-    GPIOA->CRL &= ~(GPIO_CRL_MODE1 | GPIO_CRL_CNF1);                       /* PA1 analog */
-    ADC1->SMPR2 = 7U << ADC_SMPR2_SMP1_Pos;
-    ADC1->CR2 = ADC_CR2_ADON | (7U << ADC_CR2_EXTSEL_Pos) | ADC_CR2_EXTTRIG;
-    for (volatile uint32_t n = 0U; n < 1000U; ++n)
+    RCC->AHB2ENR |= RCC_AHB2ENR_ADC12EN;
+    (void)RCC->AHB2ENR;
+    gpio_clock_on(GPIOA);
+    gpio_mode(GPIOA, 1U, BSP_GPIO_ANALOG);                                 /* PA1 analog */
+    ADC12_COMMON->CCR = ADC_CCR_CKMODE_1 | ADC_CCR_CKMODE_0;               /* HCLK / 4 = 42.5 MHz */
+    ADC1->CR &= ~ADC_CR_DEEPPWD;                                           /* the order of example 05 */
+    ADC1->CR |= ADC_CR_ADVREGEN;
+    for (volatile uint32_t n = 0U; n < 10000U; ++n)
     {
-        /* tSTAB (1 us max, DS5319) plus 2 ADC clocks before calibration; no time base needed */
+        /* regulator start-up, 20 us max (DS12288); no time base needed */
     }
-    ADC1->CR2 |= ADC_CR2_RSTCAL;
-    if (!wait_clear(&ADC1->CR2, ADC_CR2_RSTCAL))
+    ADC1->CR &= ~ADC_CR_ADCALDIF;
+    ADC1->CR |= ADC_CR_ADCAL;
+    if (!wait_flag(&ADC1->CR, ADC_CR_ADCAL, 0U))
     {
         return false;
     }
-    ADC1->CR2 |= ADC_CR2_CAL;
-    return wait_clear(&ADC1->CR2, ADC_CR2_CAL);
+    ADC1->SMPR1 = 7U << ADC_SMPR1_SMP2_Pos;                                /* 640.5 cycles */
+    ADC1->SQR1 = CH_LAMP << ADC_SQR1_SQ1_Pos;                              /* one conversion of IN2 */
+    ADC1->ISR = ADC_ISR_ADRDY;
+    ADC1->CR |= ADC_CR_ADEN;
+    return wait_flag(&ADC1->ISR, ADC_ISR_ADRDY, ADC_ISR_ADRDY);
 }
 
 bool tl_hw_init(void)
@@ -75,7 +88,7 @@ bool tl_hw_init(void)
 
 bool tl_hw_button_pressed(tl_button_t b)
 {
-    static const uint32_t pin[TL_BTN_COUNT] = {GPIO_IDR_IDR12, GPIO_IDR_IDR13, GPIO_IDR_IDR14};
+    static const uint32_t pin[TL_BTN_COUNT] = {GPIO_IDR_ID12, GPIO_IDR_ID13, GPIO_IDR_ID14};
     return (GPIOB->IDR & pin[b]) == 0U;                                    /* active-low */
 }
 
@@ -104,15 +117,10 @@ void tl_hw_lamp_ramp(const bool on[TL_SIDES], uint32_t dt_ms)
 
 uint16_t tl_hw_lamp_current(void)
 {
-    ADC1->SQR1 = 0U;
-    ADC1->SQR3 = 1U;                                                       /* channel 1 = PA1 */
-    ADC1->CR2 |= ADC_CR2_SWSTART;
-    for (uint32_t n = 0U; n < WAIT_LOOPS; ++n)
+    ADC1->CR |= ADC_CR_ADSTART;
+    if (wait_flag(&ADC1->ISR, ADC_ISR_EOC, ADC_ISR_EOC))
     {
-        if ((ADC1->SR & ADC_SR_EOC) != 0U)
-        {
-            return (uint16_t)(ADC1->DR & 0xFFFU);
-        }
+        return (uint16_t)(ADC1->DR & 0xFFFU);                              /* reading DR clears EOC */
     }
     return 0U;                                                             /* reads as "lamp out": safe side */
 }
@@ -125,7 +133,7 @@ uint8_t tl_hw_reset_code(void)
     if ((csr & RCC_CSR_WWDGRSTF) != 0U) { return (uint8_t)TL_RESET_WWDG; }
     if ((csr & RCC_CSR_SFTRSTF) != 0U) { return (uint8_t)TL_RESET_SOFTWARE; }
     if ((csr & RCC_CSR_LPWRRSTF) != 0U) { return (uint8_t)TL_RESET_LOW_POWER; }
-    if ((csr & RCC_CSR_PORRSTF) != 0U) { return (uint8_t)TL_RESET_POWER_ON; }
+    if ((csr & RCC_CSR_BORRSTF) != 0U) { return (uint8_t)TL_RESET_POWER_ON; }   /* power-on or brown-out */
     if ((csr & RCC_CSR_PINRSTF) != 0U) { return (uint8_t)TL_RESET_PIN; }
     return (uint8_t)TL_RESET_UNKNOWN;
 }
@@ -133,11 +141,13 @@ uint8_t tl_hw_reset_code(void)
 // [region:wdg]
 void tl_hw_wdg_start(void)
 {
-    DBGMCU->CR |= DBGMCU_CR_DBG_IWDG_STOP;
-    IWDG->KR = 0x5555U;                                                    /* unlock PR/RLR (RM0008 §19) */
-    IWDG->PR = 0U;                                                         /* LSI / 4: 0.1 ms per count at 40 kHz */
-    IWDG->RLR = (TL_WDG_MS * 10U) - 1U;                                    /* 100 ms nominal (67 ms at a 60 kHz LSI) */
-    IWDG->KR = 0xCCCCU;                                                    /* start */
+    DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_IWDG_STOP;
+    IWDG->KR = 0xCCCCU;                                                    /* start (RM0440 "IWDG": start first) */
+    IWDG->KR = 0x5555U;                                                    /* then unlock PR/RLR */
+    IWDG->PR = 0U;                                                         /* LSI / 4: 0.125 ms per count at 32 kHz */
+    IWDG->RLR = (TL_WDG_MS * 8U) - 1U;                                     /* 100 ms nominal; LSI varies (DS12288) */
+    (void)wait_flag(&IWDG->SR, IWDG_SR_PVU | IWDG_SR_RVU | IWDG_SR_WVU, 0U);
+    IWDG->KR = 0xAAAAU;                                                    /* load the new reload value */
 }
 
 void tl_hw_wdg_feed(void)

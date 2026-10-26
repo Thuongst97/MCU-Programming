@@ -1,7 +1,7 @@
 # Contributing to MCU Academy
 
 Thanks for helping. The most useful contributions right now are the ones that close items in
-[`docs/verification.md`](docs/verification.md): running an example on a real Blue Pill, checking a cited
+[`docs/verification.md`](docs/verification.md): running an example on a real NUCLEO-G474RE, checking a cited
 section number against the PDF, or copying an AUTOSAR requirement ID from the R25-11 specification.
 
 Read [`CLAUDE.md`](CLAUDE.md) first. Its hard rules apply to human and AI authors alike, and CI
@@ -20,7 +20,7 @@ your board. For hardware reports, say whether your chip is a genuine ST part or 
 2. Compare the UART output with `expected-output.txt` and work through the page's
    "You are done when…" checklist.
 3. Add your board to `tested_on` in the example's README front matter (for example
-   `"genuine STM32F103C8T6, ST-Link V2 clone, Linux"`) and note anything that differed.
+   `"NUCLEO-G474RE (MB1367), ST-LINK/V3E firmware V3J…, Linux"`) and note anything that differed.
 4. Run `python3 tools/gen-catalog.py` and open a pull request.
 
 ## Verify a citation
@@ -41,7 +41,7 @@ your board. For hardware reports, say whether your chip is a genuine ST part or 
 - UI text belongs in `site/assets/js/strings.js`; tool versions belong in `tools/versions.json`.
 
 Before you open a pull request, run the checks listed in the [README](README.md#checks-the-same-ones-ci-runs).
-CI runs the same ones plus the firmware build, host tests, Renode tests and the MISRA ratchet.
+CI runs the same ones plus the firmware build, host tests and the MISRA ratchet.
 
 ## Licences
 
