@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Watchdogs, Reset Sources and Low Power — MCU Academy</title>
-  <meta name="description" content="IWDG vs WWDG, reading reset causes, Sleep/Stop/Standby modes and waking up correctly.">
+  <meta name="description" content="IWDG vs WWDG on the STM32G474, reading reset causes, Sleep/Stop/Standby/Shutdown and waking up at 170 MHz again.">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,13 +25,13 @@
           <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 13</span><span>/</span><span>Watchdog &amp; Power</span></nav>
           <div class="eyebrow">Module 13 · Peripherals</div>
           <h1>Watchdogs, Reset Sources and Low Power</h1>
-          <p class="lead">Two things a product needs and a demo never shows: recovering by itself when the software hangs, and spending most of its life asleep. This module covers the watchdogs, how to find out why the chip reset, the Sleep, Stop and Standby modes, and the surprises waiting after a wake-up.</p>
+          <p class="lead">Two things a product needs and a demo never shows: recovering by itself when the software hangs, and spending most of its life asleep. This module covers the STM32G474's two watchdogs, how to find out why the chip reset, the Sleep, Stop, Standby and Shutdown modes, and the surprises waiting after a wake-up.</p>
           <div class="page-meta"><span>⏱ 45 min read</span><span>🎯 Intermediate</span><span>📂 examples/08-iwdg-hardfault, examples/09-lowpower-stop</span></div>
         </header>
 
         <section class="doc-section" id="reset-causes" data-title="Who reset me?">
           <div class="sec-head"><h2><span class="sec-num">13.1</span>Who reset me?</h2></div>
-          <p>Every reset sets a flag in <code>RCC_CSR</code> (RM0008 §7.3.10), and the flags stay set until software clears them with <code>RMVF</code>. Reading them at boot is the cheapest diagnostic a device can have: a field unit that keeps rebooting because of the watchdog tells you exactly that.</p>
+          <p>Every reset sets a flag in <code>RCC_CSR</code> (RM0440, RCC chapter, "Control/status register"), and the flags stay set until software clears them with <code>RMVF</code>. Reading them at boot is the cheapest diagnostic a device can have: a field unit that keeps rebooting because of the watchdog tells you exactly that.</p>
           <div id="reg-csr"></div>
           <script type="text/plain" id="src-08-boot" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="boot" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="123" data-end="136" data-sha="b8b58166f430">
 uart_puts("\nExample 08 boot, reset cause: ");
@@ -64,12 +64,12 @@ const char *reset_cause(uint32_t csr)
 }
 </script>
           <div id="ex-cause"></div>
-          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">PINRSTF is almost always set</span><p>Every internal reset source also pulls the NRST pin low for a moment, so the pin flag accompanies all the others. Check the specific flags first and treat "pin" as the fallback, as the decoder above does.</p></div></div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">PINRSTF is almost always set, BORRSTF means power-on too</span><p>Every internal reset source also drives the NRST pin low for a moment, so the pin flag accompanies all the others. And the G4 has no separate power-on flag: a power-on sets <code>BORRSTF</code>. Check the specific flags first and treat "pin" as the fallback, as the decoder above does.</p></div></div>
         </section>
 
         <section class="doc-section" id="iwdg" data-title="Independent watchdog">
           <div class="sec-head"><h2><span class="sec-num">13.2</span>Independent watchdog</h2></div>
-          <p>The <b>independent watchdog</b> (IWDG) is a 12-bit down-counter clocked by the ~40 kHz LSI, independent of the main clock. If software does not reload it in time, it resets the chip. Once started it cannot be stopped, not even by the program that started it (RM0008 §19).</p>
+          <p>The <b>independent watchdog</b> (IWDG) is a 12-bit down-counter clocked by the ~32 kHz LSI, independent of the main clock. If software does not reload it in time, it resets the chip. Once started it cannot be stopped, not even by the program that started it (RM0440, IWDG chapter). The G4's IWDG also has an optional window register (<code>WINR</code>); example 08 leaves it at its maximum, so the window is off.</p>
           <script type="text/plain" id="src-08-iwdg" data-src="examples/08-iwdg-hardfault/src/main.c" data-region="iwdg" data-lang="c" data-file="examples/08-iwdg-hardfault/src/main.c" data-start="28" data-end="45" data-sha="b8b58166f430">
 static void iwdg_start_1s(void)
 {
@@ -91,7 +91,7 @@ static void iwdg_feed(void)
 }
 </script>
           <div id="ex-iwdg"></div>
-          <p>Pick a prescaler and reload value. Because the LSI may run anywhere from 30 to 60 kHz (DS5319), the real timeout varies by a factor of two: design for the short end.</p>
+          <p>Pick a prescaler and reload value. The LSI frequency is not trimmed and varies from chip to chip and with temperature (DS12288, LSI characteristics), so the real timeout varies too: design for the short end.</p>
           <div id="iwdg-calc" class="calc-host glass"></div>
           <div id="reg-iwdgpr"></div>
           <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Feed the watchdog from the right place</span><p>Kicking the watchdog from a timer interrupt keeps the chip alive even when the main loop is stuck, which defeats the purpose. Feed it only when every important activity has proved it is running (the capstone's watchdog manager does exactly that).</p></div></div>
@@ -100,38 +100,39 @@ static void iwdg_feed(void)
 
         <section class="doc-section" id="wwdg" data-title="Window watchdog">
           <div class="sec-head"><h2><span class="sec-num">13.3</span>Window watchdog</h2></div>
-          <p>The <b>window watchdog</b> (WWDG) runs from PCLK1 and catches a second class of bug: refreshing too <i>early</i>. Its 7-bit counter counts down; a reset happens if it drops below <code>0x40</code>, or if software refreshes it while it is still above the window value <code>W</code> (RM0008 §20). Refreshes are only accepted inside the window, so a loop that runs too fast, for example because it skipped work, also resets the chip.</p>
+          <p>The <b>window watchdog</b> (WWDG) runs from PCLK1 and catches a second class of bug: refreshing too <i>early</i>. Its 7-bit counter counts down; a reset happens if it drops below <code>0x40</code>, or if software refreshes it while it is still above the window value <code>W</code> (RM0440, WWDG chapter). Refreshes are only accepted inside the window, so a loop that runs too fast, for example because it skipped work, also resets the chip.</p>
           <div class="table-wrap"><table class="t">
             <thead><tr><th><span class="sr-only">Aspect</span></th><th>IWDG</th><th>WWDG</th></tr></thead>
             <tbody>
-              <tr><td>Clock</td><td>LSI (~40 kHz), keeps running if the main clock fails</td><td>PCLK1 ÷ 4096 ÷ 2<sup>WDGTB</sup></td></tr>
-              <tr><td>Catches</td><td>Software stuck (no refresh)</td><td>Software stuck <i>or</i> running too fast</td></tr>
-              <tr><td>Timeout range</td><td>~0.1 ms to ~26 s</td><td>~0.1 ms to ~58 ms at 36 MHz</td></tr>
+              <tr><td>Clock</td><td>LSI (~32 kHz), keeps running if the main clock fails</td><td>PCLK1 ÷ 4096 ÷ 2<sup>WDGTB</sup> (WDGTB = 0…7)</td></tr>
+              <tr><td>Catches</td><td>Software stuck (no refresh); with <code>WINR</code>, also too-early refreshes</td><td>Software stuck <i>or</i> running too fast</td></tr>
+              <tr><td>Timeout range</td><td>~0.125 ms to ~32 s at 32 kHz</td><td>~24 µs to ~197 ms at PCLK1 = 170 MHz</td></tr>
               <tr><td>Early warning</td><td>—</td><td>Early-wakeup interrupt at counter 0x40</td></tr>
               <tr><td>Can be stopped</td><td>No</td><td>No (until reset)</td></tr>
             </tbody>
           </table></div>
         </section>
 
-        <section class="doc-section" id="modes" data-title="Sleep, Stop, Standby">
-          <div class="sec-head"><h2><span class="sec-num">13.4</span>Sleep, Stop, Standby</h2></div>
-          <p>The Cortex-M3 enters a low-power mode with <code>WFI</code> (wait for interrupt) or <code>WFE</code> (wait for event). What stops depends on <code>SCB-&gt;SCR.SLEEPDEEP</code> and <code>PWR_CR</code> (RM0008 §5.3):</p>
+        <section class="doc-section" id="modes" data-title="Sleep, Stop, Standby, Shutdown">
+          <div class="sec-head"><h2><span class="sec-num">13.4</span>Sleep, Stop, Standby, Shutdown</h2></div>
+          <p>The Cortex-M4 enters a low-power mode with <code>WFI</code> (wait for interrupt) or <code>WFE</code> (wait for event). With <code>SCB-&gt;SCR.SLEEPDEEP</code> clear you get Sleep; with it set, <code>PWR_CR1.LPMS</code> picks which deep mode (RM0440, PWR chapter, "Low-power modes"):</p>
           <div id="sm-power"></div>
           <div class="table-wrap"><table class="t">
             <thead><tr><th>Mode</th><th>Stops</th><th>Wake-up</th><th>Keeps</th></tr></thead>
             <tbody>
-              <tr><td>Sleep</td><td>CPU clock only</td><td>any interrupt; fast</td><td>everything</td></tr>
-              <tr><td>Stop</td><td>all clocks of the 1.8 V domain, PLL, HSI, HSE</td><td>any EXTI line (pins, RTC alarm, PVD, USB wake-up); microseconds, on HSI</td><td>SRAM and registers</td></tr>
-              <tr><td>Standby</td><td>1.8 V domain powered off</td><td>WKUP pin (PA0) rising, RTC alarm, NRST, IWDG; like a reset</td><td>backup registers and RTC only</td></tr>
+              <tr><td>Sleep</td><td>CPU clock only</td><td>any interrupt; a few cycles</td><td>everything</td></tr>
+              <tr><td>Stop 0 / Stop 1</td><td>all clocks of the core domain, PLL, HSE; HSI16 off unless a peripheral asks for it. Stop 1 also puts the main regulator in low-power mode</td><td>any EXTI line (pins, RTC, comparators, LPUART…); microseconds, on HSI16</td><td>SRAM and registers</td></tr>
+              <tr><td>Standby</td><td>core domain powered off</td><td>WKUP pins, RTC, IWDG, NRST; like a reset</td><td>backup domain (RTC, backup registers); SRAM2 only if <code>PWR_CR3.RRS</code> = 1</td></tr>
+              <tr><td>Shutdown</td><td>almost everything, including the brown-out detector</td><td>WKUP pins, RTC, NRST; like a power-on</td><td>backup domain only</td></tr>
             </tbody>
           </table></div>
-          <p>Typical currents range from milliamps in Sleep to tens of microamps in Stop and a few microamps in Standby (DS5319 supply-current tables). On a Blue Pill the power LED and the regulator draw more than the MCU in Stop, so measure the board, then remove the LED's resistor if you need the real numbers.</p>
+          <p>Typical currents range from milliamps in Sleep to microamps in Stop and below a microamp in Shutdown (DS12288 supply-current tables). On a NUCLEO the ST-LINK, its LEDs and the regulator draw far more than the MCU in Stop. UM2505 describes the IDD jumper (JP5 on most NUCLEO-64 boards; check yours) where you can put an ammeter in series with the MCU supply alone.</p>
           <div id="reg-pwrcr"></div>
         </section>
 
         <section class="doc-section" id="wakeup" data-title="Wake-up sources">
           <div class="sec-head"><h2><span class="sec-num">13.5</span>Wake-up sources</h2></div>
-          <p>Example 09 shows both: Sleep, woken by every SysTick interrupt, and Stop, woken only by the button on EXTI line 0.</p>
+          <p>Example 09 shows both: Sleep, woken by every SysTick interrupt, and Stop 1, woken only by the blue USER button B1 (PC13) on EXTI line 13.</p>
           <script type="text/plain" id="src-09-sleep" data-src="examples/09-lowpower-stop/src/main.c" data-region="sleep" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="43" data-end="54" data-sha="9c760ca97dd0">
 static uint32_t sleep_for_one_second(void)
 {
@@ -167,9 +168,9 @@ for (uint32_t n = 1U;; ++n)
           <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The lost wake-up race</span><p>If the button is pressed after you decide to sleep but before <code>WFI</code> executes, its interrupt runs while you are still awake, and <code>WFI</code> then sleeps until the <i>next</i> press. Example 09 accepts that (it is a demo), but products check a "pending work" flag with interrupts masked right before sleeping, or use <code>WFE</code> with the event register, which remembers an event that happened before the instruction.</p></div></div>
         </section>
 
-        <section class="doc-section" id="after-stop" data-title="Restoring clocks after Stop">
-          <div class="sec-head"><h2><span class="sec-num">13.6</span>Restoring clocks after Stop</h2></div>
-          <p>Stop mode switches off the PLL and the HSE. When an interrupt wakes the chip, it continues on the 8 MHz HSI (RM0008 §5.3.5): the UART baud rate, SysTick period and every timer are now wrong by a factor of nine until the clock tree is rebuilt.</p>
+        <section class="doc-section" id="after-stop" data-title="Restoring 170 MHz after Stop">
+          <div class="sec-head"><h2><span class="sec-num">13.6</span>Restoring 170 MHz after Stop</h2></div>
+          <p>Stop mode switches off the PLL. When an interrupt wakes the chip, it continues on HSI16 (RM0440, PWR chapter, "Stop 1 mode"): the UART baud rate, SysTick period and every timer are now wrong by a factor of more than ten until the clock tree is rebuilt. Rebuilding means the whole <a href="clocks.html#switching">170 MHz sequence</a> again, including the AHB ÷2 step.</p>
           <script type="text/plain" id="src-09-stop" data-src="examples/09-lowpower-stop/src/main.c" data-region="stop" data-lang="c" data-file="examples/09-lowpower-stop/src/main.c" data-start="58" data-end="72" data-sha="9c760ca97dd0">
 static void enter_stop(void)
 {
@@ -188,15 +189,17 @@ static void enter_stop(void)
 }
 </script>
           <div id="ex-stop"></div>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (examples 08 and 09)</span><p>✅ Watchdog reset, fault decoding, Sleep and Stop control flow with button wake-up are tested in Renode. ⚠️ The course's RCC model always reports "power-on" as the reset cause, and Renode's clocks do not really stop in Stop. ❌ No current or power model at all. Not tested on a Blue Pill yet.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (examples 08 and 09)</span><p>✅ Both build in CI; the fault and reset-cause decoders pass their host tests. ⚠️ The reset-flag bit positions and the Stop-mode wake-up clock come from ST's CMSIS header and HAL sources; their RM0440 sections are still to be checked (docs/verification.md). ❌ Not run on a NUCLEO-G474RE by the course yet, and no current was measured.</p></div></div>
         </section>
 
         <section class="doc-section" id="debug-lowpower" data-title="Debugging low-power code">
           <div class="sec-head"><h2><span class="sec-num">13.7</span>Debugging low-power code</h2></div>
-          <p>In Stop and Standby the debug logic loses its clock and the debugger disconnects. <code>DBGMCU_CR</code> keeps the clocks the debugger needs running in low-power modes, and can freeze the watchdogs and timers while the core is halted at a breakpoint (RM0008 §31.16.3):</p>
+          <p>In Stop and Standby the debug logic loses its clock and the debugger disconnects. <code>DBGMCU_CR</code> keeps the clocks the debugger needs running in low-power modes (RM0440, debug chapter):</p>
           <div id="reg-dbgmcu"></div>
+          <p>A separate set of freeze registers stops watchdogs and timers while the core is halted at a breakpoint. The IWDG and WWDG bits are in <code>DBGMCU_APB1FZR1</code>:</p>
+          <div id="reg-apb1fz"></div>
           <p>Example 08 sets <code>DBG_IWDG_STOP</code> so a breakpoint never triggers a watchdog reset; example 09 sets <code>DBG_SLEEP</code> and <code>DBG_STOP</code> in debug builds only, because they raise the current consumption.</p>
-          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Can't connect after flashing a low-power program?</span><p>If the chip enters Stop or Standby right after reset, the debugger may never catch it awake. Connect under reset, or boot with BOOT0 = 1 (<a href="troubleshooting.html#cannot-halt">Troubleshooting</a>).</p></div></div>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Can't connect after flashing a low-power program?</span><p>If the chip enters Stop or Standby right after reset, the debugger may never catch it awake. Connect under reset (the ST-LINK drives NRST), as <a href="troubleshooting.html#cannot-halt">Troubleshooting</a> shows.</p></div></div>
           <div id="ck-power"></div>
         </section>
 
@@ -211,7 +214,7 @@ static void enter_stop(void)
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/statemachine.js?v=__BUILD__"></script>
   <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
