@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>I2C and an SSD1306 OLED — MCU Academy</title>
-  <meta name="description" content="I2C protocol on the wire, the F1 I2C peripheral and its errata, then drawing on an SSD1306 OLED.">
+  <meta name="description" content="I2C on the wire, the G4 I2C peripheral (TIMINGR, NBYTES, AUTOEND), then drawing on an SSD1306 OLED.">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +25,7 @@
           <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 10</span><span>/</span><span>I2C</span></nav>
           <div class="eyebrow">Module 10 · Peripherals</div>
           <h1>I2C and an SSD1306 OLED</h1>
-          <p class="lead">I2C connects many chips over just two wires, with addresses and an acknowledge after every byte. It is everywhere on circuit boards: displays, sensors, EEPROMs. The STM32F1's I2C peripheral is famously particular, so this module spends time on its event sequence and its errata, then drives an SSD1306 OLED.</p>
+          <p class="lead">I2C connects many chips over just two wires, with addresses and an acknowledge after every byte. It is everywhere on circuit boards: displays, sensors, EEPROMs. The STM32G4's I2C peripheral does most of a transfer by itself once its timing register is right, so this module spends its time on that register, on the pitfalls (including one specific to this board), and then drives an SSD1306 OLED.</p>
           <div class="page-meta"><span>⏱ 45 min read</span><span>🎯 Intermediate</span><span>📂 examples/06-i2c-oled-ssd1306</span></div>
         </header>
 
@@ -53,11 +53,11 @@
           </div>
         </section>
 
-        <section class="doc-section" id="f1-i2c" data-title="The F1 I2C peripheral">
-          <div class="sec-head"><h2><span class="sec-num">10.3</span>The F1 I2C peripheral</h2></div>
-          <p>The F1's I2C peripheral is driven by <b>events</b>: you write a control bit, wait for a status flag, and the flag is cleared by a specific sequence of reads and writes (RM0008 §26.3.3). Step through a master write:</p>
+        <section class="doc-section" id="g4-i2c" data-title="The G4 I2C peripheral">
+          <div class="sec-head"><h2><span class="sec-num">10.3</span>The G4 I2C peripheral</h2></div>
+          <p>The G4's I2C peripheral does most of a transfer by itself (RM0440, I2C). You tell it the slave address, the number of bytes (<code>NBYTES</code>, up to 255 per chunk) and whether to send STOP automatically at the end (<code>AUTOEND</code>), then set <code>START</code>. From then on it asks for each byte with <code>TXIS</code> and reports the outcome with <code>STOPF</code> or <code>NACKF</code>. Status flags are cleared through <code>I2C_ICR</code>, never by a magic read order. Step through a master write:</p>
           <div id="sm-i2c"></div>
-          <div id="reg-i2csr1"></div>
+          <div id="reg-i2cisr"></div>
           <script type="text/plain" id="src-06-write" data-src="examples/06-i2c-oled-ssd1306/src/i2c.c" data-region="write" data-lang="c" data-file="examples/06-i2c-oled-ssd1306/src/i2c.c" data-start="102" data-end="137" data-sha="46e281e8c465">
 i2c_status_t i2c_write(uint8_t addr7, uint8_t prefix, const uint8_t *data, uint32_t len)
 {
@@ -97,7 +97,7 @@ i2c_status_t i2c_write(uint8_t addr7, uint8_t prefix, const uint8_t *data, uint3
 }
 </script>
           <div id="ex-write"></div>
-          <p>Timing is set from the peripheral clock (36 MHz on APB1):</p>
+          <p>Bus timing lives in one register, <code>I2C_TIMINGR</code>: a prescaler and the SCL low time, high time, data hold and data set-up, all counted in ticks of the kernel clock (PCLK1 = 170 MHz here). ST's CubeMX computes it with a closed tool; example 06 computes it in plain C from the I2C specification's minimum and maximum times (UM10204), and a host test checks the result:</p>
           <script type="text/plain" id="src-06-init" data-src="examples/06-i2c-oled-ssd1306/src/i2c.c" data-region="init" data-lang="c" data-file="examples/06-i2c-oled-ssd1306/src/i2c.c" data-start="68" data-end="86" data-sha="46e281e8c465">
 i2c_status_t i2c_init(void)
 {
@@ -120,15 +120,72 @@ i2c_status_t i2c_init(void)
 }
 </script>
           <div id="ex-init"></div>
+          <script type="text/plain" id="src-06-calc" data-src="examples/06-i2c-oled-ssd1306/src/i2c_timing.c" data-region="calc" data-lang="c" data-file="examples/06-i2c-oled-ssd1306/src/i2c_timing.c" data-start="23" data-end="78" data-sha="351073bd4071">
+/* Try one prescaler: 0 and the fields if everything fits, -1 otherwise. */
+static int try_presc(uint32_t fclk_hz, uint32_t fscl_hz, const bus_mode_t *m, uint32_t presc, i2c_timing_t *t)
+{
+    const uint64_t tick_ps = (1000000000000ULL * ((uint64_t)presc + 1U)) / fclk_hz;
+    const uint64_t clk_ps = 1000000000000ULL / fclk_hz;
+    /* Low and high phases: at least the spec minimum, together at least one SCL period. */
+    uint32_t low = div_up((uint64_t)m->t_low_min * 1000U, tick_ps);                 // «2»
+    uint32_t high = div_up((uint64_t)m->t_high_min * 1000U, tick_ps);
+    const uint32_t period = div_up(1000000000000ULL / fscl_hz, tick_ps);
+    if ((low + high) < period)
+    {
+        const uint32_t extra = period - (low + high);
+        low += extra / 2U;                                                          // «3»
+        high += extra - (extra / 2U);
+    }
+    /* Data hold (SDADEL) and set-up (SCLDEL), with the RM0440 formulas (no digital filter). */
+    const uint64_t hold_ps = (uint64_t)m->t_f_max * 1000U;                            // «4»
+    const uint64_t skip_ps = ((uint64_t)T_AF_MIN_NS * 1000U) + (3U * clk_ps);
+    const uint32_t sdadel = (hold_ps > skip_ps) ? div_up(hold_ps - skip_ps, tick_ps) : 0U;
+    uint32_t scldel = div_up((uint64_t)(m->t_r_max + m->t_su_dat_min) * 1000U, tick_ps);  // «5»
+    scldel = (scldel == 0U) ? 0U : (scldel - 1U);
+    if ((low > 256U) || (high > 256U) || (sdadel > 15U) || (scldel > 15U) ||
+        (((uint64_t)sdadel * tick_ps) > ((uint64_t)m->t_hd_dat_max * 1000U)))
+    {
+        return -1;
+    }
+    t->presc = presc;
+    t->scll = low - 1U;
+    t->sclh = high - 1U;
+    t->sdadel = sdadel;
+    t->scldel = scldel;
+    return 0;
+}
+
+int i2c_timing_calc(uint32_t fclk_hz, uint32_t fscl_hz, i2c_timing_t *t)
+{
+    if ((fclk_hz == 0U) || (fscl_hz == 0U) || (fscl_hz > 400000U))
+    {
+        return -1;
+    }
+    static const bus_mode_t k_standard = {4700U, 4000U, 250U, 1000U, 300U, 3450U};
+    static const bus_mode_t k_fast = {1300U, 600U, 100U, 300U, 300U, 900U};
+    const bus_mode_t *m = (fscl_hz <= 100000U) ? &k_standard : &k_fast;
+    /* Start with a tick of about 60 ns (fine resolution) and slow it down until every field
+     * fits: the 4-bit SCLDEL/SDADEL fields need a longer tick in standard mode. */
+    uint32_t presc = div_up(fclk_hz, 16000000U);                                    // «1»
+    presc = (presc == 0U) ? 0U : (presc - 1U);
+    for (; presc <= 15U; ++presc)
+    {
+        if (try_presc(fclk_hz, fscl_hz, m, presc, t) == 0)
+        {
+            return 0;
+        }
+    }
+    return -1;
+}
+</script>
+          <div id="ex-calc"></div>
+          <div id="reg-timingr"></div>
         </section>
 
-        <section class="doc-section" id="errata" data-title="Errata you must know">
-          <div class="sec-head"><h2><span class="sec-num">10.4</span>Errata you must know</h2></div>
-          <p>ST's errata sheet ES096 lists several limitations of the F1 I2C peripheral. The ones that bite most often:</p>
-          <ul>
-            <li><b>A stuck BUSY flag.</b> If a slave is left holding SDA low (for example, the MCU reset in the middle of a read), or the analog filter latches a glitch, the peripheral believes the bus is busy forever. Software must clock the bus free and reset the peripheral.</li>
-            <li><b>Strict timing between events</b> in master receive mode with interrupts: the sequences for reading 1, 2 or N bytes differ (RM0008 §26.3.3), and an interrupt arriving at the wrong moment can make the peripheral read one byte too many. Polling with interrupts masked for the critical steps, or DMA, avoids it.</li>
-          </ul>
+        <section class="doc-section" id="pitfalls" data-title="Pitfalls: BOOT0, bus recovery and errata">
+          <div class="sec-head"><h2><span class="sec-num">10.4</span>Pitfalls: BOOT0, bus recovery and errata</h2></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Not on D15/D14: PB8 is BOOT0</span><p>On an Arduino-style board, D15/D14 is where I2C "belongs", and on the NUCLEO-G474RE those pins are PB8/PB9 with I2C1. But PB8 is also the <b>BOOT0</b> pin, sampled at every reset while the option bit <code>nSWBOOT0</code> is 1 (the factory setting, <a href="boot.html#boot-modes">module 03</a>). The pull-up resistor on an OLED module's SCL holds PB8 high during reset, and the chip starts ST's bootloader instead of your program. Example 06 therefore uses <b>I2C2 on PA9 (SCL, D8) and PA8 (SDA, D7)</b>, AF4 on both (DS12288).</p></div></div>
+          <p><b>A stuck bus.</b> If the MCU resets in the middle of a read, a slave may be left holding SDA low, waiting for clocks that never come, and the peripheral sees the bus as busy forever. Software recovers by taking the pins over as GPIOs, clocking SCL until the slave lets go of SDA (at most nine pulses), and resetting the I2C block by clearing <code>PE</code>:</p>
           <script type="text/plain" id="src-06-recover" data-src="examples/06-i2c-oled-ssd1306/src/i2c.c" data-region="recover" data-lang="c" data-file="examples/06-i2c-oled-ssd1306/src/i2c.c" data-start="42" data-end="64" data-sha="46e281e8c465">
 /* If a slave was reset in the middle of a transfer it may still hold SDA low, and the I2C
  * peripheral then sees the bus as busy forever. Clock SCL by hand (up to 9 pulses) until the
@@ -155,7 +212,8 @@ static void bus_recover(void)
 }
 </script>
           <div id="ex-recover"></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Every wait needs a timeout</span><p>The most common I2C bug is a <code>while (!(I2C1-&gt;SR1 &amp; I2C_SR1_SB));</code> that hangs forever when the display is unplugged. Example 06 returns <code>I2C_ERR_NACK</code> or <code>I2C_ERR_TIMEOUT</code> instead, and the program keeps running.</p></div></div>
+          <p><b>Errata.</b> ST lists known limitations of each silicon revision in the device errata sheet (ES0430 for the STM32G474). Read the I2C section for your revision before you rely on corner cases such as clock stretching by slow slaves or SMBus timeouts.</p>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Every wait needs a timeout</span><p>The most common I2C bug is a <code>while (!(I2C2-&gt;ISR &amp; I2C_ISR_TXIS));</code> that hangs forever when the display is unplugged: <code>TXIS</code> never comes, <code>NACKF</code> does. Example 06 checks for <code>NACKF</code> in every wait and returns <code>I2C_ERR_NACK</code> or <code>I2C_ERR_TIMEOUT</code> instead, and the program keeps running.</p></div></div>
         </section>
 
         <section class="doc-section" id="ssd1306" data-title="Driving the SSD1306">
@@ -211,7 +269,7 @@ void gfx_pixel(gfx_t *g, uint32_t x, uint32_t y, bool on)
 </script>
           <div id="ex-pixel"></div>
           <p>At 400 kHz a full 1024-byte frame takes about 23 ms on the wire (9 clocks per byte), so example 06 redraws about 15 times per second. Updating only the pages that changed is the usual optimisation.</p>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 06)</span><p>✅ The I2C protocol path runs in Renode against a generic slave that acknowledges everything: probe, init and frames succeed; with no slave, the NACK path is tested. ❌ Renode has no SSD1306 model, so <b>no pixels</b> are simulated; no bus timing or pull-up rise times. Not tested on a Blue Pill yet.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (example 06)</span><p>✅ Builds in CI; the framebuffer drawing and the TIMINGR calculation (0xA0640D18 for 400 kHz from 170 MHz) pass their host tests. ✅ The I2C2 alternate-function numbers are checked against ST's pin data. ❌ Not run on a NUCLEO-G474RE with an SSD1306 by the course yet.</p></div></div>
           <div id="ck-i2c"></div>
         </section>
 
@@ -226,9 +284,9 @@ void gfx_pixel(gfx_t *g, uint32_t x, uint32_t y, bool on)
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/nucleo-pins.js?v=__BUILD__"></script>
   <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
