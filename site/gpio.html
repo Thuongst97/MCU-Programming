@@ -22,27 +22,30 @@
       <div class="content-inner">
 
         <header class="page-hero">
-          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 05</span><span>/</span><span>GPIO &amp; AFIO</span></nav>
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 05</span><span>/</span><span>GPIO &amp; AF</span></nav>
           <div class="eyebrow">Module 05 · From reset to main</div>
           <h1>GPIO and Alternate Functions</h1>
-          <p class="lead">General-purpose I/O is where software touches the physical world. The STM32F1 does it differently from newer STM32 families: four configuration bits per pin, no pull-up register, no alternate-function number. This module covers the F1 model, the electrical limits that protect your board, pin remapping, and the one setting that can lock you out of your own chip.</p>
+          <p class="lead">General-purpose I/O is where software touches the physical world. On the STM32G4 every pin is described by a handful of small fields: a mode, an output type, a speed, a pull resistor and an alternate-function number. This module covers that model, the electrical limits that protect your board, the alternate-function mux, and the two pins you must never touch.</p>
           <div class="page-meta"><span>⏱ 40 min read</span><span>🎯 Beginner → intermediate</span><span>📂 examples/01-exti-button-debounce</span></div>
         </header>
 
-        <section class="doc-section" id="model" data-title="The F1 GPIO model">
-          <div class="sec-head"><h2><span class="sec-num">5.1</span>The F1 GPIO model</h2></div>
-          <p>Each GPIO port (A, B, C, …) has 16 pins. Every pin is configured with 4 bits: <b>MODE</b> (2 bits) and <b>CNF</b> (2 bits). Pins 0–7 live in <code>GPIOx_CRL</code>, pins 8–15 in <code>GPIOx_CRH</code> (RM0008 §9.2).</p>
+        <section class="doc-section" id="model" data-title="The G4 GPIO model">
+          <div class="sec-head"><h2><span class="sec-num">5.1</span>The G4 GPIO model</h2></div>
+          <p>Each GPIO port (A to G) has 16 pins and sits on the AHB2 bus at <code>0x48000000</code> + 1 KB per port. Every pin is configured through separate registers, each holding one field per pin (RM0440, GPIO):</p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th>MODE</th><th>CNF = 00</th><th>CNF = 01</th><th>CNF = 10</th><th>CNF = 11</th></tr></thead>
+            <thead><tr><th>Register</th><th>Bits per pin</th><th>Values</th></tr></thead>
             <tbody>
-              <tr><td><code>00</code> input</td><td>analog (ADC)</td><td>floating (reset state)</td><td>pull-up <i>or</i> pull-down</td><td>reserved</td></tr>
-              <tr><td><code>01/10/11</code> output, 10/2/50 MHz</td><td>push-pull</td><td>open-drain</td><td>alternate function push-pull</td><td>alternate function open-drain</td></tr>
+              <tr><td><code>MODER</code></td><td>2</td><td><code>00</code> input · <code>01</code> output · <code>10</code> alternate function · <code>11</code> analog (the reset state of most pins)</td></tr>
+              <tr><td><code>OTYPER</code></td><td>1</td><td><code>0</code> push-pull · <code>1</code> open-drain</td></tr>
+              <tr><td><code>OSPEEDR</code></td><td>2</td><td>edge rate, from low (<code>00</code>) to very high (<code>11</code>): faster edges mean more noise and current spikes</td></tr>
+              <tr><td><code>PUPDR</code></td><td>2</td><td><code>00</code> none · <code>01</code> pull-up · <code>10</code> pull-down</td></tr>
+              <tr><td><code>AFR[0]</code>, <code>AFR[1]</code></td><td>4</td><td>alternate function 0–15 for pins 0–7 (AFRL) and 8–15 (AFRH)</td></tr>
             </tbody>
           </table></div>
-          <p>Two differences surprise people who know newer STM32 parts:</p>
+          <p>Two things to know from the start:</p>
           <ul>
-            <li><b>Pull direction comes from ODR.</b> In input pull mode (<code>CNF = 10</code>), the pin's bit in <code>ODR</code> chooses the resistor: 1 = pull-up, 0 = pull-down. Example 01 sets it with <code>BSRR</code>.</li>
-            <li><b>No alternate-function number.</b> On the F1, setting a pin to "alternate function output" connects it to whichever peripheral is enabled on that pin. Inputs used by a peripheral (USART RX, SPI MISO) stay ordinary inputs. Conflicts are resolved by enabling only one peripheral per pin, or by remapping (<a href="#afio">below</a>).</li>
+            <li><b>Analog is the reset state.</b> Unused pins draw the least current in analog mode, so the G4 starts most pins there. A pin you want to read as a digital input must be switched to input mode first. The exceptions are the debug pins PA13, PA14, PA15, PB3 and PB4, which start in alternate-function mode.</li>
+            <li><b>Pull resistors are separate from the output.</b> <code>PUPDR</code> chooses them, in any mode. The NUCLEO's B1 button already has resistors on the board, and example 01 adds the internal pull-down the way ST's board support does:</li>
           </ul>
           <script type="text/plain" id="src-01-gpio" data-src="examples/01-exti-button-debounce/src/main.c" data-region="gpio" data-lang="c" data-file="examples/01-exti-button-debounce/src/main.c" data-start="21" data-end="26" data-sha="5b0926fe06e1">
 static void button_init(void)
@@ -53,13 +56,23 @@ static void button_init(void)
 }
 </script>
           <div id="ex-gpio"></div>
-          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>A pin is a door with a configurable lock. Input floating: the door swings freely in the wind (you read whatever the breeze decides). Input with pull-up: a spring holds it closed unless someone pushes. Push-pull output: you hold the door open or shut yourself. Open-drain: you can only pull it shut; a spring opens it again.</p></div></div>
+          <p>The two helpers it calls are three lines each. Every <code>gpio_*</code> function in the course's BSP follows the same pattern: compute the field position, clear the field, write the new value.</p>
+          <script type="text/plain" id="src-bsp-mode" data-src="examples/common/bsp/gpio.c" data-region="mode" data-lang="c" data-file="examples/common/bsp/gpio.c" data-start="14" data-end="18" data-sha="aedd925dd26d">
+void gpio_mode(GPIO_TypeDef *port, uint32_t pin, bsp_gpio_mode_t mode)
+{
+    const uint32_t shift = pin * 2U;                                    // «1»
+    port->MODER = (port->MODER & ~(3UL << shift)) | ((uint32_t)mode << shift);   // «2»
+}
+</script>
+          <div id="ex-mode"></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>A pin is a door with a configurable lock. Input floating: the door swings freely in the wind (you read whatever the breeze decides). Input with pull-up: a spring holds it closed unless someone pushes. Push-pull output: you hold the door open or shut yourself. Open-drain: you can only pull it shut; a spring opens it again. Analog: the door is bricked up, and only a sensor in the wall listens.</p></div></div>
         </section>
 
         <section class="doc-section" id="reg-viewer" data-title="Configure a pin bit by bit">
           <div class="sec-head"><h2><span class="sec-num">5.2</span>Configure a pin bit by bit</h2></div>
-          <p>Configure GPIOA pins 0–7 bit by bit. Pick values in the fields, or click bits directly; the C expression shows how you would write it with CMSIS names. Start with the reset value <code>0x44444444</code> (every pin floating input) and configure PA0 as input with pull-up, as example 01 does.</p>
-          <div id="reg-crl"></div>
+          <p>Configure port A bit by bit. Pick values in the fields, or click bits directly; the C expression shows how you would write it with CMSIS names. The first viewer starts at port A's reset value <code>0xABFFFFFF</code>: make PA5 an output, as example 00 does, and notice which pins are already in alternate-function mode.</p>
+          <div id="reg-moder"></div>
+          <div id="reg-pupdr"></div>
         </section>
 
         <section class="doc-section" id="write-read" data-title="ODR, BSRR, BRR and IDR">
@@ -68,8 +81,8 @@ static void button_init(void)
           <div class="table-wrap"><table class="t">
             <thead><tr><th>Register</th><th>Access</th><th>Use</th></tr></thead>
             <tbody>
-              <tr><td><code>IDR</code></td><td>read</td><td>The level the input buffer sees on each pin, right now.</td></tr>
-              <tr><td><code>ODR</code></td><td>read/write</td><td>The level the pin drives (outputs), or pull direction (inputs). Writing it is a read-modify-write: not interrupt-safe.</td></tr>
+              <tr><td><code>IDR</code></td><td>read</td><td>The level the input buffer sees on each pin, right now. Reads 0 for pins in analog mode.</td></tr>
+              <tr><td><code>ODR</code></td><td>read/write</td><td>The level each output pin drives. Writing it is a read-modify-write: not interrupt-safe.</td></tr>
               <tr><td><code>BSRR</code></td><td>write</td><td>Low 16 bits set pins, high 16 bits reset pins, in one store. Bits written as 0 change nothing. Interrupt-safe.</td></tr>
               <tr><td><code>BRR</code></td><td>write</td><td>Reset pins (the same as BSRR's high half).</td></tr>
               <tr><td><code>LCKR</code></td><td>special</td><td>Locks a pin's configuration until the next reset.</td></tr>
@@ -96,41 +109,42 @@ void led_toggle(void)
 
         <section class="doc-section" id="electrical" data-title="Electrical limits">
           <div class="sec-head"><h2><span class="sec-num">5.4</span>Electrical limits</h2></div>
-          <p>Software can damage hardware here. Switch the pinout to <b>5 V tolerance</b> to see which pins accept 5 V signals:</p>
+          <p>Software can damage hardware here. The numbers that matter live in the datasheet's "Absolute maximum ratings" and "I/O port characteristics" sections (DS12288); learn where they are, and keep a margin:</p>
+          <div class="table-wrap"><table class="t">
+            <thead><tr><th>Limit</th><th>What to do</th><th>Source</th></tr></thead>
+            <tbody>
+              <tr><td>Current per I/O pin and in total</td><td>Stay at a few mA per pin for logic and LEDs; DS12288 gives the absolute maximum per pin and for all pins together, and the output voltages it guarantees at a given current.</td><td>DS12288, absolute maximum ratings; I/O port characteristics</td></tr>
+              <tr><td>Internal pull-up / pull-down</td><td>Weak: tens of kΩ (DS12288 gives min/typ/max). Fine for a button; too weak for a fast I2C bus.</td><td>DS12288, I/O port characteristics</td></tr>
+              <tr><td>5 V tolerance</td><td>Most pins are marked FT in the pin table: they accept 5 V as digital inputs, but <b>not in analog mode</b>, and they always drive only VDD (3.3 V). Pins without FT never accept more than VDD.</td><td>DS12288, pin descriptions</td></tr>
+              <tr><td>Analog inputs</td><td>An ADC input must stay between 0 V and VDDA. The pinout's <b>Analog inputs</b> view shows which pins can be ADC inputs.</td><td>DS12288</td></tr>
+            </tbody>
+          </table></div>
           <div id="po-gpio"></div>
-          <div class="table-wrap"><table class="t">
-            <thead><tr><th>Limit</th><th>Value</th><th>Source</th></tr></thead>
-            <tbody>
-              <tr><td>Current per I/O pin, sink or source</td><td>±25 mA absolute maximum; design for ≤ 8 mA</td><td>DS5319 §5.2, §5.3 (I/O port characteristics)</td></tr>
-              <tr><td>Total current into all VDD pins</td><td>150 mA absolute maximum</td><td>DS5319 §5.2</td></tr>
-              <tr><td>PC13, PC14, PC15</td><td>sink only, about 3 mA, ≤ 2 MHz, never source current</td><td>DS5319 Table 5 notes</td></tr>
-              <tr><td>Internal pull-up / pull-down</td><td>about 40 kΩ (30–50 kΩ)</td><td>DS5319 §5.3 (I/O port characteristics)</td></tr>
-              <tr><td>5 V tolerant (FT) pins</td><td>accept 5 V as inputs or open-drain outputs; they still drive only 3.3 V</td><td>DS5319 Table 5</td></tr>
-            </tbody>
-          </table></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Never connect 5 V to a 3.3 V-only pin</span><p>PA0–PA7, PB0, PB1, PB5 and PC13–PC15 are not 5 V tolerant. A 5 V sensor output, an Arduino pin or a 5 V UART adapter on one of them can destroy the pin or the chip. Use a level shifter or a resistor divider, or choose an FT pin.</p></div></div>
-          <p>To drive an LED from a normal pin, put a resistor in series: (3.3 V − LED forward voltage) ÷ current. With a red LED (about 2 V) and 4 mA: 1.3 V ÷ 4 mA ≈ 330 Ω. For anything bigger than an LED (a relay, a motor, a 12 V lamp) use a transistor or a driver chip: a GPIO pin is a signal, not a power supply.</p>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Check the pin table before you connect 5 V</span><p>A 5 V sensor output or a 5 V Arduino shield on a pin that is not FT, or on an FT pin you later switch to analog mode, can destroy the pin or the chip. When in doubt, use a level shifter or a resistor divider. Your NUCLEO's 5 V pin on the power header is an output for shields, not a signal.</p></div></div>
+          <p>To drive an LED from a pin, put a resistor in series: (3.3 V − LED forward voltage) ÷ current. With a red LED (about 2 V) and 4 mA: 1.3 V ÷ 4 mA ≈ 330 Ω. For anything bigger than an LED (a relay, a motor, a 12 V lamp) use a transistor or a driver chip: a GPIO pin is a signal, not a power supply.</p>
         </section>
 
-        <section class="doc-section" id="afio" data-title="AFIO and remapping">
-          <div class="sec-head"><h2><span class="sec-num">5.5</span>AFIO and remapping</h2></div>
-          <p>The <b>AFIO</b> block (alternate-function I/O) does three jobs: it remaps peripheral signals to different pins, routes pins to EXTI lines, and decides which debug pins stay reserved. Its clock (<code>RCC_APB2ENR.AFIOEN</code>) must be on before you write any AFIO register.</p>
-          <p>Remapping is all-or-nothing per peripheral: <code>USART1_REMAP</code> moves both TX and RX from PA9/PA10 to PB6/PB7. <code>CAN_REMAP = 10</code> moves bxCAN to PB8/PB9, which the course uses to keep the USB pins free (RM0008 §9.3).</p>
-          <div id="reg-mapr-gpio"></div>
+        <section class="doc-section" id="af" data-title="Alternate functions (AFR)">
+          <div class="sec-head"><h2><span class="sec-num">5.5</span>Alternate functions (AFR)</h2></div>
+          <p>Each pin can belong to one of up to 16 peripheral signals. Mode <code>10</code> hands the pin to a peripheral; the 4-bit field in <code>AFR</code> says which one. The mapping from (pin, AF number) to signal is fixed in silicon and listed in the datasheet's alternate-function table (DS12288). The same signal is often available on several pins with different AF numbers: LPUART1_TX is AF12 on PA2, for example.</p>
+          <script type="text/plain" id="src-bsp-af" data-src="examples/common/bsp/gpio.c" data-region="af" data-lang="c" data-file="examples/common/bsp/gpio.c" data-start="46" data-end="52" data-sha="aedd925dd26d">
+void gpio_af(GPIO_TypeDef *port, uint32_t pin, uint32_t af)
+{
+    const uint32_t reg = pin / 8U;                 /* AFR[0] = AFRL (pins 0-7), AFR[1] = AFRH */  // «3»
+    const uint32_t shift = (pin % 8U) * 4U;        /* 4 bits per pin */
+    port->AFR[reg] = (port->AFR[reg] & ~(0xFUL << shift)) | ((af & 0xFU) << shift);   // «4»
+    gpio_mode(port, pin, BSP_GPIO_AF);             /* AF first, then hand the pin over */  // «5»
+}
+</script>
+          <div id="ex-af"></div>
+          <div id="reg-afrl"></div>
+          <div class="callout tip"><div class="ci">💡</div><div><span class="ct">No magic AF numbers</span><p>The CMSIS header does not name AF numbers, so the course defines them as constants named after pin and signal, such as <code>AF_PA2_LPUART1_TX</code>, next to the code that uses them. <code>tools/check-pins.py</code> checks every one of them against ST's own pin database, so a typo fails the build instead of leaving a silent pin. Click any pin in the <a href="board.html#pinout">board pinout</a> to see its AF numbers.</p></div></div>
         </section>
 
-        <section class="doc-section" id="swj" data-title="SWJ_CFG: keeping SWD alive">
-          <div class="sec-head"><h2><span class="sec-num">5.6</span>SWJ_CFG: keeping SWD alive</h2></div>
-          <p>After reset, five pins belong to the debug port: PA13 (SWDIO), PA14 (SWCLK), and the JTAG-only pins PA15, PB3 and PB4. To use PA15/PB3/PB4 as GPIO, release JTAG but keep SWD:</p>
-          <div class="table-wrap"><table class="t">
-            <thead><tr><th><code>SWJ_CFG</code></th><th>Macro</th><th>Effect</th></tr></thead>
-            <tbody>
-              <tr><td><code>000</code></td><td>(reset)</td><td>Full JTAG + SWD.</td></tr>
-              <tr><td><code>010</code></td><td><code>AFIO_MAPR_SWJ_CFG_JTAGDISABLE</code></td><td>JTAG off, <b>SWD still works</b>. PA15, PB3, PB4 free. Use this one.</td></tr>
-              <tr><td><code>100</code></td><td><code>AFIO_MAPR_SWJ_CFG_DISABLE</code></td><td>JTAG <b>and SWD</b> off. The debugger can no longer connect while the program runs.</td></tr>
-            </tbody>
-          </table></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Never write <code>SWJ_CFG_DISABLE</code></span><p>It locks the debugger out as soon as the line runs, and after every reset. Recovery needs BOOT0 = 1 (<a href="troubleshooting.html#cannot-halt">Troubleshooting</a>). Also note that <code>SWJ_CFG</code> is write-only and reads back as undefined (RM0008 §9.4.2): when you read-modify-write <code>AFIO_MAPR</code> to change another remap, set <code>SWJ_CFG</code> explicitly in the same write.</p></div></div>
+        <section class="doc-section" id="swd" data-title="Keeping SWD alive">
+          <div class="sec-head"><h2><span class="sec-num">5.6</span>Keeping SWD alive</h2></div>
+          <p>After reset, five pins belong to the debug port in alternate-function mode AF0: PA13 (SWDIO), PA14 (SWCLK), and the JTAG pins PA15 (JTDI), PB3 (JTDO/SWO) and PB4 (NJTRST). The ST-LINK uses only PA13 and PA14 (plus PB3 if you use SWO). The other three you may reconfigure like any pin. There is no special register for this on the G4: the pin's <code>MODER</code> and <code>AFR</code> fields decide.</p>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Never change PA13 or PA14</span><p>A write such as <code>GPIOA-&gt;MODER = 0x00000400</code> (instead of a read-modify-write of one field) puts PA13 and PA14 into input mode, and the debugger loses the chip as soon as the line runs, and again after every reset. Recovery is a <a href="troubleshooting.html#cannot-halt">connect under reset</a>, which the NUCLEO supports because its ST-LINK drives NRST. That is why every GPIO helper in the course touches only its own pin's field, and why the AUTOSAR Port driver refuses configurations that take PA13/PA14 away from AF0 (<a href="autosar-mcal.html#dio-port">module 20</a>).</p></div></div>
         </section>
 
         <section class="doc-section" id="debounce" data-title="Buttons and debouncing">
@@ -158,7 +172,7 @@ debounce_event_t debounce_update(debounce_t *d, bool pressed_sample, uint32_t no
 </script>
           <div id="ex-debounce"></div>
           <p>The debounce logic has no hardware dependencies, so it is tested on your PC: <code>examples/01-exti-button-debounce/test/test_debounce.c</code> feeds it bouncing samples and checks that exactly one press comes out.</p>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 01)</span><p>✅ EXTI routing, NVIC, debounce logic and the LED are tested in Renode. ⚠️ Renode's button does not bounce, so it shows one raw edge per press; the Robot test injects a short glitch to check the filter. ❌ Not tested on a Blue Pill yet.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (example 01)</span><p>✅ Builds in CI; the debounce logic passes its host tests. ⚠️ B1's polarity (pressed = 1) follows ST's NUCLEO BSP; one community board file says the opposite, so the code keeps it in <code>BOARD_BTN_PRESSED</code>. ❌ Not run on a NUCLEO-G474RE by the course yet.</p></div></div>
           <div id="ck-gpio"></div>
         </section>
 
@@ -173,9 +187,9 @@ debounce_event_t debounce_update(debounce_t *d, bool pressed_sample, uint32_t no
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/nucleo-pins.js?v=__BUILD__"></script>
   <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>

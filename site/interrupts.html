@@ -36,13 +36,13 @@
             <thead><tr><th>Exception number</th><th>Name</th><th>Priority</th><th>Cause</th></tr></thead>
             <tbody>
               <tr><td>1</td><td>Reset</td><td>−3 (fixed)</td><td>Power-on, NRST, watchdog, software reset</td></tr>
-              <tr><td>2</td><td>NMI</td><td>−2 (fixed)</td><td>Non-maskable; on the F103 the clock security system</td></tr>
+              <tr><td>2</td><td>NMI</td><td>−2 (fixed)</td><td>Non-maskable; on the G474 for example the clock security system</td></tr>
               <tr><td>3</td><td>HardFault</td><td>−1 (fixed)</td><td>Any fault that cannot be handled elsewhere</td></tr>
               <tr><td>4–6</td><td>MemManage, BusFault, UsageFault</td><td>configurable</td><td>Access violations, bus errors, illegal instructions (<a href="faults-debug.html#fault-types">module 15</a>)</td></tr>
               <tr><td>11</td><td>SVCall</td><td>configurable</td><td>The <code>SVC</code> instruction (RTOS system calls)</td></tr>
               <tr><td>14</td><td>PendSV</td><td>configurable</td><td>Requested by software; RTOS context switches (<a href="rtos.html#context-switch">module 14</a>)</td></tr>
               <tr><td>15</td><td>SysTick</td><td>configurable</td><td>The core's 24-bit timer reached zero</td></tr>
-              <tr><td>16 + n</td><td>IRQ n</td><td>configurable</td><td>Peripheral interrupt n: EXTI0 is IRQ 6, USART1 is IRQ 37 (RM0008 §10.1.2)</td></tr>
+              <tr><td>16 + n</td><td>IRQ n</td><td>configurable</td><td>Peripheral interrupt n: EXTI0 is IRQ 6, EXTI15_10 is IRQ 40, LPUART1 is IRQ 91 (RM0440, NVIC; <code>IRQn_Type</code> in <code>stm32g474xx.h</code>)</td></tr>
             </tbody>
           </table></div>
           <p>A lower number means a higher priority. Reset, NMI and HardFault have fixed negative priorities, so nothing can block them.</p>
@@ -50,14 +50,15 @@
 
         <section class="doc-section" id="entry-exit" data-title="What the core does on entry">
           <div class="sec-head"><h2><span class="sec-num">6.2</span>What the core does on entry</h2></div>
-          <p>When an interrupt is accepted, the Cortex-M3 does in hardware what other CPUs need assembly for (ARM DDI 0403 §B1.5.6–B1.5.8). Step through it:</p>
+          <p>When an interrupt is accepted, the Cortex-M4 does in hardware what other CPUs need assembly for (ARM DDI 0403, B1.5.6–B1.5.8). Step through it:</p>
           <div id="seq-entry"></div>
+          <div class="callout note"><div class="ci">ℹ️</div><div><span class="ct">With the FPU: 8 or 26 words</span><p>If the interrupted code has used the FPU, the exception frame grows by 18 words: <code>s0</code>–<code>s15</code>, <code>FPSCR</code> and one reserved word. To keep latency low, the Cortex-M4 only <i>reserves</i> that space at entry and saves the registers later, if and when the handler itself touches the FPU (<b>lazy stacking</b>, PM0214). Size every stack for the larger frame.</p></div></div>
           <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>You are reading a book when the doorbell rings. You put a bookmark in (stacking), answer the door (the handler) and come back to exactly the same line (unstacking). If the phone rings while you are still at the door, you take the call before going back to the book (tail-chaining), instead of sitting down and getting up again.</p></div></div>
         </section>
 
         <section class="doc-section" id="nvic" data-title="NVIC priorities and grouping">
           <div class="sec-head"><h2><span class="sec-num">6.3</span>NVIC priorities and grouping</h2></div>
-          <p>The NVIC (nested vectored interrupt controller) decides which pending interrupt runs. Each interrupt has an 8-bit priority field, of which the STM32F103 implements the <b>upper 4 bits</b>: 16 levels, 0 (highest) to 15 (PM0056 §4.3). CMSIS's <code>NVIC_SetPriority(irq, 5)</code> shifts the value into those bits for you.</p>
+          <p>The NVIC (nested vectored interrupt controller) decides which pending interrupt runs. Each interrupt has an 8-bit priority field, of which the STM32G474 implements the <b>upper 4 bits</b> (<code>__NVIC_PRIO_BITS</code> = 4 in the header): 16 levels, 0 (highest) to 15 (PM0214, NVIC). CMSIS's <code>NVIC_SetPriority(irq, 5)</code> shifts the value into those bits for you.</p>
           <ul>
             <li><b>Preemption:</b> a pending interrupt with a strictly higher priority (lower number) interrupts a running handler. Equal priorities wait their turn.</li>
             <li><b>Grouping:</b> <code>SCB-&gt;AIRCR.PRIGROUP</code> can split the 4 bits into preemption priority and sub-priority (which only orders pending interrupts of the same preemption level). The course keeps all 4 bits as preemption priority, which is also what FreeRTOS expects.</li>
@@ -67,9 +68,9 @@
           <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Priority 0 is not "normal"</span><p>Every interrupt is priority 0 (the highest) after reset. If you never set priorities, nothing preempts anything and a slow handler delays all the others. Give every IRQ a deliberate priority: fast, short handlers high; slow ones low. SysTick gets the lowest priority from <code>SysTick_Config()</code>.</p></div></div>
         </section>
 
-        <section class="doc-section" id="exti" data-title="EXTI and AFIO_EXTICR">
-          <div class="sec-head"><h2><span class="sec-num">6.4</span>EXTI and AFIO_EXTICR</h2></div>
-          <p>Any GPIO pin can raise an interrupt through the <b>EXTI</b> controller. There are 16 EXTI lines for pins (plus lines for PVD, RTC alarm and USB wake-up): line <i>n</i> serves pin <i>n</i> of <b>one</b> port, chosen in <code>AFIO_EXTICR</code> (RM0008 §10.2). So PA0 and PB0 cannot both interrupt at the same time.</p>
+        <section class="doc-section" id="exti" data-title="EXTI and SYSCFG_EXTICR">
+          <div class="sec-head"><h2><span class="sec-num">6.4</span>EXTI and SYSCFG_EXTICR</h2></div>
+          <p>Any GPIO pin can raise an interrupt through the <b>EXTI</b> controller. There are 16 EXTI lines for pins (plus lines for internal events such as the PVD, the RTC and the comparators): line <i>n</i> serves pin <i>n</i> of <b>one</b> port, chosen in <code>SYSCFG_EXTICR1</code>…<code>4</code> (RM0440, SYSCFG and EXTI). So PA13 and PC13 cannot both interrupt at the same time. SYSCFG needs its own clock (<code>RCC_APB2ENR.SYSCFGEN</code>), and the EXTI registers for lines 0–31 end in <code>1</code>: <code>IMR1</code>, <code>RTSR1</code>, <code>FTSR1</code>, <code>PR1</code>.</p>
           <div id="seq-exti"></div>
           <script type="text/plain" id="src-01-exti" data-src="examples/01-exti-button-debounce/src/main.c" data-region="exti" data-lang="c" data-file="examples/01-exti-button-debounce/src/main.c" data-start="30" data-end="53" data-sha="5b0926fe06e1">
 static void exti_init(void)
@@ -99,12 +100,12 @@ void EXTI15_10_IRQHandler(void)
 </script>
           <div id="ex-exti"></div>
           <div id="reg-exticr"></div>
-          <p>Lines 0–4 each have their own IRQ. Lines 5–9 share <code>EXTI9_5_IRQHandler</code> and lines 10–15 share <code>EXTI15_10_IRQHandler</code>; such a handler reads <code>EXTI-&gt;PR</code> to find out which line fired.</p>
+          <p>Lines 0–4 each have their own IRQ. Lines 5–9 share <code>EXTI9_5_IRQHandler</code> and lines 10–15 share <code>EXTI15_10_IRQHandler</code>; such a handler reads <code>EXTI-&gt;PR1</code> to find out which line fired. B1 on PC13 is on line 13, so example 01 uses <code>EXTI15_10_IRQHandler</code>.</p>
         </section>
 
         <section class="doc-section" id="systick" data-title="SysTick time base">
           <div class="sec-head"><h2><span class="sec-num">6.5</span>SysTick time base</h2></div>
-          <p>SysTick is a 24-bit down-counter inside the core. It reloads from <code>LOAD</code> when it reaches zero and can raise the SysTick exception each time. With HCLK = 72 MHz and <code>LOAD</code> = 71 999, that is exactly once per millisecond. The largest possible reload (2<sup>24</sup> − 1) gives about 233 ms at 72 MHz.</p>
+          <p>SysTick is a 24-bit down-counter inside the core. It reloads from <code>LOAD</code> when it reaches zero and can raise the SysTick exception each time. With HCLK = 170 MHz and <code>LOAD</code> = 169 999, that is exactly once per millisecond. The largest possible reload (2<sup>24</sup> − 1) gives about 98 ms at 170 MHz.</p>
           <script type="text/plain" id="src-bsp-tick" data-src="examples/common/bsp/systick.c" data-region="tick" data-lang="c" data-file="examples/common/bsp/systick.c" data-start="6" data-end="22" data-sha="44b9b53934d9">
 static volatile uint32_t s_ms;       /* written by the interrupt, read by main: volatile */   // «1»
 
@@ -133,7 +134,7 @@ uint32_t millis(void)
           <p>Data shared between a handler and <code>main()</code> is where interrupt bugs hide. Three rules:</p>
           <ol>
             <li><b>Mark it <code>volatile</code></b>, so the compiler re-reads it every time instead of keeping a copy in a register.</li>
-            <li><b>Know what is atomic.</b> A naturally aligned 8-, 16- or 32-bit load or store is a single access on the Cortex-M3. A read-modify-write (<code>x++</code>, <code>reg |= bit</code>) or a 64-bit value is not: an interrupt can land in the middle.</li>
+            <li><b>Know what is atomic.</b> A naturally aligned 8-, 16- or 32-bit load or store is a single access on the Cortex-M4. A read-modify-write (<code>x++</code>, <code>reg |= bit</code>) or a 64-bit value is not: an interrupt can land in the middle.</li>
             <li><b>Protect non-atomic sequences</b> with a short critical section, or design them away with one writer per variable.</li>
           </ol>
           <p>Example 04 uses both techniques. The ring buffer needs no locking because the interrupt only writes <code>head</code> and <code>main()</code> only writes <code>tail</code>:</p>
@@ -170,7 +171,7 @@ bool ringbuf_get(ringbuf_t *rb, uint8_t *byte)
 }
 </script>
           <div id="ex-ring"></div>
-          <p>But <code>USART1-&gt;CR1</code> is written by both sides, so the read-modify-write in <code>main()</code> is wrapped in a critical section that saves and restores <code>PRIMASK</code>:</p>
+          <p>But <code>LPUART1-&gt;CR1</code> is written by both sides, so the read-modify-write in <code>main()</code> is wrapped in a critical section that saves and restores <code>PRIMASK</code>:</p>
           <script type="text/plain" id="src-04-write" data-src="examples/04-uart-shell-ringbuffer/src/main.c" data-region="write" data-lang="c" data-file="examples/04-uart-shell-ringbuffer/src/main.c" data-start="68" data-end="91" data-sha="e5690058d8e2">
 static void tx_put(uint8_t b)
 {
@@ -239,7 +240,7 @@ uint32_t sched_run_due(task_t *tasks, uint32_t count, uint32_t now_ms)
 </script>
           <div id="ex-run"></div>
           <p>"Cooperative" means no task is ever interrupted by another task: each must return quickly. Interrupts still preempt everything. When that model stops being enough, an RTOS takes over (<a href="rtos.html#why-rtos">module 14</a>).</p>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (examples 01, 02, 04)</span><p>✅ NVIC, EXTI, SysTick timing in virtual time and the UART interrupt paths are tested in Renode. ⚠️ Interrupt latency in cycles and contact bounce are not modelled. ❌ Not tested on a Blue Pill yet.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (examples 01, 02, 04)</span><p>✅ Build in CI; the debouncer, the scheduler, the ring buffer and the shell parser pass their host tests. ⚠️ No simulation: there is no STM32G4 model in Renode. ❌ Not run on a NUCLEO-G474RE by the course yet.</p></div></div>
           <div id="ck-irq"></div>
         </section>
 
@@ -254,7 +255,7 @@ uint32_t sched_run_due(task_t *tasks, uint32_t count, uint32_t now_ms)
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
   <script src="assets/js/pages/interrupts.js?v=__BUILD__"></script>

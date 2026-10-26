@@ -31,28 +31,29 @@
 
         <section class="doc-section" id="timebase" data-title="Prescaler, ARR and update events">
           <div class="sec-head"><h2><span class="sec-num">7.1</span>Prescaler, ARR and update events</h2></div>
-          <p>A general-purpose timer is a 16-bit counter with a prescaler in front of it (RM0008 §15.3):</p>
+          <p>A general-purpose timer is a counter with a 16-bit prescaler in front of it (RM0440, TIM2/TIM3/TIM4/TIM5). TIM3 and TIM4 count with 16 bits; TIM2 and TIM5 have 32-bit counters:</p>
           <ul>
             <li>The <b>prescaler</b> <code>PSC</code> divides the timer clock by <code>PSC + 1</code>. Each resulting tick advances the counter <code>CNT</code> by one.</li>
             <li>When <code>CNT</code> reaches the <b>auto-reload</b> value <code>ARR</code>, it goes back to 0 and raises an <b>update event</b> (UEV), which can trigger an interrupt or DMA request.</li>
           </ul>
           <div class="formula">f<sub>update</sub> = f<sub>TIM</sub> ÷ ((PSC + 1) × (ARR + 1))</div>
-          <p>For 1 kHz from a 72 MHz timer clock: 72 000 000 ÷ 1000 = 72 000 = (PSC + 1) × (ARR + 1). PSC = 71 and ARR = 999 gives 1 µs ticks and 1000 steps per period, which is handy for PWM. Both registers are 16 bits, so each factor must be ≤ 65 536. Try other values:</p>
+          <p>For 1 kHz from a 170 MHz timer clock: 170 000 000 ÷ 1000 = 170 000 = (PSC + 1) × (ARR + 1). PSC = 169 and ARR = 999 gives 1 µs ticks and 1000 steps per period, which is handy for PWM. On a 16-bit timer each factor must be ≤ 65 536. Try other values:</p>
           <div id="calc-timer"></div>
           <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The prescaler is a gear that turns the fast motor shaft into slow, regular steps; the counter is a clock face with ARR + 1 positions. Each time the hand passes 12 o'clock, a bell rings: the update event.</p></div></div>
         </section>
 
         <section class="doc-section" id="timer-clock" data-title="The ×2 timer clock rule">
           <div class="sec-head"><h2><span class="sec-num">7.2</span>The ×2 timer clock rule</h2></div>
-          <p>Which clock reaches the timer? TIM2–TIM4 are on APB1, TIM1 on APB2. The rule (RM0008 §7.2): <b>if the APB prescaler is 1, the timer clock equals the bus clock; otherwise it is twice the bus clock.</b></p>
+          <p>Which clock reaches the timer? TIM2–TIM7 are on APB1; TIM1, TIM8, TIM15–17 and TIM20 on APB2. The rule (RM0440, RCC): <b>if the APB prescaler is 1, the timer clock equals the bus clock; otherwise it is twice the bus clock.</b></p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th>Setup</th><th>PCLK1</th><th>TIM2–4 clock</th><th>PCLK2</th><th>TIM1 clock</th></tr></thead>
+            <thead><tr><th>Setup</th><th>PCLK1</th><th>TIM2–7 clock</th><th>PCLK2</th><th>TIM1/8 clock</th></tr></thead>
             <tbody>
-              <tr><td>After reset (HSI 8 MHz, all ÷ 1)</td><td>8 MHz</td><td>8 MHz</td><td>8 MHz</td><td>8 MHz</td></tr>
-              <tr><td>Course setup (72 MHz, APB1 ÷ 2)</td><td>36 MHz</td><td><b>72 MHz</b></td><td>72 MHz</td><td>72 MHz</td></tr>
+              <tr><td>After reset (HSI16, all ÷ 1)</td><td>16 MHz</td><td>16 MHz</td><td>16 MHz</td><td>16 MHz</td></tr>
+              <tr><td>Course setup (170 MHz, all ÷ 1)</td><td>170 MHz</td><td>170 MHz</td><td>170 MHz</td><td>170 MHz</td></tr>
+              <tr><td>Hypothetical: 170 MHz with APB1 ÷ 2</td><td>85 MHz</td><td><b>170 MHz</b></td><td>170 MHz</td><td>170 MHz</td></tr>
             </tbody>
           </table></div>
-          <p>Example 03 computes its prescaler from the bus clock instead of hard-coding it, so it stays correct if the clock changes: <code>PSC = 2 × PCLK1 ÷ 1 MHz − 1</code>.</p>
+          <p>Example 03 computes its prescaler from the timer clock instead of hard-coding it, so it stays correct if the clock changes: <code>tim_apb1_clock()</code> reads the APB1 prescaler from <code>RCC_CFGR</code> and applies the ×2 rule, then <code>PSC = f<sub>TIM</sub> ÷ 1 MHz − 1</code>.</p>
           <div id="reg-tim-cr1"></div>
         </section>
 
@@ -117,7 +118,7 @@ uint32_t breath_duty(uint32_t step, uint32_t period, uint32_t top)
 
         <section class="doc-section" id="capture" data-title="Input capture">
           <div class="sec-head"><h2><span class="sec-num">7.5</span>Input capture</h2></div>
-          <p>In <b>input capture</b>, an edge on a timer input copies the running counter into CCRx. The difference between two captures is a period in timer ticks. The F1 timers have a <b>PWM input mode</b> that measures period and high time in one go: channel 1 captures on the rising edge, channel 2 on the falling edge of the same pin, and the slave controller resets the counter on each rising edge (RM0008 §15.3.6).</p>
+          <p>In <b>input capture</b>, an edge on a timer input copies the running counter into CCRx. The difference between two captures is a period in timer ticks. The general-purpose timers have a <b>PWM input mode</b> that measures period and high time in one go: channel 1 captures on the rising edge, channel 2 on the falling edge of the same pin, and the slave controller resets the counter on each rising edge (RM0440, TIM2/TIM3/TIM4/TIM5). Example 03 uses TIM2, whose 32-bit counter cannot overflow between two edges of any signal it is likely to see.</p>
           <script type="text/plain" id="src-03-capture" data-src="examples/03-tim-pwm-dimming/src/main.c" data-region="capture" data-lang="c" data-file="examples/03-tim-pwm-dimming/src/main.c" data-start="54" data-end="69" data-sha="b5e430775783">
 /* TIM2 PWM-input mode on PA0 (TI1): CCR1 captures the period, CCR2 the high time. The counter
  * is reset on every rising edge by the slave-mode controller (RM0440, "PWM input mode"). */
@@ -137,7 +138,7 @@ static void capture_init(void)
 }
 </script>
           <div id="ex-capture"></div>
-          <p>With a wire from PA6 to PA0, example 03 measures its own PWM signal:</p>
+          <p>With a wire from D12 (PA6) to A0 (PA0), example 03 measures its own PWM signal:</p>
           <script type="text/plain" data-code data-src="examples/03-tim-pwm-dimming/expected-output.txt" data-lang="console" data-file="expected-output.txt" data-start="1" data-end="5" data-sha="7bb12a8fd7ae">
 Example 03: TIM3 PWM on PA6 (D12), TIM2 capture on PA0 (A0)
 clock status: 0
@@ -145,23 +146,23 @@ duty 250/1000; capture: 1000 us period, 240 us high
 duty 1000/1000; capture: 1000 us period, 980 us high
 duty 250/1000; capture: 1000 us period, 260 us high
 </script>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 03)</span><p>✅ Timer registers, the duty sequence and the UART report are tested in Renode. ⚠️ Renode drives no PWM waveform onto the pin and generates no capture edges, so the capture reads "no edges" in simulation. ❌ LED brightness is not simulated; not tested on a Blue Pill yet.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (example 03)</span><p>✅ Builds in CI; the breathing curve passes its host tests. ⚠️ No simulation (no STM32G4 model in Renode). ❌ Not run on a NUCLEO-G474RE by the course yet: the expected output above is what it should print.</p></div></div>
         </section>
 
-        <section class="doc-section" id="remap" data-title="Timer pins and remaps">
-          <div class="sec-head"><h2><span class="sec-num">7.6</span>Timer pins and remaps</h2></div>
-          <p>Timer channels come out on fixed pins, and AFIO remaps move some of them (RM0008 §9.3.7). The Blue Pill pinout shows them: search for <code>TIM3</code> or <code>TIM2</code>.</p>
+        <section class="doc-section" id="timer-pins" data-title="Timer pins and AF numbers">
+          <div class="sec-head"><h2><span class="sec-num">7.6</span>Timer pins and AF numbers</h2></div>
+          <p>Each timer channel is available on several pins, each with its own AF number from the datasheet table (DS12288). The pinout shows them: search for <code>TIM3</code> or <code>TIM2</code>, and click a pin for its AF numbers.</p>
           <div id="po-tim"></div>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th>Timer</th><th>Default pins (CH1–CH4)</th><th>Partial remap</th></tr></thead>
+            <thead><tr><th>Channel</th><th>Some pins on the LQFP64 (AF number)</th></tr></thead>
             <tbody>
-              <tr><td>TIM2</td><td>PA0, PA1, PA2, PA3</td><td>PA15, PB3 (CH1, CH2) or PB10, PB11 (CH3, CH4)</td></tr>
-              <tr><td>TIM3</td><td>PA6, PA7, PB0, PB1</td><td>PB4, PB5 (CH1, CH2)</td></tr>
-              <tr><td>TIM4</td><td>PB6, PB7, PB8, PB9</td><td>(full remap to port D only)</td></tr>
-              <tr><td>TIM1</td><td>PA8, PA9, PA10, PA11</td><td>(port E only)</td></tr>
+              <tr><td>TIM2_CH1</td><td>PA0 (AF1), PA5 (AF1), PA15 (AF1)</td></tr>
+              <tr><td>TIM2_CH2</td><td>PA1 (AF1), PB3 (AF1)</td></tr>
+              <tr><td>TIM3_CH1</td><td>PA6 (AF2), PB4 (AF2), PC6 (AF2)</td></tr>
+              <tr><td>TIM3_CH2</td><td>PA4 (AF2), PA7 (AF2), PB5 (AF2), PC7 (AF2)</td></tr>
             </tbody>
           </table></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Pin conflicts</span><p>PA9/PA10 are both TIM1 CH2/CH3 and USART1 TX/RX; PA11/PA12 are TIM1 CH4/ETR, USB and CAN. Remaps of TIM2 and TIM3 onto PA15, PB3 and PB4 also need <code>SWJ_CFG = JTAGDISABLE</code> first (<a href="gpio.html#swj">module 05</a>).</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Pin conflicts</span><p>A pin can only have one alternate function at a time. PA5 carries TIM2_CH1 but also drives LD2; PB3 (TIM2_CH2) is the debugger's SWO line; PA11/PA12 are FDCAN1 in this course. The table above came from <code>python3 tools/check-pins.py --signal TIM3_CH</code>, which reads ST's pin database.</p></div></div>
           <div id="ck-timers"></div>
         </section>
 
@@ -176,9 +177,9 @@ duty 250/1000; capture: 1000 us period, 260 us high
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/nucleo-pins.js?v=__BUILD__"></script>
   <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/waveform.js?v=__BUILD__"></script>
