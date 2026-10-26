@@ -31,11 +31,11 @@
 
         <section class="doc-section" id="what-ll" data-title="What LL is (and isn&#x27;t)">
           <div class="sec-head"><h2><span class="sec-num">D.1</span>What LL is (and isn&#x27;t)</h2></div>
-          <p>The <b>LL drivers</b> (<code>stm32f1xx_ll_*.h</code>, part of ST's STM32CubeF1 package) are mostly <code>static inline</code> functions, each wrapping one or a few register accesses. <code>LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_13)</code> is a single write to <code>GPIOC-&gt;BSRR</code>. They add readable names and a little argument packing, not behaviour:</p>
+          <p>The <b>LL drivers</b> (<code>stm32g4xx_ll_*.h</code>, part of ST's STM32CubeG4 package) are mostly <code>static inline</code> functions, each wrapping one or a few register accesses. <code>LL_GPIO_SetOutputPin(GPIOA, LL_GPIO_PIN_5)</code> is a single write to <code>GPIOA-&gt;BSRR</code>. They add readable names and a little argument packing, not behaviour:</p>
           <ul>
             <li>no state, no handles, no callbacks, no timeouts: you still write every wait loop yourself;</li>
-            <li>no interrupt handlers: you still write <code>USART1_IRQHandler</code>;</li>
-            <li>a few helper functions (<code>LL_USART_SetBaudRate</code>, <code>LL_RCC_GetSystemClocksFreq</code>) do arithmetic you would otherwise write by hand.</li>
+            <li>no interrupt handlers: you still write <code>LPUART1_IRQHandler</code>;</li>
+            <li>a few helper functions (<code>LL_LPUART_SetBaudRate</code>, <code>LL_RCC_GetSystemClocksFreq</code>) do arithmetic you would otherwise write by hand.</li>
           </ul>
           <p>The course's LL build of example 00 uses the same startup code and linker script as the register build and only the header-only parts of LL, taken from the CubeMX-generated HAL folder (<code>examples/00-…/hal/Drivers</code>, the one place vendor HAL code lives in this repository).</p>
           <script type="text/plain" id="src-ll-io" data-src="examples/00-nucleo-blink-uart/ll/src/main.c" data-region="io" data-lang="c" data-file="examples/00-nucleo-blink-uart/ll/src/main.c" data-start="51" data-end="64" data-sha="142fca76a614">
@@ -116,7 +116,7 @@ static int clock_170mhz(void)
     return 0;
 }
 </script>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The name does not make it right</span><p><code>LL_FLASH_LATENCY_2</code> is <code>0x2</code>: two wait states. The CMSIS macro <code>FLASH_ACR_LATENCY_2</code> is the mask <code>0x4</code>, bit 2 of the field, which is not a valid latency on the F1 at all (module 04). Similar-looking names in the two layers can mean different things: when in doubt, check the value in the header against the reference manual.</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The name does not make it right</span><p>On the G4 the two layers agree: <code>LL_FLASH_LATENCY_4</code> is defined as <code>FLASH_ACR_LATENCY_4WS</code>, the value 4. On other families the CMSIS header has bit-mask macros with similar names (on the STM32F1, <code>FLASH_ACR_LATENCY_2</code> is the mask <code>0x4</code>, not two wait states). Similar-looking names in the two layers can mean different things: when in doubt, check the value in the header against the reference manual.</p></div></div>
         </section>
 
         <section class="doc-section" id="choosing" data-title="Registers, LL or HAL?">
@@ -124,9 +124,9 @@ static int clock_170mhz(void)
           <div class="table-wrap"><table class="t">
             <thead><tr><th><span class="sr-only">Aspect</span></th><th>Registers (CMSIS)</th><th>LL</th><th>HAL</th></tr></thead>
             <tbody>
-              <tr><td>Example 00, debug build (flash)</td><td>~1.7 KB</td><td>~2.7 KB</td><td>~6.3 KB</td></tr>
+              <tr><td>Example 00, debug build (flash)</td><td>~2.8 KB</td><td>~3.7 KB</td><td>~10 KB</td></tr>
               <tr><td>What you learn about the chip</td><td>everything</td><td>almost everything</td><td>the API, less of the chip</td></tr>
-              <tr><td>Portability across STM32 families</td><td>low: register names differ (F1 <code>CRL</code> vs F4 <code>MODER</code>)</td><td>medium: similar API, family details leak</td><td>high: same API on most families</td></tr>
+              <tr><td>Portability across STM32 families</td><td>low: register names differ (F1 <code>CRL</code>/<code>CRH</code> vs G4 <code>MODER</code>)</td><td>medium: similar API, family details leak</td><td>high: same API on most families</td></tr>
               <tr><td>Timeouts, state, error handling</td><td>yours</td><td>yours</td><td>built in (with its own ideas)</td></tr>
               <tr><td>Fit for AUTOSAR MCAL code</td><td>yes: MCALs are written at this level</td><td>possible inside an MCAL</td><td>no: overlaps with MCAL responsibilities</td></tr>
             </tbody>

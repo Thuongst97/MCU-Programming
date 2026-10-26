@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>From Blue Pill to Automotive-Grade MCUs — MCU Academy</title>
+  <title>From the STM32G474 to Automotive-Grade MCUs — MCU Academy</title>
   <meta name="description" content="How each lesson maps to NXP S32K1xx, Infineon AURIX TC3xx and Renesas RH850: qualification, safety, vendor MCAL and tooling.">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,25 +24,25 @@
         <header class="page-hero">
           <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Reference C</span><span>/</span><span>Automotive MCUs</span></nav>
           <div class="eyebrow">Reference C · Reference</div>
-          <h1>From Blue Pill to Automotive-Grade MCUs</h1>
-          <p class="lead">The Blue Pill taught you the concepts with a cheap chip you can see every register of. Real ECUs use microcontrollers built and qualified for cars. This appendix explains what is different about them and maps each lesson of the course onto three families you are likely to meet: NXP S32K, Infineon AURIX and Renesas RH850.</p>
+          <h1>From the STM32G474 to Automotive-Grade MCUs</h1>
+          <p class="lead">The NUCLEO-G474RE taught you the concepts with an affordable chip you can see every register of. Real ECUs use microcontrollers built and qualified for cars. This appendix explains what is different about them and maps each lesson of the course onto three families you are likely to meet: NXP S32K, Infineon AURIX and Renesas RH850.</p>
           <div class="page-meta"><span>⏱ 20 min read</span><span>🎯 Intermediate</span><span>📂 (reading)</span></div>
         </header>
 
-        <section class="doc-section" id="why-not-f103" data-title="Why the F103 isn&#x27;t automotive">
-          <div class="sec-head"><h2><span class="sec-num">C.1</span>Why the F103 isn&#x27;t automotive</h2></div>
-          <p>The STM32F103 is an industrial part. Nothing stops it from working in a car on a bench, but it lacks what a car maker requires:</p>
+        <section class="doc-section" id="why-not-g474" data-title="Why the G474 isn&#x27;t automotive">
+          <div class="sec-head"><h2><span class="sec-num">C.1</span>Why the G474 isn&#x27;t automotive</h2></div>
+          <p>The STM32G474RET6 is a general-purpose industrial part. It has some features an automotive designer likes (CAN FD, flash ECC, a capable FPU), but it lacks what a car maker requires from a qualified part:</p>
           <div class="table-wrap"><table class="t">
-            <thead><tr><th>Topic</th><th>Automotive MCU</th><th>STM32F103C8T6</th></tr></thead>
+            <thead><tr><th>Topic</th><th>Automotive MCU</th><th>STM32G474RET6</th></tr></thead>
             <tbody>
-              <tr><td>Qualification</td><td><b>AEC-Q100</b> stress tests, grade by ambient temperature (grade 1: −40 to 125 °C, grade 0: up to 150 °C)</td><td>industrial range, −40 to 85 °C for the "6" suffix (DS5319)</td></tr>
-              <tr><td>Functional safety</td><td>ISO 26262 safety manual, lockstep CPU cores, ECC on flash and RAM, built-in self tests, safety management unit</td><td>none of these</td></tr>
-              <tr><td>Communication</td><td>CAN FD, several CAN channels, LIN, often Ethernet and FlexRay</td><td>one classic CAN, shared with USB</td></tr>
-              <tr><td>Long-term supply</td><td>10–15 years, change notification process, PPAP</td><td>commercial availability; clone chips on many Blue Pills</td></tr>
+              <tr><td>Qualification</td><td><b>AEC-Q100</b> stress tests, grade by ambient temperature (grade 1: −40 to 125 °C, grade 0: up to 150 °C)</td><td>industrial range, −40 to 85 °C for the "6" suffix (DS12288, ordering information)</td></tr>
+              <tr><td>Functional safety</td><td>ISO 26262 safety manual, lockstep CPU cores, ECC on flash and RAM, built-in self tests, safety management unit</td><td>ECC on flash and parity on part of the SRAM, but no lockstep core, no safety manual for ISO 26262 and no safety management unit</td></tr>
+              <tr><td>Communication</td><td>CAN FD, several CAN channels, LIN, often Ethernet and FlexRay</td><td>three FDCAN controllers (CAN FD) and USART LIN mode; no Ethernet or FlexRay</td></tr>
+              <tr><td>Long-term supply</td><td>10–15 years, change notification process, PPAP</td><td>ST's longevity commitment for industrial parts, but not the automotive change-control process</td></tr>
               <tr><td>Software</td><td>vendor AUTOSAR MCAL, safety OS options, configuration tools</td><td>CMSIS, HAL/LL</td></tr>
             </tbody>
           </table></div>
-          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The Blue Pill is a learner car on an empty parking lot: every control is visible and nothing bad happens if you stall. An automotive MCU is the same car built for the motorway in winter: same pedals, plus airbags, ABS, a service history and a manufacturer who promises spare parts for fifteen years.</p></div></div>
+          <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>The NUCLEO is a learner car on an empty parking lot: every control is visible and nothing bad happens if you stall. An automotive MCU is the same car built for the motorway in winter: same pedals, plus airbags, ABS, a service history and a manufacturer who promises spare parts for fifteen years.</p></div></div>
           <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Never in a real vehicle</span><p>Nothing from this course, hardware or software, belongs in a vehicle on a public road. The capstone imitates an ECU to teach how one is built; it is not qualified, not safety-analysed and not tested to automotive standards.</p></div></div>
         </section>
 
