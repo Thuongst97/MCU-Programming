@@ -96,7 +96,7 @@
       { id: "a", label: "Page A active", sub: "append new versions", x: 30, y: 20, tone: "svc", desc: "<p>Each write of a block appends a new copy with a header to page A. Reading returns the newest copy. Page B is erased and empty.</p>" },
       { id: "afull", label: "Page A full", sub: "no room for the next write", x: 400, y: 20, tone: "cdd", desc: "<p>The next write does not fit. Fee starts a page swap before accepting it.</p>" },
       { id: "copy", label: "Copy to page B", sub: "newest copy of each block", x: 770, y: 20, tone: "tool", desc: "<p>Only the latest version of every block is copied, then page B is marked active. Until that marker is written, page A stays the valid one, so a reset here loses nothing.</p>" },
-      { id: "erase", label: "Erase page A", sub: "one erase cycle used", x: 770, y: 170, tone: "mcal", desc: "<p>Page A is erased (20–40 ms on the F103) and becomes the spare. Each swap costs one of its ~10 000 erase cycles.</p>" },
+      { id: "erase", label: "Erase page A", sub: "one erase cycle used", x: 770, y: 170, tone: "mcal", desc: "<p>Page A is erased (tens of milliseconds on the G474, DS12288) and becomes the spare. Each swap costs one of its ~10 000 erase cycles.</p>" },
       { id: "b", label: "Page B active", sub: "append new versions", x: 400, y: 170, tone: "svc", desc: "<p>The roles have swapped. Writes append to page B until it fills, and the cycle repeats in the other direction.</p>" },
     ],
     transitions: [

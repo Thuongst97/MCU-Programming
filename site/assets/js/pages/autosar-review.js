@@ -25,16 +25,16 @@
     why: "If the crystal never starts, the bad version hangs before the watchdog even runs, and the ECU is dead with no diagnosis. The Mcu driver gives up after a bounded number of polls and returns an error the caller can act on (stay on HSI, report a DEM event)." });
 
   const REQ = {
-    "TL-REQ-001": ["Stalk inputs, 20 ms debounce", ["logic/turnlight_sm.c: stalk_logic()", "stage 1/2: debounce.c (example 01)", "stage 3: IoHwAb_MainFunction (debounce), Rte_Call_StalkLeft_Get"], ["host: test_left_stalk_flashes_left_only", "Renode: TL-REQ-001 Left Stalk (3 stages)"]],
-    "TL-REQ-002": ["Flash rate 1.5 Hz, 50 % duty", ["logic/turnlight_sm.h: TL_PERIOD_MS, TL_ON_MS"], ["host: test_flash_rate_is_1_5_hz", "hardware checklist: logic analyser on PA6"]],
-    "TL-REQ-003": ["Hazard overrides, in phase", ["logic/turnlight_sm.c: tl_step() hazard branch"], ["host: test_hazard_overrides_and_is_in_phase", "Renode: TL-REQ-003 Hazard (3 stages)"]],
-    "TL-REQ-004": ["Comfort blink: tap gives 3 flashes", ["logic/turnlight_sm.c: TL_MODE_COMFORT"], ["host: test_tap_gives_exactly_three_flashes", "Renode: TL-REQ-004 Comfort Blink (3 stages)"]],
-    "TL-REQ-005": ["Lamp-out detection, double rate, DEM event", ["logic/lampmon.c", "stage 3: SWC LampMonitor, Dem_SetEventStatus"], ["host: test_lamp_out_judged_once_per_phase_after_settling, test_failed_lamp_flashes_twice_as_fast", "Renode: TL-REQ-005 Lamp Out (3 stages)"]],
-    "TL-REQ-006": ["TurnLightStatus 0x3A0, 100 ms + on change", ["logic/tl_msg.c: tl_status_pack()", "stage 3: Com mixed mode, CanIf, Can"], ["host: test_status_round_trip", "Renode: TL-REQ-006 CAN Status To Cluster (3 stages)"]],
-    "TL-REQ-007": ["ClusterAck supervision 500 ms", ["logic/tl_msg.c: tl_comm_step()", "stage 3: Com deadline monitoring → RTE_E_MAX_AGE_EXCEEDED"], ["host: test_cluster_lost_after_500_ms", "Renode: TL-REQ-007 Cluster Supervision (3 stages)"]],
-    "TL-REQ-008": ["PWM lamps, 20 ms soft ramp", ["hw/tl_hw.c: tl_hw_lamp_ramp()", "stage 3: IoHwAb_MainFunction_Fast"], ["hardware checklist: scope on PA6 (Renode has no PWM output)"]],
-    "TL-REQ-009": ["IWDG 100 ms, fed only when all checked in", ["stage 1: job_supervisor()", "stage 2: supervisor_task + event group", "stage 3: WdgM alive supervision → WdgIf → Wdg"], ["hardware checklist: stall a task, watch the reset"]],
-    "TL-REQ-010": ["Reset cause logged and sent", ["hw/tl_hw.c: tl_hw_reset_code()", "stage 3: Mcu_GetResetReason, Rte_Call_ResetReason_Get"], ["Renode: TL-REQ-010 Reset Cause (3 stages)"]],
+    "TL-REQ-001": ["Stalk inputs, 20 ms debounce", ["logic/turnlight_sm.c: stalk_logic()", "stage 1/2: debounce.c (example 01)", "stage 3: IoHwAb_MainFunction (debounce), Rte_Call_StalkLeft_Get"], ["host: test_left_stalk_flashes_left_only", "hardware checklist (acceptance.md): stalk and hazard buttons"]],
+    "TL-REQ-002": ["Flash rate 1.5 Hz, 50 % duty", ["logic/turnlight_sm.h: TL_PERIOD_MS, TL_ON_MS"], ["host: test_flash_rate_is_1_5_hz", "hardware checklist (acceptance.md): logic analyser on PA6"]],
+    "TL-REQ-003": ["Hazard overrides, in phase", ["logic/turnlight_sm.c: tl_step() hazard branch"], ["host: test_hazard_overrides_and_is_in_phase", "hardware checklist (acceptance.md): stalk and hazard buttons"]],
+    "TL-REQ-004": ["Comfort blink: tap gives 3 flashes", ["logic/turnlight_sm.c: TL_MODE_COMFORT"], ["host: test_tap_gives_exactly_three_flashes", "hardware checklist (acceptance.md): tap the right stalk"]],
+    "TL-REQ-005": ["Lamp-out detection, double rate, DEM event", ["logic/lampmon.c", "stage 3: SWC LampMonitor, Dem_SetEventStatus"], ["host: test_lamp_out_judged_once_per_phase_after_settling, test_failed_lamp_flashes_twice_as_fast", "hardware checklist (acceptance.md): pot to GND"]],
+    "TL-REQ-006": ["TurnLightStatus 0x3A0, 100 ms + on change", ["logic/tl_msg.c: tl_status_pack()", "stage 3: Com mixed mode, CanIf, Can"], ["host: test_status_round_trip", "hardware checklist (acceptance.md): second board with the cluster"]],
+    "TL-REQ-007": ["ClusterAck supervision 500 ms", ["logic/tl_msg.c: tl_comm_step()", "stage 3: Com deadline monitoring → RTE_E_MAX_AGE_EXCEEDED"], ["host: test_cluster_lost_after_500_ms", "hardware checklist (acceptance.md): hold B1 on the cluster"]],
+    "TL-REQ-008": ["PWM lamps, 20 ms soft ramp", ["hw/tl_hw.c: tl_hw_lamp_ramp()", "stage 3: IoHwAb_MainFunction_Fast"], ["hardware checklist (acceptance.md): scope on PA6"]],
+    "TL-REQ-009": ["IWDG 100 ms, fed only when all checked in", ["stage 1: job_supervisor()", "stage 2: supervisor_task + event group", "stage 3: WdgM alive supervision → WdgIf → Wdg"], ["hardware checklist (acceptance.md): stall a task, watch the reset"]],
+    "TL-REQ-010": ["Reset cause logged and sent", ["hw/tl_hw.c: tl_hw_reset_code()", "stage 3: Mcu_GetResetReason, Rte_Call_ResetReason_Get"], ["hardware checklist (acceptance.md): press B2 (RESET)"]],
   };
   const tr = $("#trace");
   tr.innerHTML = `<div class="calc-title"><b>Requirement → code → test</b></div>
@@ -49,7 +49,7 @@
   renderCodeExplorer($("#ex-r-lm"), { ...embedded("src-r-lm"), notes: {
     1: ["Input: the lamp commands", "What TurnLight asked for this cycle (sender-receiver)."],
     2: ["Input: the measured current", "From IoHwAb, which owns the ADC group."],
-    3: ["The requirement's logic", "The same host-tested function as stages 1 and 2; TL-REQ-005 is verified there and in Renode."],
+    3: ["The requirement's logic", "The same host-tested function as stages 1 and 2; TL-REQ-005 is verified there and on the hardware checklist."],
     4: ["Output to TurnLight and the bus", "TurnLight doubles the flash rate; the cluster shows the fault."],
     5: ["Output to diagnostics", "The DTC a workshop will read (module 22)."],
   } });

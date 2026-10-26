@@ -7,9 +7,9 @@
 
   explore("#ex-port", "src-ar-port", {
     1: ["NULL configuration", "A development error: reported to DET, then the function returns without touching the hardware."],
-    2: ["Refuse a lock-out", "A configuration that would disable SWD is rejected. This check is our addition: the F1 lets software lock out its own debugger."],
-    3: ["Remaps from the table", "<code>AFIO_MAPR</code> comes from the configuration: here the bxCAN remap to PB8/PB9."],
-    4: ["One entry per pin", "Each entry is the F1's 4-bit CNF/MODE value plus an initial level."],
+    2: ["Refuse a lock-out", "A configuration that takes PA13/PA14 away from SWD (anything but alternate function 0) is rejected. This check is our addition: the G4, like every STM32, lets software lock out its own debugger."],
+    3: ["Clock every port", "Port owns all pins, so it enables the clocks of GPIOA to GPIOG in <code>RCC_AHB2ENR</code> once. The read-back makes sure the clocks are on before the first register write."],
+    4: ["One entry per pin", "Each entry holds the G4 fields: mode, pull, speed, open-drain, alternate-function number (<code>AF_&lt;pin&gt;_&lt;signal&gt;</code> constants) and an initial level. The level is written before the mode, so an output never glitches."],
     5: ["Only the pointer is kept", "The driver stores the address of the <code>const</code> table; it never copies or changes it."],
   });
   explore("#ex-cmp", "src-ar-cmp", {
@@ -34,14 +34,14 @@
   });
   explore("#ex-adc", "src-ar-adc", {
     1: ["Buffer first", "The caller must have set up a result buffer with <code>Adc_SetupResultBuffer</code>."],
-    2: ["One group at a time", "The F1's single regular sequence is busy; a second start is a development error."],
+    2: ["One group at a time", "ADC1's regular sequence is busy; a second start is a development error."],
     3: ["Polling advances the group", "Each status query collects a finished channel and starts the next one."],
     4: ["Completed", "A one-shot group reports stream-completed; <code>Adc_ReadGroup</code> copies the results and returns it to idle."],
   });
   const NCAN = {
-    1: ["CAN_BUSY", "All three mailboxes are occupied. Not an error: the caller (CanIf) may retry."],
-    2: ["Request transmission", "The 11-bit ID into <code>TIxR</code> together with <code>TXRQ</code>: from here the hardware arbitrates on the bus."],
-    3: ["Transmit confirmation", "Only for frames the bus acknowledged (<code>TXOK</code>); CanIf passes it up to Com."],
+    1: ["CAN_BUSY", "The TX FIFO/queue is full, or its next element still waits for a confirmation. Not an error: the caller (CanIf) may retry."],
+    2: ["Request transmission", "The element is written into message RAM (ID, DLC, data), then its bit in <code>TXBAR</code> is set: from here the hardware arbitrates on the bus."],
+    3: ["Transmit confirmation", "Only for elements whose <code>TXBTO</code> bit says they were sent and acknowledged; a cancelled one (<code>TXBCF</code>) is only freed. CanIf passes the confirmation up to Com."],
     4: ["Receive indication", "Hardware object, ID and data go to CanIf, in task context."],
   };
   explore("#ex-canw", "src-ar-canw", NCAN);
@@ -60,7 +60,7 @@
   Checklist($("#ck-mcal"), [
     "You can list the files of a module and say which ones are generated per ECU.",
     "You can expand <code>FUNC(Std_ReturnType, DIO_CODE)</code> and <code>P2CONST(Port_ConfigType, AUTOMATIC, PORT_APPL_CONST)</code> by hand.",
-    "You can explain why <code>Dio_WriteChannel</code> needs no critical section on the F1.",
+    "You can explain why <code>Dio_WriteChannel</code> needs no critical section on the G4.",
     "You know when a problem goes to DET and when to DEM.",
     "<code>python3 tools/check-autosar.py</code> passes, and you know what three of its checks look for.",
   ], { key: "autosar-mcal" });

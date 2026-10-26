@@ -113,11 +113,11 @@
           <div class="callout prod" data-doc="AUTOSAR R4.3.1 / R4.4.0"><div class="ci">🏭</div><div><span class="ct">In production (R4.x)</span><p>ECUs on R4.x use the older document names without the <code>CP_</code> part (for example <code>AUTOSAR_SWS_DIODriver</code>) and slightly different APIs in several modules. The AUTOSAR pages point out the differences you are likely to meet.</p></div></div>
         </section>
 
-        <section class="doc-section" id="on-bluepill" data-title="How we do AUTOSAR on a Blue Pill">
-          <div class="sec-head"><h2><span class="sec-num">18.6</span>How we do AUTOSAR on a Blue Pill</h2></div>
-          <p>Real AUTOSAR stacks need licences, configuration tools and a certified OS, and they target automotive microcontrollers. The course builds a small, honest imitation on the Blue Pill so you can read and step through every line:</p>
+        <section class="doc-section" id="on-nucleo" data-title="How we do AUTOSAR on a NUCLEO">
+          <div class="sec-head"><h2><span class="sec-num">18.6</span>How we do AUTOSAR on a NUCLEO</h2></div>
+          <p>Real AUTOSAR stacks need licences, configuration tools and a certified OS, and they target automotive microcontrollers. The course builds a small, honest imitation on the NUCLEO-G474RE so you can read and step through every line:</p>
           <ul>
-            <li><code>autosar/</code>: MCAL drivers (Mcu, Port, Dio, Pwm, Adc, Wdg, Can) over the STM32F1 registers you know, and "-lite" versions of CanIf, PduR, Com, Dem, WdgM, EcuM, IoHwAb and Det. Each header lists what was left out.</li>
+            <li><code>autosar/</code>: MCAL drivers (Mcu, Port, Dio, Pwm, Adc, Wdg, Can) over the STM32G4 registers you know (FDCAN1 for Can), and "-lite" versions of CanIf, PduR, Com, Dem, WdgM, EcuM, IoHwAb and Det. Each header lists what was left out.</li>
             <li><code>autosar/os_shim</code>: an OSEK/AUTOSAR-OS-like API over FreeRTOS. <b>It is not a real AUTOSAR OS</b>, and module 21 lists the differences.</li>
             <li><code>capstone/turnlight/stage3-autosar</code>: two SWCs, a hand-written RTE that mirrors generated code, and the configuration files.</li>
           </ul>

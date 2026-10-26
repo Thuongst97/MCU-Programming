@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Writing MCAL Drivers the AUTOSAR Way — MCU Academy</title>
-  <meta name="description" content="Std_Types, compiler abstraction, MemMap, config structures, DET error reporting and naming rules, applied to Port, Dio, Pwm, Adc, Gpt, Wdg and Can on the F1.">
+  <meta name="description" content="Std_Types, compiler abstraction, MemMap, config structures, DET error reporting and naming rules, applied to Port, Dio, Pwm, Adc, Gpt, Wdg and Can on the STM32G474.">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +25,7 @@
           <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Module 20</span><span>/</span><span>MCAL Conventions</span></nav>
           <div class="eyebrow">Module 20 · AUTOSAR Classic</div>
           <h1>Writing MCAL Drivers the AUTOSAR Way</h1>
-          <p class="lead">The MCAL is where AUTOSAR meets the registers you have been programming since module 05. The register work does not change; what changes is everything around it: standard names and types, configuration kept out of the code, memory sections, and a defined way to report misuse. This module applies those conventions to Port, Dio, Pwm, Adc, Wdg and Can on the STM32F103, using the course's own drivers in <code>autosar/mcal</code>.</p>
+          <p class="lead">The MCAL is where AUTOSAR meets the registers you have been programming since module 05. The register work does not change; what changes is everything around it: standard names and types, configuration kept out of the code, memory sections, and a defined way to report misuse. This module applies those conventions to Port, Dio, Pwm, Adc, Wdg and Can on the STM32G474, using the course's own drivers in <code>autosar/mcal</code>.</p>
           <div class="page-meta"><span>⏱ 60 min read</span><span>🎯 Advanced</span><span>📂 autosar/mcal, autosar/include, stage3-autosar/cfg</span></div>
         </header>
 
@@ -275,9 +275,9 @@ FUNC(void, PORT_CODE) Port_Init(P2CONST(Port_ConfigType, AUTOMATIC, PORT_APPL_CO
           <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">DET is not DEM</span><p>DET is for bugs that tests must find before release; it is usually off in production. Faults of the running system (a lamp that fails, a crystal that does not start, a bus that goes silent) are <b>production errors</b>: they go to the Diagnostic Event Manager and become DTCs a workshop can read (module 22).</p></div></div>
         </section>
 
-        <section class="doc-section" id="dio-port" data-title="Port and Dio on the F1">
-          <div class="sec-head"><h2><span class="sec-num">20.7</span>Port and Dio on the F1</h2></div>
-          <p><b>Port</b> configures every pin once at start-up from its configuration table; <b>Dio</b> reads and writes the pins. Dio has no init function and must be safe to call from any context. On the F1, <code>GPIOx_BSRR</code> sets or clears pins atomically, so Dio needs no critical section:</p>
+        <section class="doc-section" id="dio-port" data-title="Port and Dio on the G4">
+          <div class="sec-head"><h2><span class="sec-num">20.7</span>Port and Dio on the G4</h2></div>
+          <p><b>Port</b> configures every pin once at start-up from its configuration table; <b>Dio</b> reads and writes the pins. Dio has no init function and must be safe to call from any context. On the G4, <code>GPIOx_BSRR</code> sets or clears pins atomically, so Dio needs no critical section:</p>
           <script type="text/plain" id="src-ar-dio" data-src="autosar/mcal/dio/Dio.c" data-region="channel" data-lang="c" data-file="autosar/mcal/dio/Dio.c" data-start="42" data-end="60" data-sha="7966630f5818">
 FUNC(Dio_LevelType, DIO_CODE) Dio_ReadChannel(Dio_ChannelType ChannelId)
 {
@@ -339,8 +339,8 @@ FUNC(void, DIO_CODE) Dio_WriteChannel(Dio_ChannelType ChannelId, Dio_LevelType L
           <p>Channel IDs are <code>16 × port + pin</code>, so <code>DioConf_DioChannel_StalkLeft</code> = 28 is PB12. The mapping lives in the driver, not in the application.</p>
         </section>
 
-        <section class="doc-section" id="pwm-adc-gpt" data-title="Pwm, Adc and Gpt on the F1">
-          <div class="sec-head"><h2><span class="sec-num">20.8</span>Pwm, Adc and Gpt on the F1</h2></div>
+        <section class="doc-section" id="pwm-adc-gpt" data-title="Pwm, Adc and Gpt on the G4">
+          <div class="sec-head"><h2><span class="sec-num">20.8</span>Pwm, Adc and Gpt on the G4</h2></div>
           <p><b>Pwm</b> expresses duty cycles on a fixed scale, <code>0x0000</code> = 0 % to <code>0x8000</code> = 100 % (AUTOSAR_CP_SWS_PWMDriver), and converts to timer counts itself, using the timer clock from the configuration (the ×2 rule of module 07):</p>
           <script type="text/plain" id="src-ar-pwm" data-src="autosar/mcal/pwm/Pwm.c" data-region="duty" data-lang="c" data-file="autosar/mcal/pwm/Pwm.c" data-start="94" data-end="109" data-sha="756d27e6f948">
 FUNC(void, PWM_CODE) Pwm_SetDutyCycle(Pwm_ChannelType ChannelNumber, uint16 DutyCycle)
@@ -420,9 +420,9 @@ FUNC(Adc_StatusType, ADC_CODE) Adc_GetGroupStatus(Adc_GroupType Group)
           <p><b>Gpt</b> (general-purpose timer) provides time bases and notifications to other modules. The capstone does not need it: the OS counter is the only time base. It is listed as not implemented rather than stubbed.</p>
         </section>
 
-        <section class="doc-section" id="can-wdg" data-title="Can and Wdg on the F1">
-          <div class="sec-head"><h2><span class="sec-num">20.9</span>Can and Wdg on the F1</h2></div>
-          <p>The <b>Can</b> driver moves frames between hardware mailboxes and CanIf. It is called with <i>hardware object handles</i> (HTH for transmit, HRH for receive) and reports back through callbacks (AUTOSAR_CP_SWS_CANDriver). Can-lite runs in polling mode: the main functions do the work in task context, never in an interrupt:</p>
+        <section class="doc-section" id="can-wdg" data-title="Can and Wdg on the G4">
+          <div class="sec-head"><h2><span class="sec-num">20.9</span>Can and Wdg on the G4</h2></div>
+          <p>The <b>Can</b> driver moves frames between the FDCAN1 message RAM (TX FIFO/queue, RX FIFO 0) and CanIf. It is called with <i>hardware object handles</i> (HTH for transmit, HRH for receive) and reports back through callbacks (AUTOSAR_CP_SWS_CANDriver). Can-lite runs in polling mode: the main functions do the work in task context, never in an interrupt:</p>
           <script type="text/plain" id="src-ar-canw" data-src="autosar/mcal/can/Can.c" data-region="write" data-lang="c" data-file="autosar/mcal/can/Can.c" data-start="137" data-end="179" data-sha="8ac0e73cc718">
 FUNC(Std_ReturnType, CAN_CODE) Can_Write(Can_HwHandleType Hth, P2CONST(Can_PduType, AUTOMATIC, CAN_APPL_DATA) PduInfo)
 {
