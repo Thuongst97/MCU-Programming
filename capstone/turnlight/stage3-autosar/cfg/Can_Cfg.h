@@ -10,7 +10,7 @@
 #define CAN_VERSION_INFO_API   STD_ON
 
 #define CanConf_CanHardwareObject_Rx                       ((Can_HwHandleType)0U)   /* FIFO 0, every standard ID */
-#define CanConf_CanHardwareObject_Tx                       ((Can_HwHandleType)1U)   /* the three transmit mailboxes */
+#define CanConf_CanHardwareObject_Tx                       ((Can_HwHandleType)1U)   /* the three-element TX FIFO */
 #define CanConf_CanController_0         0U
 
 #endif

@@ -38,7 +38,7 @@ void Os_AssertFailed(const char *file, int line);
 #define configUSE_TICK_HOOK                     0
 #define configUSE_MALLOC_FAILED_HOOK            0
 
-/* Cortex-M interrupt priorities: the F103 implements 4 priority bits (stm32f103xb.h). */
+/* Cortex-M interrupt priorities: the G474 implements 4 priority bits (__NVIC_PRIO_BITS in stm32g474xx.h). */
 #define configPRIO_BITS                         4
 #define configKERNEL_INTERRUPT_PRIORITY         (15U << (8U - configPRIO_BITS))   /* lowest */
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY    (5U << (8U - configPRIO_BITS))    /* 0..4: never masked, no FreeRTOS API */

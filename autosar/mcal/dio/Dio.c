@@ -17,14 +17,14 @@
 #error "Dio.c: AUTOSAR release of Std_Types.h does not match"
 #endif
 
-#define DIO_NUM_PORTS 3U
+#define DIO_NUM_PORTS 7U
 
 #define DIO_START_SEC_CODE
 #include "Dio_MemMap.h"
 
 static FUNC(GPIO_TypeDef *, DIO_CODE) Dio_Gpio(uint8 port)
 {
-    static GPIO_TypeDef *const gpio[DIO_NUM_PORTS] = {GPIOA, GPIOB, GPIOC};
+    static GPIO_TypeDef *const gpio[DIO_NUM_PORTS] = {GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG};
     return gpio[port];
 }
 

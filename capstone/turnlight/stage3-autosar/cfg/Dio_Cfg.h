@@ -13,6 +13,6 @@
 #define DioConf_DioChannel_StalkLeft    ((Dio_ChannelType)28U)   /* PB12 */
 #define DioConf_DioChannel_StalkRight   ((Dio_ChannelType)29U)   /* PB13 */
 #define DioConf_DioChannel_Hazard       ((Dio_ChannelType)30U)   /* PB14 */
-#define DioConf_DioChannel_Heartbeat    ((Dio_ChannelType)45U)   /* PC13, LED active-low */
+#define DioConf_DioChannel_Heartbeat    ((Dio_ChannelType)5U)    /* PA5, LD2, active-high */
 
 #endif

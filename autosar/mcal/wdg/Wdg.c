@@ -17,7 +17,7 @@
 #error "Wdg.c: AUTOSAR release of Std_Types.h does not match"
 #endif
 
-#define WDG_KEY_UNLOCK   0x5555U          /* IWDG_KR key values, RM0008 §19.4.1 */
+#define WDG_KEY_UNLOCK   0x5555U          /* IWDG_KR key values, RM0440 "IWDG" */
 #define WDG_KEY_START    0xCCCCU
 #define WDG_KEY_RELOAD   0xAAAAU
 
@@ -42,11 +42,16 @@ FUNC(void, WDG_CODE) Wdg_Init(P2CONST(Wdg_ConfigType, AUTOMATIC, WDG_APPL_CONST)
         WDG_DET(WDG_INIT_SID, WDG_E_PARAM_CONFIG);
         return;
     }
-    DBGMCU->CR |= DBGMCU_CR_DBG_IWDG_STOP;                /* pause while halted by the debugger */
-    IWDG->KR = WDG_KEY_UNLOCK;
+    DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_IWDG_STOP;    /* pause while halted by the debugger */
+    IWDG->KR = WDG_KEY_START;                             /* from here on it cannot be stopped */
+    IWDG->KR = WDG_KEY_UNLOCK;                            /* G4 order (as ST's HAL): start, then configure */
     IWDG->PR = ConfigPtr->prescaler;
     IWDG->RLR = ConfigPtr->reload;
-    IWDG->KR = WDG_KEY_START;                             /* from here on it cannot be stopped */
+    for (uint32 n = 0U; ((IWDG->SR & (IWDG_SR_PVU | IWDG_SR_RVU | IWDG_SR_WVU)) != 0U) && (n < 100000UL); ++n)
+    {
+        /* the values cross into the LSI clock domain */
+    }
+    IWDG->KR = WDG_KEY_RELOAD;
     Wdg_ConfigPtr = ConfigPtr;
 }
 

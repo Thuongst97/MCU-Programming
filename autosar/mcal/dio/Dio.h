@@ -3,9 +3,9 @@
  * Spec reference : AUTOSAR CP R25-11, AUTOSAR_CP_SWS_DIODriver
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  *
- * Dio on the STM32F1: channels are 16 * port + pin; writes go through GPIOx_BSRR, which sets
+ * Dio on the STM32G4: channels are 16 * port + pin; writes go through GPIOx_BSRR, which sets
  * and clears bits atomically, so no read-modify-write and no critical section is needed
- * (RM0008 §9.2.5). Dio has no init function: Port configures the pins.
+ * (RM0440 "GPIO port bit set/reset register"). Dio has no init function: Port configures the pins.
  * Not supported: channel groups (Dio_ReadChannelGroup / Dio_WriteChannelGroup).
  */
 #ifndef DIO_H

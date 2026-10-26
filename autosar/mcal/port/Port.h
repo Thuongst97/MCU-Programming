@@ -3,8 +3,8 @@
  * Spec reference : AUTOSAR CP R25-11, AUTOSAR_CP_SWS_PortDriver
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  *
- * Port-lite for the STM32F1: every pin's mode comes from the configuration as the 4-bit
- * CNF[1:0] MODE[1:0] value of GPIOx_CRL/CRH (RM0008 §9.2.1), plus the AFIO remap register.
+ * Port-lite for the STM32G4: every pin's mode, pull, output type, speed and alternate function
+ * come from the configuration and go into GPIOx_MODER/PUPDR/OTYPER/OSPEEDR/AFR (RM0440 "GPIO").
  * Port_SetPinDirection and Port_SetPinMode are not supported (configured STD_OFF); the
  * SWS makes both optional.
  */
@@ -34,27 +34,31 @@
 typedef uint8 Port_PinType;               /* 16 * port + pin: A0 = 0, B12 = 28, C13 = 45 */
 typedef enum { PORT_PIN_IN = 0, PORT_PIN_OUT } Port_PinDirectionType;
 
-/* F1 pin modes: CNF[1:0] << 2 | MODE[1:0] */
-#define PORT_F1_ANALOG          0x0U
-#define PORT_F1_IN_FLOATING     0x4U
-#define PORT_F1_IN_PULL         0x8U      /* pull-up or pull-down, chosen by the initial level */
-#define PORT_F1_OUT_PP_2MHZ     0x2U
-#define PORT_F1_OUT_OD_2MHZ     0x6U
-#define PORT_F1_AF_PP_2MHZ      0xAU
-#define PORT_F1_AF_PP_50MHZ     0xBU
+/* GPIOx_MODER values (2 bits per pin) */
+#define PORT_MODE_INPUT         0U
+#define PORT_MODE_OUTPUT        1U
+#define PORT_MODE_AF            2U
+#define PORT_MODE_ANALOG        3U
+/* GPIOx_PUPDR values */
+#define PORT_PULL_NONE          0U
+#define PORT_PULL_UP            1U
+#define PORT_PULL_DOWN          2U
 
 typedef struct
 {
     Port_PinType pin;
-    uint8 mode;                           /* PORT_F1_... */
-    uint8 initialLevel;                   /* STD_HIGH / STD_LOW: output level, or pull-up/down */
+    uint8 mode;                           /* PORT_MODE_... */
+    uint8 pull;                           /* PORT_PULL_... */
+    uint8 openDrain;                      /* 1: OTYPER open-drain */
+    uint8 speed;                          /* OSPEEDR 0 (low) .. 3 (very high) */
+    uint8 af;                             /* AFR value when mode is PORT_MODE_AF (DS12288 table) */
+    uint8 initialLevel;                   /* STD_HIGH / STD_LOW: output level before the pin drives */
 } Port_PinConfigType;
 
 typedef struct
 {
     P2CONST(Port_PinConfigType, TYPEDEF, PORT_APPL_CONST) pins;
     uint8 numPins;
-    uint32 afioMapr;                      /* remaps; SWJ_CFG must never disable SWD */
 } Port_ConfigType;
 
 #define PORT_START_SEC_CODE

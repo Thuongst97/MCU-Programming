@@ -37,11 +37,11 @@ static VAR(sint16, ADC_VAR) Adc_Active;                   /* one group at a time
 #define ADC_START_SEC_CODE
 #include "Adc_MemMap.h"
 
-static FUNC(boolean, ADC_CODE) Adc_WaitClear(uint32 mask)
+static FUNC(boolean, ADC_CODE) Adc_Wait(volatile uint32 *reg, uint32 mask, uint32 want)
 {
     for (uint32 n = 0U; n < ADC_WAIT_LOOPS; ++n)
     {
-        if ((ADC1->CR2 & mask) == 0U)
+        if ((*reg & mask) == want)
         {
             return TRUE;
         }
@@ -51,9 +51,8 @@ static FUNC(boolean, ADC_CODE) Adc_WaitClear(uint32 mask)
 
 static FUNC(void, ADC_CODE) Adc_StartChannel(Adc_ChannelType ch)
 {
-    ADC1->SQR1 = 0U;                                      /* sequence of one */
-    ADC1->SQR3 = ch;
-    ADC1->CR2 |= ADC_CR2_SWSTART;
+    ADC1->SQR1 = (uint32)ch << ADC_SQR1_SQ1_Pos;          /* L = 0: a sequence of one */
+    ADC1->CR |= ADC_CR_ADSTART;
 }
 
 FUNC(void, ADC_CODE) Adc_Init(P2CONST(Adc_ConfigType, AUTOMATIC, ADC_APPL_CONST) ConfigPtr)
@@ -68,25 +67,29 @@ FUNC(void, ADC_CODE) Adc_Init(P2CONST(Adc_ConfigType, AUTOMATIC, ADC_APPL_CONST)
         ADC_DET(ADC_INIT_SID, ADC_E_ALREADY_INITIALIZED);
         return;
     }
-    RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;                    /* ADCCLK: PCLK2 / 6 = 12 MHz, set by Mcu */
+    RCC->AHB2ENR |= RCC_AHB2ENR_ADC12EN;
+    ADC12_COMMON->CCR = ADC_CCR_CKMODE_1 | ADC_CCR_CKMODE_0;   /* ADC clock = HCLK / 4 = 42.5 MHz */
     uint32 smp = 0U;
-    for (uint32 i = 0U; i < 8U; ++i)
+    for (uint32 i = 0U; i < 10U; ++i)
     {
         smp |= (uint32)ConfigPtr->sampleTime << (3U * i);
     }
-    ADC1->SMPR2 = smp;                                    /* channels 0..7 */
-    ADC1->CR2 = ADC_CR2_ADON | (7UL << ADC_CR2_EXTSEL_Pos) | ADC_CR2_EXTTRIG;   /* trigger: SWSTART */
-    for (volatile uint32 n = 0U; n < 1000U; ++n)
+    ADC1->SMPR1 = smp;                                    /* channels 0..9 */
+    ADC1->CR &= ~ADC_CR_DEEPPWD;                          /* G4 power-up: leave deep power-down, */
+    ADC1->CR |= ADC_CR_ADVREGEN;                          /* start the regulator (20 us), */
+    for (volatile uint32 n = 0U; n < 10000U; ++n)
     {
-        /* tSTAB + 2 ADC clocks before calibration */
+        /* tADCVREG_STUP */
     }
-    ADC1->CR2 |= ADC_CR2_RSTCAL;
-    if (!Adc_WaitClear(ADC_CR2_RSTCAL))
+    ADC1->CR &= ~ADC_CR_ADCALDIF;                         /* calibrate (single-ended), */
+    ADC1->CR |= ADC_CR_ADCAL;
+    if (!Adc_Wait(&ADC1->CR, ADC_CR_ADCAL, 0U))
     {
         return;                                           /* stays uninitialised: every call reports UNINIT */
     }
-    ADC1->CR2 |= ADC_CR2_CAL;
-    if (!Adc_WaitClear(ADC_CR2_CAL))
+    ADC1->ISR = ADC_ISR_ADRDY;
+    ADC1->CR |= ADC_CR_ADEN;                              /* enable and wait until ready */
+    if (!Adc_Wait(&ADC1->ISR, ADC_ISR_ADRDY, ADC_ISR_ADRDY))
     {
         return;
     }
@@ -153,7 +156,7 @@ FUNC(Adc_StatusType, ADC_CODE) Adc_GetGroupStatus(Adc_GroupType Group)
         return ADC_IDLE;
     }
     P2VAR(Adc_GroupStateType, AUTOMATIC, ADC_VAR) st = &Adc_State[Group];
-    if ((st->status == ADC_BUSY) && ((ADC1->SR & ADC_SR_EOC) != 0U))      /* polling advances the group */   // «3»
+    if ((st->status == ADC_BUSY) && ((ADC1->ISR & ADC_ISR_EOC) != 0U))     /* polling advances the group */   // «3»
     {
         st->buffer[st->next] = (Adc_ValueGroupType)(ADC1->DR & 0xFFFU);
         st->next++;

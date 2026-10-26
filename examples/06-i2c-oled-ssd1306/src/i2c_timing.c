@@ -4,11 +4,14 @@
 /* I2C-bus minimums and maximums in ns (UM10204): standard mode (100 kHz) and fast mode (400 kHz). */
 typedef struct
 {
-    uint32_t t_low_min, t_high_min, t_su_dat_min, t_r_max, t_f_max, t_hd_dat_max;
+    uint32_t t_low_min;
+    uint32_t t_high_min;
+    uint32_t t_su_dat_min;
+    uint32_t t_r_max;
+    uint32_t t_f_max;
+    uint32_t t_hd_dat_max;
 } bus_mode_t;
 
-static const bus_mode_t k_standard = {4700U, 4000U, 250U, 1000U, 300U, 3450U};
-static const bus_mode_t k_fast = {1300U, 600U, 100U, 300U, 300U, 900U};
 #define T_AF_MIN_NS 50U           /* analog noise filter delay, minimum (RM0440 / DS12288) */
 
 static uint32_t div_up(uint64_t a, uint64_t b)
@@ -20,7 +23,7 @@ static uint32_t div_up(uint64_t a, uint64_t b)
 /* Try one prescaler: 0 and the fields if everything fits, -1 otherwise. */
 static int try_presc(uint32_t fclk_hz, uint32_t fscl_hz, const bus_mode_t *m, uint32_t presc, i2c_timing_t *t)
 {
-    const uint64_t tick_ps = (1000000000000ULL * (presc + 1U)) / fclk_hz;
+    const uint64_t tick_ps = (1000000000000ULL * ((uint64_t)presc + 1U)) / fclk_hz;
     const uint64_t clk_ps = 1000000000000ULL / fclk_hz;
     /* Low and high phases: at least the spec minimum, together at least one SCL period. */
     uint32_t low = div_up((uint64_t)m->t_low_min * 1000U, tick_ps);                 // «2»
@@ -34,12 +37,12 @@ static int try_presc(uint32_t fclk_hz, uint32_t fscl_hz, const bus_mode_t *m, ui
     }
     /* Data hold (SDADEL) and set-up (SCLDEL), with the RM0440 formulas (no digital filter). */
     const uint64_t hold_ps = (uint64_t)m->t_f_max * 1000U;                            // «4»
-    const uint64_t skip_ps = (uint64_t)T_AF_MIN_NS * 1000U + 3U * clk_ps;
+    const uint64_t skip_ps = ((uint64_t)T_AF_MIN_NS * 1000U) + (3U * clk_ps);
     const uint32_t sdadel = (hold_ps > skip_ps) ? div_up(hold_ps - skip_ps, tick_ps) : 0U;
     uint32_t scldel = div_up((uint64_t)(m->t_r_max + m->t_su_dat_min) * 1000U, tick_ps);  // «5»
     scldel = (scldel == 0U) ? 0U : (scldel - 1U);
     if ((low > 256U) || (high > 256U) || (sdadel > 15U) || (scldel > 15U) ||
-        ((uint64_t)sdadel * tick_ps > (uint64_t)m->t_hd_dat_max * 1000U))
+        (((uint64_t)sdadel * tick_ps) > ((uint64_t)m->t_hd_dat_max * 1000U)))
     {
         return -1;
     }
@@ -57,6 +60,8 @@ int i2c_timing_calc(uint32_t fclk_hz, uint32_t fscl_hz, i2c_timing_t *t)
     {
         return -1;
     }
+    static const bus_mode_t k_standard = {4700U, 4000U, 250U, 1000U, 300U, 3450U};
+    static const bus_mode_t k_fast = {1300U, 600U, 100U, 300U, 300U, 900U};
     const bus_mode_t *m = (fscl_hz <= 100000U) ? &k_standard : &k_fast;
     /* Start with a tick of about 60 ns (fine resolution) and slow it down until every field
      * fits: the 4-bit SCLDEL/SDADEL fields need a longer tick in standard mode. */

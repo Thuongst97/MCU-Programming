@@ -3,7 +3,7 @@
  * Spec reference : AUTOSAR CP R25-11, AUTOSAR_CP_SWS_ADCDriver
  * In production  : VENDOR-SUPPLIED (MCAL from the silicon vendor)
  *
- * Adc-lite on ADC1 (RM0008 §11): one-shot, software-triggered groups, converted channel by
+ * Adc-lite on ADC1 (RM0440 "ADC"): one-shot, software-triggered groups, converted channel by
  * channel and advanced by polling in Adc_GetGroupStatus (no interrupts, no DMA).
  * Not supported: hardware triggers, continuous and streaming modes, priorities, notifications,
  * Adc_EnableHardwareTrigger, power-state control.

@@ -2,11 +2,11 @@
  * TurnLight capstone, stages 1 and 2: the board layer. Every register access of the ECU node
  * lives here; the logic in ../logic never touches hardware.
  *
- *   PB12 / PB13 / PB14  left stalk / right stalk / hazard button, to GND, internal pull-up
- *   PA6 / PA7           left / right lamp: TIM3 CH1 / CH2, 1 kHz PWM (a LED + resistor each)
- *   PA1                 lamp current sense (ADC1 IN1): a potentiometer on the bench
- *   PB8 / PB9           CAN RX / TX (example 11's driver) to an SN65HVD230
- *   PA9 / PA10          USART1 log;  PC13 heartbeat LED
+ *   PB12 / PB13 / PB14  left stalk / right stalk / hazard button, to GND, internal pull-up (Morpho header)
+ *   PA6 / PA7           left / right lamp: TIM3 CH1 / CH2 (D12 / D11), 1 kHz PWM (a LED + resistor each)
+ *   PA1                 lamp current sense (ADC1_IN2, A1): a potentiometer on the bench
+ *   PA11 / PA12         FDCAN1 RX / TX (example 11's driver) to a CAN FD transceiver
+ *   PA2 / PA3           LPUART1 log on the ST-LINK virtual COM port;  PA5 heartbeat LD2
  */
 #ifndef TL_HW_H
 #define TL_HW_H

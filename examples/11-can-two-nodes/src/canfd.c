@@ -32,7 +32,8 @@ int can_timing_calc(uint32_t fclk_hz, uint32_t bitrate, uint32_t sp_permille,
         {
             continue;
         }
-        const uint32_t tseg1 = before_sp - 1U, tseg2 = tq - before_sp;
+        const uint32_t tseg1 = before_sp - 1U;
+        const uint32_t tseg2 = tq - before_sp;
         if ((tseg1 > lim->max_tseg1) || (tseg2 < 1U) || (tseg2 > lim->max_tseg2))
         {
             continue;

@@ -1,15 +1,18 @@
 /* SPDX-License-Identifier: MIT
- * TurnLight capstone: the cluster node (a second Blue Pill). Receives TurnLightStatus, draws the
+ * TurnLight capstone: the cluster node (a second NUCLEO-G474RE). Receives TurnLightStatus, draws the
  * telltales on the SSD1306 OLED, and answers with ClusterAck every 100 ms (TL-REQ-006/007).
- * Holding the button on PA0 stops the acknowledgements, to test the ECU's supervision on a bench.
- * Drivers: examples 06 (I2C, SSD1306, font) and 11 (bxCAN).
+ * Holding B1 (USER, PC13) stops the acknowledgements, to test the ECU's supervision on a bench.
+ * Drivers: examples 06 (I2C, SSD1306, font) and 11 (FDCAN).
  */
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
+#include "board.h"
 #include "can.h"
 #include "clock.h"
 #include "gfx.h"
+#include "gpio.h"
 #include "i2c.h"
 #include "led.h"
 #include "ssd1306.h"
@@ -20,11 +23,18 @@
 
 static gfx_t s_fb;
 
+/* 500 kbit/s classic CAN from the FDCAN kernel clock (PCLK1), sample point 87.5 % target. */
+static bool can_start(void)
+{
+    can_timing_t nominal;
+    return (can_timing_calc(clock_pclk1(), 500000U, 875U, &CAN_NOMINAL_LIMITS, &nominal) == 0)
+           && can_init(&nominal, NULL, CAN_MODE_NORMAL);
+}
+
 static void button_init(void)
 {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
-    GPIOA->CRL = (GPIOA->CRL & ~(GPIO_CRL_MODE0 | GPIO_CRL_CNF0)) | GPIO_CRL_CNF0_1;
-    GPIOA->BSRR = GPIO_BSRR_BS0;
+    gpio_clock_on(BOARD_BTN_PORT);
+    gpio_mode(BOARD_BTN_PORT, BOARD_BTN_PIN, BSP_GPIO_INPUT);         /* B1 has its own resistors on the board */
 }
 
 static void draw(const tl_status_t *s, bool have_oled)
@@ -53,7 +63,7 @@ int main(void)
     i2c_init();
     const bool have_oled = ssd1306_init() == I2C_OK;
     uart_puts(have_oled ? "\nTurnLight cluster node, OLED ok\n" : "\nTurnLight cluster node, no OLED\n");
-    if (!can_init(CAN_BTR_500K_36MHZ, CAN_MODE_NORMAL))
+    if (!can_start())
     {
         uart_puts("cluster: CAN init failed\n");
     }
@@ -67,7 +77,7 @@ int main(void)
         while (can_receive(&rx))
         {
             tl_status_t s;
-            if ((rx.id == TL_CAN_ID_STATUS) && tl_status_unpack(rx.data, rx.dlc, &s))
+            if ((rx.id == TL_CAN_ID_STATUS) && tl_status_unpack(rx.data, rx.len, &s))
             {
                 last_alive = s.alive;
                 const bool changed = (s.lamp_left != shown.lamp_left) || (s.lamp_right != shown.lamp_right) ||
@@ -86,11 +96,11 @@ int main(void)
                 }
             }
         }
-        const bool muted = (GPIOA->IDR & GPIO_IDR_IDR0) == 0U;              /* button held: stay silent */
+        const bool muted = ((BOARD_BTN_PORT->IDR >> BOARD_BTN_PIN) & 1U) == BOARD_BTN_PRESSED;   /* held: stay silent */
         if (((int32_t)(millis() - next_ack) >= 0) && !muted)
         {
             next_ack += TL_STATUS_CYCLE_MS;
-            const can_frame_t ack = {.id = TL_CAN_ID_ACK, .dlc = 1U, .data = {last_alive}};
+            const can_frame_t ack = {.id = TL_CAN_ID_ACK, .len = 1U, .data = {last_alive}};
             (void)can_send(&ack);
             led_toggle();
         }

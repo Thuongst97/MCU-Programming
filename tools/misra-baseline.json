@@ -10,7 +10,7 @@
   "misra-c2012-13.3": 3
  },
  "examples/05-adc-pot-dma/src/adcmath.c": {
-  "misra-c2012-12.1": 2,
+  "misra-c2012-12.1": 1,
   "misra-c2012-12.3": 1
  },
  "examples/06-i2c-oled-ssd1306/src/font5x7.h": {

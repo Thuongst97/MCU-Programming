@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: MIT
  * TurnLight capstone, stage 1: bare metal. Example 02's cooperative scheduler runs six periodic
  * jobs; the state machine, lamp monitor and message packing come from ../logic, the drivers from
- * examples 01 (debounce), 11 (bxCAN) and ../hw. Requirements: ../docs/requirements.md.
+ * examples 01 (debounce), 11 (FDCAN) and ../hw. Requirements: ../docs/requirements.md.
  */
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "can.h"
@@ -18,6 +19,14 @@
 #include "tl_msg.h"
 #include "turnlight_sm.h"
 #include "uart_log.h"
+
+/* 500 kbit/s classic CAN from the FDCAN kernel clock (PCLK1), sample point 87.5 % target. */
+static bool can_start(void)
+{
+    can_timing_t nominal;
+    return (can_timing_calc(clock_pclk1(), 500000U, 875U, &CAN_NOMINAL_LIMITS, &nominal) == 0)
+           && can_init(&nominal, NULL, CAN_MODE_NORMAL);
+}
 
 static const char SIDE[TL_SIDES] = {'L', 'R'};
 
@@ -115,7 +124,7 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
     can_frame_t rx;
     while (can_receive(&rx))
     {
-        ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.dlc >= 1U));
+        ack = ack || ((rx.id == TL_CAN_ID_ACK) && (rx.len >= 1U));
     }
     if (tl_comm_step(&s_comm, ack, 10U))                                  /* TL-REQ-007 */   // «5»
     {
@@ -134,9 +143,9 @@ static void job_can(void)              /* 10 ms: ClusterAck supervision, TurnLig
         s_status.out_right = s_mon.failed[TL_RIGHT];
         s_status.cluster_lost = s_comm.lost;
         s_status.alive++;
-        can_frame_t tx = {.id = TL_CAN_ID_STATUS, .dlc = TL_STATUS_DLC, .data = {0}};
+        can_frame_t tx = {.id = TL_CAN_ID_STATUS, .len = TL_STATUS_DLC, .data = {0}};
         tl_status_pack(&s_status, tx.data);   // «7»
-        (void)can_send(&tx);           /* a full mailbox drops this frame; the next cycle repeats it */
+        (void)can_send(&tx);           /* a full TX FIFO drops this frame; the next cycle repeats it */
         s_status_changed = false;
         since_tx_ms = 0U;
     }
@@ -184,7 +193,7 @@ int main(void)
     {
         uart_puts("dem: TL_E_ADC_INIT failed\n");
     }
-    if (!can_init(CAN_BTR_500K_36MHZ, CAN_MODE_NORMAL))
+    if (!can_start())
     {
         uart_puts("dem: TL_E_CAN_INIT failed\n");
     }

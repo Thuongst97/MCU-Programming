@@ -7,8 +7,8 @@
 
 #define ADC_START_SEC_CONFIG_DATA_UNSPECIFIED
 #include "Adc_MemMap.h"
-static CONST(Adc_ChannelType, ADC_CONST) Adc_LampCurrentChannels[1] = {1U};
+static CONST(Adc_ChannelType, ADC_CONST) Adc_LampCurrentChannels[1] = {2U};   /* PA1 = ADC1_IN2 */
 static CONST(Adc_GroupDefType, ADC_CONST) Adc_Groups[ADC_MAX_GROUPS] = {{Adc_LampCurrentChannels, 1U}};
-CONST(Adc_ConfigType, ADC_CONST) Adc_Config = {Adc_Groups, ADC_MAX_GROUPS, 7U};   /* 239.5 cycles */
+CONST(Adc_ConfigType, ADC_CONST) Adc_Config = {Adc_Groups, ADC_MAX_GROUPS, 7U};   /* 640.5 cycles */
 #define ADC_STOP_SEC_CONFIG_DATA_UNSPECIFIED
 #include "Adc_MemMap.h"

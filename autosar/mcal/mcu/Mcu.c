@@ -26,6 +26,7 @@
 #include "Mcu_MemMap.h"
 static P2CONST(Mcu_ConfigType, MCU_VAR, MCU_APPL_CONST) Mcu_ConfigPtr;
 static VAR(uint32, MCU_VAR) Mcu_ResetRaw;
+static P2CONST(Mcu_ClockSettingConfigType, MCU_VAR, MCU_APPL_CONST) Mcu_Setting;
 #define MCU_STOP_SEC_VAR_CLEARED_UNSPECIFIED
 #include "Mcu_MemMap.h"
 
@@ -72,17 +73,21 @@ FUNC(Std_ReturnType, MCU_CODE) Mcu_InitClock(Mcu_ClockType ClockSetting)
         return E_NOT_OK;
     }
     P2CONST(Mcu_ClockSettingConfigType, AUTOMATIC, MCU_APPL_CONST) c = &Mcu_ConfigPtr->clockSettings[ClockSetting];
-    RCC->CR |= RCC_CR_HSEON;
-    if (!Mcu_WaitSet(&RCC->CR, RCC_CR_HSERDY, RCC_CR_HSERDY))
+    Mcu_Setting = c;
+    RCC->APB1ENR1 |= RCC_APB1ENR1_PWREN;
+    if (c->boost == TRUE)
     {
-        return E_NOT_OK;                                  /* production: Dem event MCU_E_CLOCK_FAILURE */
+        PWR->CR5 &= ~PWR_CR5_R1MODE;                      /* range 1 boost before the speed-up */
     }
-    FLASH->ACR = FLASH_ACR_PRFTBE | ((uint32)c->flashLatency << FLASH_ACR_LATENCY_Pos);
-    RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2 | RCC_CFGR_PLLMULL | RCC_CFGR_PLLSRC |
-                               RCC_CFGR_PLLXTPRE | RCC_CFGR_ADCPRE)) |
-                ((uint32)c->ahbDiv << RCC_CFGR_HPRE_Pos) | ((uint32)c->apb1Div << RCC_CFGR_PPRE1_Pos) |
-                ((uint32)c->apb2Div << RCC_CFGR_PPRE2_Pos) | RCC_CFGR_PLLSRC | RCC_CFGR_ADCPRE_DIV6 |
-                ((uint32)(c->pllMul - 2U) << RCC_CFGR_PLLMULL_Pos);
+    FLASH->ACR = FLASH_ACR_PRFTEN | FLASH_ACR_ICEN | FLASH_ACR_DCEN | ((uint32)c->flashLatency << FLASH_ACR_LATENCY_Pos);
+    RCC->CR &= ~RCC_CR_PLLON;                             /* PLLCFGR may only change with the PLL off */
+    if (!Mcu_WaitSet(&RCC->CR, RCC_CR_PLLRDY, 0U))
+    {
+        return E_NOT_OK;
+    }
+    RCC->PLLCFGR = RCC_PLLCFGR_PLLSRC_HSI | ((uint32)(c->pllM - 1U) << RCC_PLLCFGR_PLLM_Pos) |
+                   ((uint32)c->pllN << RCC_PLLCFGR_PLLN_Pos) |
+                   ((uint32)((c->pllR / 2U) - 1U) << RCC_PLLCFGR_PLLR_Pos) | RCC_PLLCFGR_PLLREN;
     RCC->CR |= RCC_CR_PLLON;                              /* Mcu_GetPllStatus() reports the lock */
     return E_OK;
 }
@@ -100,16 +105,24 @@ FUNC(Mcu_PllStatusType, MCU_CODE) Mcu_GetPllStatus(void)
 
 FUNC(Std_ReturnType, MCU_CODE) Mcu_DistributePllClock(void)
 {
-    if (Mcu_GetPllStatus() != MCU_PLL_LOCKED)
+    if ((Mcu_GetPllStatus() != MCU_PLL_LOCKED) || (Mcu_Setting == NULL_PTR))
     {
         MCU_DET(MCU_DISTRIBUTEPLLCLOCK_SID, MCU_E_PLL_NOT_LOCKED);
         return E_NOT_OK;
     }
+    /* Above 80 MHz go through AHB / 2 for at least 1 us (RM0440 "RCC"), then to the configured divider. */
+    RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2)) | RCC_CFGR_HPRE_DIV2 |
+                ((uint32)Mcu_Setting->apb1Div << RCC_CFGR_PPRE1_Pos) | ((uint32)Mcu_Setting->apb2Div << RCC_CFGR_PPRE2_Pos);
     RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;
     if (!Mcu_WaitSet(&RCC->CFGR, RCC_CFGR_SWS, RCC_CFGR_SWS_PLL))
     {
         return E_NOT_OK;
     }
+    for (volatile uint32 d = 0U; d < 200U; ++d)
+    {
+        /* >= 1 us at 85 MHz */
+    }
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_HPRE) | ((uint32)Mcu_Setting->ahbDiv << RCC_CFGR_HPRE_Pos);
     SystemCoreClockUpdate();
     return E_OK;
 }
@@ -123,7 +136,7 @@ FUNC(Mcu_ResetType, MCU_CODE) Mcu_GetResetReason(void)
     }
     if ((Mcu_ResetRaw & (RCC_CSR_IWDGRSTF | RCC_CSR_WWDGRSTF)) != 0U) { return MCU_WATCHDOG_RESET; }
     if ((Mcu_ResetRaw & RCC_CSR_SFTRSTF) != 0U) { return MCU_SW_RESET; }
-    if ((Mcu_ResetRaw & RCC_CSR_PORRSTF) != 0U) { return MCU_POWER_ON_RESET; }
+    if ((Mcu_ResetRaw & RCC_CSR_BORRSTF) != 0U) { return MCU_POWER_ON_RESET; }   /* G4: BOR covers power-on */
     if ((Mcu_ResetRaw & RCC_CSR_PINRSTF) != 0U) { return MCU_RESET_PIN; }
     return MCU_RESET_UNDEFINED;
 }

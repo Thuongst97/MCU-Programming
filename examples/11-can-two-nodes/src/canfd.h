@@ -9,14 +9,20 @@
  * The sample point sits after 1 + tseg1 quanta. sjw is how far a resync may move it. */
 typedef struct
 {
-    uint32_t brp, tseg1, tseg2, sjw;
+    uint32_t brp;
+    uint32_t tseg1;
+    uint32_t tseg2;
+    uint32_t sjw;
 } can_timing_t;
 
 /* Field limits of one bit-timing register (FDCAN_NBTP for the arbitration phase, FDCAN_DBTP for
  * the data phase; RM0440 "FDCAN"). */
 typedef struct
 {
-    uint32_t max_brp, max_tseg1, max_tseg2, max_sjw;
+    uint32_t max_brp;
+    uint32_t max_tseg1;
+    uint32_t max_tseg2;
+    uint32_t max_sjw;
 } can_timing_limits_t;
 
 extern const can_timing_limits_t CAN_NOMINAL_LIMITS;   /* NBTP: 512 / 256 / 128 / 128 */
