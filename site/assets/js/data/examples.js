@@ -4,7 +4,7 @@ window.MCU_DATA = window.MCU_DATA || {};
 window.MCU_DATA.examples = [
  {
   "id": "00",
-  "title": "Blink, 72 MHz and \"Hello from Blue Pill\"",
+  "title": "Blink, 170 MHz and \"Hello from NUCLEO-G474RE\"",
   "modules": [
    "setup",
    "boot",
@@ -14,26 +14,26 @@ window.MCU_DATA.examples = [
   ],
   "peripherals": [
    "RCC",
+   "PWR",
    "FLASH",
-   "GPIOC",
    "GPIOA",
-   "USART1",
+   "LPUART1",
    "SysTick"
   ],
   "flavor": "bare metal (registers) + ST HAL + ST LL",
   "pins": [
-   "PC13",
-   "PA9",
-   "PA10",
+   "PA5",
+   "PA2",
+   "PA3",
    "PA13",
    "PA14"
   ],
   "hw": [
-   "USB-UART adapter (3.3 V logic)"
+   "NUCLEO-G474RE",
+   "USB cable"
   ],
-  "sim": "partial",
   "tested_on": [],
-  "folder": "00-bluepill-blink-uart"
+  "folder": "00-nucleo-blink-uart"
  },
  {
   "id": "01",
@@ -43,25 +43,23 @@ window.MCU_DATA.examples = [
    "interrupts"
   ],
   "peripherals": [
-   "GPIOA",
-   "AFIO",
+   "GPIOC",
+   "SYSCFG",
    "EXTI",
    "NVIC",
    "SysTick",
-   "USART1"
+   "LPUART1"
   ],
   "flavor": "bare metal + host unit tests",
   "pins": [
-   "PA0",
    "PC13",
-   "PA9",
-   "PA10"
+   "PA5",
+   "PA2",
+   "PA3"
   ],
   "hw": [
-   "push button from PA0 to GND",
-   "USB-UART adapter"
+   "NUCLEO-G474RE"
   ],
-  "sim": "partial",
   "tested_on": [],
   "folder": "01-exti-button-debounce"
  },
@@ -73,19 +71,18 @@ window.MCU_DATA.examples = [
   ],
   "peripherals": [
    "SysTick",
-   "GPIOC",
-   "USART1"
+   "GPIOA",
+   "LPUART1"
   ],
   "flavor": "bare metal + host unit tests",
   "pins": [
-   "PC13",
-   "PA9",
-   "PA10"
+   "PA5",
+   "PA2",
+   "PA3"
   ],
   "hw": [
-   "USB-UART adapter"
+   "NUCLEO-G474RE"
   ],
-  "sim": "full",
   "tested_on": [],
   "folder": "02-systick-scheduler"
  },
@@ -99,21 +96,20 @@ window.MCU_DATA.examples = [
    "TIM3",
    "TIM2",
    "GPIOA",
-   "USART1"
+   "LPUART1"
   ],
   "flavor": "bare metal + host unit tests",
   "pins": [
    "PA6",
    "PA0",
-   "PA9",
-   "PA10"
+   "PA2",
+   "PA3"
   ],
   "hw": [
+   "NUCLEO-G474RE",
    "LED + 330 Ω resistor",
-   "jumper wire PA6–PA0",
-   "USB-UART adapter"
+   "jumper wire D12–A0"
   ],
-  "sim": "partial",
   "tested_on": [],
   "folder": "03-tim-pwm-dimming"
  },
@@ -125,21 +121,20 @@ window.MCU_DATA.examples = [
    "interrupts"
   ],
   "peripherals": [
-   "USART1",
+   "LPUART1",
    "NVIC",
-   "GPIOC"
+   "GPIOA"
   ],
   "flavor": "bare metal + host unit tests",
   "pins": [
-   "PA9",
-   "PA10",
-   "PC13",
+   "PA2",
+   "PA3",
+   "PA5",
    "PA8"
   ],
   "hw": [
-   "USB-UART adapter"
+   "NUCLEO-G474RE"
   ],
-  "sim": "full",
   "tested_on": [],
   "folder": "04-uart-shell-ringbuffer"
  },
@@ -152,21 +147,21 @@ window.MCU_DATA.examples = [
   "peripherals": [
    "ADC1",
    "DMA1",
+   "DMAMUX1",
    "GPIOA",
-   "USART1"
+   "LPUART1"
   ],
   "flavor": "bare metal + host unit tests",
   "pins": [
    "PA1",
-   "PA9",
-   "PA10"
+   "PA2",
+   "PA3"
   ],
   "hw": [
-   "10 kΩ potentiometer (ends to 3.3 V and GND",
-   "wiper to PA1)",
-   "USB-UART adapter"
+   "NUCLEO-G474RE",
+   "10 kΩ potentiometer (ends to 3V3 and GND",
+   "wiper to A1)"
   ],
-  "sim": "partial",
   "tested_on": [],
   "folder": "05-adc-pot-dma"
  },
@@ -177,22 +172,21 @@ window.MCU_DATA.examples = [
    "i2c"
   ],
   "peripherals": [
-   "I2C1",
-   "GPIOB",
-   "USART1"
+   "I2C2",
+   "GPIOA",
+   "LPUART1"
   ],
   "flavor": "bare metal + host unit tests",
   "pins": [
-   "PB6",
-   "PB7",
    "PA9",
-   "PA10"
+   "PA8",
+   "PA2",
+   "PA3"
   ],
   "hw": [
-   "SSD1306 128×64 I2C OLED module",
-   "USB-UART adapter"
+   "NUCLEO-G474RE",
+   "SSD1306 128×64 I2C OLED module"
   ],
-  "sim": "partial",
   "tested_on": [],
   "folder": "06-i2c-oled-ssd1306"
  },
@@ -203,25 +197,25 @@ window.MCU_DATA.examples = [
    "spi"
   ],
   "peripherals": [
-   "SPI1",
+   "SPI2",
    "DMA1",
-   "GPIOA",
-   "USART1"
+   "DMAMUX1",
+   "GPIOB",
+   "LPUART1"
   ],
   "flavor": "bare metal + host unit tests",
   "pins": [
-   "PA4",
-   "PA5",
-   "PA6",
-   "PA7",
-   "PA9",
-   "PA10"
+   "PB12",
+   "PB13",
+   "PB14",
+   "PB15",
+   "PA2",
+   "PA3"
   ],
   "hw": [
-   "W25Q32 or W25Q64 SPI flash module",
-   "USB-UART adapter"
+   "NUCLEO-G474RE",
+   "W25Q32 or W25Q64 SPI flash module"
   ],
-  "sim": "partial",
   "tested_on": [],
   "folder": "07-spi-flash-w25q"
  },
@@ -237,18 +231,17 @@ window.MCU_DATA.examples = [
    "RCC",
    "SCB",
    "DBGMCU",
-   "USART1"
+   "LPUART1"
   ],
   "flavor": "bare metal + host unit tests",
   "pins": [
-   "PA9",
-   "PA10",
-   "PC13"
+   "PA2",
+   "PA3",
+   "PA5"
   ],
   "hw": [
-   "USB-UART adapter"
+   "NUCLEO-G474RE"
   ],
-  "sim": "partial",
   "tested_on": [],
   "folder": "08-iwdg-hardfault"
  },
@@ -262,23 +255,21 @@ window.MCU_DATA.examples = [
    "PWR",
    "SCB",
    "EXTI",
-   "AFIO",
+   "SYSCFG",
    "SysTick",
-   "USART1"
+   "LPUART1"
   ],
   "flavor": "bare metal",
   "pins": [
-   "PA0",
    "PC13",
-   "PA9",
-   "PA10"
+   "PA5",
+   "PA2",
+   "PA3"
   ],
   "hw": [
-   "push button from PA0 to GND",
-   "USB-UART adapter",
-   "multimeter in the 3.3 V supply line (optional)"
+   "NUCLEO-G474RE",
+   "multimeter (optional)"
   ],
-  "sim": "partial",
   "tested_on": [],
   "folder": "09-lowpower-stop"
  },
@@ -293,55 +284,51 @@ window.MCU_DATA.examples = [
    "PendSV",
    "SVCall",
    "EXTI",
-   "USART1",
+   "LPUART1",
+   "GPIOA",
    "GPIOC"
   ],
   "flavor": "FreeRTOS (static allocation)",
   "pins": [
-   "PA0",
    "PC13",
-   "PA9",
-   "PA10"
+   "PA5",
+   "PA2",
+   "PA3"
   ],
   "hw": [
-   "push button from PA0 to GND (optional)",
-   "USB-UART adapter"
+   "NUCLEO-G474RE"
   ],
-  "sim": "full",
   "tested_on": [],
   "folder": "10-freertos-basics"
  },
  {
   "id": "11",
-  "title": "Two Blue Pills on a CAN bus",
+  "title": "Two NUCLEO boards on a CAN bus, classic and CAN FD frames",
   "modules": [
    "can"
   ],
   "peripherals": [
-   "bxCAN",
-   "AFIO",
+   "FDCAN1",
    "GPIOA",
-   "GPIOB",
+   "GPIOC",
    "NVIC",
-   "USART1"
+   "LPUART1"
   ],
-  "flavor": "bare metal",
+  "flavor": "bare metal + host unit tests",
   "pins": [
-   "PB8",
-   "PB9",
-   "PA0",
+   "PA11",
+   "PA12",
    "PC13",
-   "PA9",
-   "PA10"
+   "PA5",
+   "PA2",
+   "PA3"
   ],
   "hw": [
-   "second Blue Pill",
-   "2 × SN65HVD230 transceiver modules",
+   "second NUCLEO-G474RE",
+   "2 × 3.3 V CAN transceiver modules (CAN FD-rated for the FD frames)",
    "twisted pair",
-   "2 × 120 Ω (if the modules have none)",
-   "push button on node A"
+   "2 × 120 Ω (if the modules have none)"
   ],
-  "sim": "partial",
   "tested_on": [],
   "folder": "11-can-two-nodes"
  },
@@ -353,7 +340,7 @@ window.MCU_DATA.examples = [
   ],
   "peripherals": [
    "FLASH (FPEC)",
-   "USART1",
+   "LPUART1",
    "SysTick",
    "GPIOA",
    "GPIOC",
@@ -362,48 +349,44 @@ window.MCU_DATA.examples = [
   ],
   "flavor": "bare-metal (CMSIS registers)",
   "pins": [
-   "PA0",
    "PC13",
-   "PA9",
-   "PA10"
+   "PA5",
+   "PA2",
+   "PA3"
   ],
   "hw": [
-   "USB-UART adapter",
-   "push button from PA0 to GND (optional)"
+   "NUCLEO-G474RE"
   ],
-  "sim": "partial",
   "tested_on": [],
   "folder": "12-uart-bootloader"
  },
  {
   "id": "13",
-  "title": "LIN between two Blue Pills (UART level)",
+  "title": "LIN between two NUCLEO boards (UART level)",
   "modules": [
    "uart",
    "can"
   ],
   "peripherals": [
-   "USART2 (LIN mode)",
-   "USART1",
+   "USART1 (LIN mode)",
+   "LPUART1",
    "GPIOA",
    "GPIOC"
   ],
   "flavor": "bare-metal (CMSIS registers)",
   "pins": [
-   "PA2",
-   "PA3",
-   "PA0",
-   "PC13",
    "PA9",
-   "PA10"
+   "PA10",
+   "PC13",
+   "PA5",
+   "PA2",
+   "PA3"
   ],
   "hw": [
-   "second Blue Pill",
+   "2 × NUCLEO-G474RE",
    "2 small-signal diodes (1N4148)",
-   "1 kΩ resistor",
-   "push button from PA0 to GND on the slave"
+   "1 kΩ resistor"
   ],
-  "sim": "none",
   "tested_on": [],
   "folder": "13-lin-two-nodes"
  }

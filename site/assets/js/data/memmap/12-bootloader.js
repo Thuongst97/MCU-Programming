@@ -9,7 +9,7 @@ window.MCU_DATA = window.MCU_DATA || {};
   {
    "name": "FLASH",
    "origin": 134217728,
-   "length": 12288
+   "length": 524288
   },
   {
    "name": "RAM",

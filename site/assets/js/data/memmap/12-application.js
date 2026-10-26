@@ -8,8 +8,8 @@ window.MCU_DATA = window.MCU_DATA || {};
  "regions": [
   {
    "name": "FLASH",
-   "origin": 134234112,
-   "length": 245760
+   "origin": 134217728,
+   "length": 524288
   },
   {
    "name": "RAM",
@@ -25,43 +25,43 @@ window.MCU_DATA = window.MCU_DATA || {};
  "sections": [
   {
    "name": ".isr_vector",
-   "vma": 134234112,
-   "lma": 134234112,
+   "vma": 134217728,
+   "lma": 134217728,
    "size": 472,
    "load": true
   },
   {
    "name": ".text",
-   "vma": 134234584,
-   "lma": 134234584,
+   "vma": 134218200,
+   "lma": 134218200,
    "size": 3172,
    "load": true
   },
   {
    "name": ".ARM.exidx",
-   "vma": 134237756,
-   "lma": 134237756,
+   "vma": 134221372,
+   "lma": 134221372,
    "size": 8,
    "load": true
   },
   {
    "name": ".data",
    "vma": 536870912,
-   "lma": 134237764,
+   "lma": 134221380,
    "size": 4,
    "load": true
   },
   {
    "name": ".bss",
    "vma": 536870916,
-   "lma": 134237768,
+   "lma": 134221384,
    "size": 4,
    "load": false
   },
   {
    "name": ".noinit",
    "vma": 536870920,
-   "lma": 134237772,
+   "lma": 134221388,
    "size": 0,
    "load": false
   },
@@ -76,23 +76,23 @@ window.MCU_DATA = window.MCU_DATA || {};
  "symbols": [
   {
    "name": "g_vector_table",
-   "value": 134234112
+   "value": 134217728
   },
   {
    "name": "Reset_Handler",
-   "value": 134234636
+   "value": 134218252
   },
   {
    "name": "main",
-   "value": 134235040
+   "value": 134218656
   },
   {
    "name": "_etext",
-   "value": 134237756
+   "value": 134221372
   },
   {
    "name": "_sidata",
-   "value": 134237764
+   "value": 134221380
   },
   {
    "name": "SystemCoreClock",
@@ -122,42 +122,42 @@ window.MCU_DATA = window.MCU_DATA || {};
  "largest_functions": [
   {
    "name": "__udivmoddi4",
-   "value": 134236784,
+   "value": 134220400,
    "size": 800
   },
   {
    "name": "clock_init_170mhz",
-   "value": 134235256,
+   "value": 134218872,
    "size": 264
   },
   {
    "name": "SystemCoreClockUpdate",
-   "value": 134234820,
+   "value": 134218436,
    "size": 176
   },
   {
    "name": "uart_log_init",
-   "value": 134236248,
+   "value": 134219864,
    "size": 176
   },
   {
    "name": "main",
-   "value": 134235040,
+   "value": 134218656,
    "size": 148
   },
   {
    "name": "Reset_Handler",
-   "value": 134234636,
+   "value": 134218252,
    "size": 136
   },
   {
    "name": "uart_put_dec",
-   "value": 134236552,
+   "value": 134220168,
    "size": 120
   },
   {
    "name": "gpio_af",
-   "value": 134235768,
+   "value": 134219384,
    "size": 94
   }
  ]

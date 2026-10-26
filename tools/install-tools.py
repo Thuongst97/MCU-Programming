@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Install the pinned Arm GCC (xPack build) and Renode on Linux x86-64, from tools/versions.json.
+"""Install the pinned Arm GCC (xPack build) on Linux x86-64, from tools/versions.json.
 Used by CI; also handy on a Linux workstation (setup.html#install shows the per-OS steps).
 
-  python3 tools/install-tools.py --dest ~/.local/mcu-tools gcc renode
+  python3 tools/install-tools.py --dest ~/.local/mcu-tools gcc
   # then add the printed directories to PATH
 
 Prints the bin directories (one per line) so CI can append them to $GITHUB_PATH.
 """
 import argparse
 import json
-import subprocess
 import sys
 import tarfile
 import tempfile
@@ -18,7 +17,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-KEYS = {"gcc": "arm-gnu-toolchain", "renode": "renode"}
+KEYS = {"gcc": "arm-gnu-toolchain"}
 
 
 def install(tool, dest):
@@ -31,8 +30,6 @@ def install(tool, dest):
             urllib.request.urlretrieve(entry["linux_x64_url"], archive)
             with tarfile.open(archive) as t:
                 t.extractall(dest, filter="tar")
-    if tool == "renode" and entry.get("python_requirements"):
-        subprocess.run([sys.executable, "-m", "pip", "install", "-q", *entry["python_requirements"]], check=True)
     return target
 
 

@@ -98,9 +98,9 @@ class CheckRegsTest(unittest.TestCase):
         self.assertGreaterEqual(n, 10)
 
     def test_detects_wrong_data(self):
-        good = {"RCC_CFGR": {"periph": "RCC", "reg": "CFGR", "addr": 0x40021004, "fields": [{"name": "PLLMUL", "cmsis": "PLLMULL", "bits": [21, 18]}]}}
+        good = {"RCC_CFGR": {"periph": "RCC", "reg": "CFGR", "addr": 0x40021008, "fields": [{"name": "HPRE", "bits": [7, 4]}]}}
         self.assertEqual(self.mod.check_data(self.h, good), [])
-        bad = {"RCC_CFGR": {"periph": "RCC", "reg": "CFGR", "addr": 0x40021008, "fields": [{"name": "SW", "bits": [2, 0]}]}}
+        bad = {"RCC_CFGR": {"periph": "RCC", "reg": "CFGR", "addr": 0x40021004, "fields": [{"name": "SW", "bits": [2, 0]}]}}
         problems = self.mod.check_data(self.h, bad)
         self.assertEqual(len(problems), 2, problems)
 

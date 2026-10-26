@@ -1,8 +1,21 @@
 # MCU Academy — Implementation Plan
 
 > A static, interactive learning site that takes a software engineer from "what is a microcontroller?"
-> to AUTOSAR-structured automotive firmware, with every example running on one cheap board:
-> the **STM32F103C8T6 "Blue Pill"** programmed through an **ST-Link V2** over SWD.
+> to AUTOSAR-structured automotive firmware, with every example running on one board:
+> the **NUCLEO-G474RE** (STM32G474RET6, Cortex-M4F, 170 MHz) through its on-board **ST-LINK/V3E**.
+
+> **D13 — target changed to the STM32G474 (2026-10-26).** The course moved from the STM32F103C8T6
+> Blue Pill to the NUCLEO-G474RE (the STM32G474VET6 is the same die and runs the same firmware).
+> Renode has no STM32G4 model, so the simulator, the Robot suites and the `renode-tests` CI job were
+> removed: examples are hardware-only and pure logic is host-tested. Consequences: STM32G4 register
+> names (RM0440) everywhere, FDCAN instead of bxCAN, LPUART1 virtual COM port instead of a USB-UART
+> adapter, I2C2 on PA9/PA8 (PB8 is BOOT0), SPI2 on PB12–PB15, pin data generated from ST's open pin
+> data (`tools/gen-pins.py`, `tools/check-pins.py`). Section ids were renamed once, where the F1 topic
+> no longer exists (e.g. `setup#clock-72` → `#clock-170`, `gpio#swj` → `#swd`, `can#usb-conflict`
+> removed, `autosar-arch#on-bluepill` → `#on-nucleo`, `automotive-mcus#why-not-f103` → `#why-not-g474`,
+> the troubleshooting sections); the "never renamed" rule applies again from here.
+> **Where the rest of this plan still describes the Blue Pill, CLAUDE.md and the site are
+> authoritative**; the plan text below is the historical design and is updated section by section.
 
 Status: **Phases 1–8 implemented 2026-10-24/25** (see §11.2): all 31 pages, examples 00–13, the
 `autosar/` teaching library and the TurnLight capstone. **Still open:** Phase 0 (PDF and hardware

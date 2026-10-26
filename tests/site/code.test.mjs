@@ -27,7 +27,7 @@ test("asm, ld, cmake, console, json", () => {
   assert.deepEqual(classes("Reset_Handler:\n  ldr r0, =_estack @ sp", "asm"), ["fn:Reset_Handler", "kw:ldr", "ty:r0", "com:@ sp"]);
   assert.ok(classes("FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 64K", "ld").includes("num:64K"));
   assert.ok(classes("add_executable(${PROJECT_NAME} main.c)", "cmake").includes("ann:${PROJECT_NAME}"));
-  const con = classes("$ openocd -f bluepill.cfg\nOpen On-Chip Debugger 0.12.0", "console");
+  const con = classes("$ openocd -f nucleo-g474re.cfg\nOpen On-Chip Debugger 0.12.0", "console");
   assert.ok(con.includes("fn:openocd") && con.includes("attr:-f") && con.includes("out:Open On-Chip Debugger 0.12.0"));
   assert.deepEqual(classes('{"a": true}', "json"), ['attr:"a"', "kw:true"]);
 });

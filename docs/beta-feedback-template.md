@@ -8,8 +8,8 @@ Results of a round are summarised in one issue labelled `beta`. Beta rounds neve
 - Years of C:
 - Embedded experience before this module (yes / no, what):
 - OS (and version):
-- Board: genuine ST / clone / not sure. Debug probe (ST-Link V2 clone, Nucleo ST-Link, …):
-- Did you use hardware, Renode, or both?
+- Board: NUCLEO-G474RE / own STM32G474VET6 board / other. ST-LINK firmware version:
+- Did you run it on hardware, or only read and run the host tests?
 
 ## Time spent
 
@@ -31,7 +31,7 @@ Quote the sentence and say what you thought it meant.
 
 ## Errors you saw
 
-Paste the exact output (compiler, OpenOCD, Renode, browser console).
+Paste the exact output (compiler, OpenOCD, browser console).
 
 ```text
 ```
