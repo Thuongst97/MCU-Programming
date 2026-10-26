@@ -660,15 +660,16 @@ pre.code .abadge { margin-left: 14px; font-size: 0.68rem; font-weight: 700; min-
 .po-panel code { display: inline-block; margin: 2px 0; }
 .po-warn { color: var(--amber); }
 .po-svg text { font-family: var(--mono); }
-.po-board { fill: color-mix(in srgb, var(--green) 26%, var(--dg-card)); stroke: color-mix(in srgb, var(--green) 50%, transparent); stroke-width: 1.5; }
+.po-board { fill: color-mix(in srgb, var(--dg-title) 7%, var(--dg-card)); stroke: var(--dg-line-2); stroke-width: 1.5; }
+.po-stlink, .po-morpho { fill: var(--dg-chip); stroke: var(--dg-card-border); }
+.po-btn.b1 { fill: var(--blue); } .po-btn.b2 { fill: var(--dg-faint); }
 .po-usb { fill: var(--dg-line-2); stroke: var(--dg-card-border); }
 .po-usb-lbl, .po-part-lbl { fill: var(--dg-muted); font-size: 10px; }
 .po-chip { fill: var(--dg-canvas); stroke: var(--dg-line-2); }
 .po-chip-lbl { fill: var(--dg-title); font-weight: 700; font-size: 12px; }
 .po-chip-sub { fill: var(--dg-muted); font-size: 10px; }
 .po-xtal { fill: var(--dg-line-2); }
-.po-jumper rect { fill: var(--dg-canvas); stroke: var(--dg-line-2); } .po-jumper circle { fill: var(--copper); }
-.po-led rect { fill: var(--red); }
+.po-led rect { fill: var(--green); }
 .po-pin { cursor: pointer; outline: none; }
 .po-dot { fill: var(--copper); stroke: color-mix(in srgb, var(--copper) 60%, #000); stroke-width: 1; transition: r 0.15s; }
 .po-tag { fill: var(--dg-card); stroke: var(--dg-card-border); }
@@ -679,8 +680,8 @@ pre.code .abadge { margin-left: 14px; font-size: 0.68rem; font-weight: 700; min-
 .po-pin.sel .po-tag, .po-pin:focus-visible .po-tag, .po-pin:hover .po-tag { stroke: var(--blue); stroke-width: 2; }
 .po-pin.sel .po-dot, .po-pin:hover .po-dot { r: 8; }
 .po-pin.warn .po-name { fill: var(--amber); }
-.po-host:has([data-mode="electrical"][aria-pressed="true"]) .c-ft .po-tag { fill: color-mix(in srgb, var(--green) 20%, var(--dg-card)); stroke: var(--green); }
-.po-host:has([data-mode="electrical"][aria-pressed="true"]) .c-nft .po-tag { fill: color-mix(in srgb, var(--amber) 22%, var(--dg-card)); stroke: var(--amber); }
+.po-host:has([data-mode="electrical"][aria-pressed="true"]) .c-adc .po-tag { fill: color-mix(in srgb, var(--green) 20%, var(--dg-card)); stroke: var(--green); }
+.po-host:has([data-mode="electrical"][aria-pressed="true"]) .c-dig .po-tag { fill: color-mix(in srgb, var(--amber) 22%, var(--dg-card)); stroke: var(--amber); }
 .po-host:has([data-mode="electrical"][aria-pressed="true"]) :is(.c-power, .c-control) .po-tag { fill: color-mix(in srgb, var(--red) 18%, var(--dg-card)); stroke: var(--red); }
 .po-host:has([data-mode="electrical"][aria-pressed="true"]) .c-ground .po-tag { fill: var(--dg-chip); stroke: var(--dg-faint); }
 .po-ext rect { fill: var(--dg-card); stroke: var(--dg-card-border); }
@@ -691,7 +692,7 @@ pre.code .abadge { margin-left: 14px; font-size: 0.68rem; font-weight: 700; min-
 .po-wire.k-power { stroke: var(--red); } .po-wire.k-ground { stroke: var(--dg-faint); } .po-wire.k-swd { stroke: var(--purple); }
 .po-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--dg-muted); }
 .po-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; border: 1.5px solid; }
-.po-lg-ft i { border-color: var(--green); } .po-lg-nft i { border-color: var(--amber); } .po-lg-power i { border-color: var(--red); }
+.po-lg-adc i { border-color: var(--green); } .po-lg-dig i { border-color: var(--amber); } .po-lg-power i { border-color: var(--red); }
 .po-lg-ground i { border-color: var(--dg-faint); } .po-lg-hl i { border-color: var(--copper); } .po-lg-match i { border-color: var(--blue); }
 
 .reg-host { padding: 16px 18px; }

@@ -9,9 +9,9 @@
 #define CAN_START_SEC_CONFIG_DATA_UNSPECIFIED
 #include "Can_MemMap.h"
 /* 500 kbit/s from the FDCAN kernel clock PCLK1 = 170 MHz: prescaler 17 (10 MHz quanta),
- * 1 + 16 + 3 quanta per bit, sample point 85 % (same as example 11). Fields hold value - 1. */
+ * 1 + 16 + 3 quanta per bit, sample point 85 %, SJW 3 (same as example 11). Fields hold value - 1. */
 CONST(Can_ConfigType, CAN_CONST) Can_Config = {
-    (0UL << FDCAN_NBTP_NSJW_Pos) | (16UL << FDCAN_NBTP_NBRP_Pos) | (15UL << FDCAN_NBTP_NTSEG1_Pos)
+    (2UL << FDCAN_NBTP_NSJW_Pos) | (16UL << FDCAN_NBTP_NBRP_Pos) | (15UL << FDCAN_NBTP_NTSEG1_Pos)
         | (2UL << FDCAN_NBTP_NTSEG2_Pos),
     FALSE};
 #define CAN_STOP_SEC_CONFIG_DATA_UNSPECIFIED

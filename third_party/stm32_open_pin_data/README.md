@@ -16,4 +16,5 @@ Vendored copy. **Do not edit these files**; update them only with
 | File | SHA-256 |
 |---|---|
 | `./STM32G474R(B-C-E)Tx.xml` | `8866d1f3b9bcaff9…` |
+| `./STM32G474V(B-C-E)Tx.xml` | `4144d2569c7798ab…` |
 | `./IP/GPIO-STM32G47x_gpio_v1_0_Modes.xml` | `201aef96428b5763…` |

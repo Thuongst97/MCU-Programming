@@ -34,7 +34,7 @@ transceiver). The log goes to the ST-LINK virtual COM port (LPUART1, PA2/PA3): n
 LD2 (PA5) is the heartbeat.
 
 ## Wiring (cluster node, a second NUCLEO-G474RE)
-PA11 / PA12 to its own transceiver; SSD1306 on PB8 (D15, SCL) / PB9 (D14, SDA), as in example 06.
+PA11 / PA12 to its own transceiver; SSD1306 on PA9 (D8, SCL) / PA8 (D7, SDA), as in example 06.
 Hold B1 (USER) to stop acknowledging, to test TL-REQ-007.
 
 ## How this was verified

@@ -9,12 +9,17 @@ window.MCU_DATA = window.MCU_DATA || {};
   {
    "name": "FLASH",
    "origin": 134234112,
-   "length": 49152
+   "length": 245760
   },
   {
    "name": "RAM",
    "origin": 536870912,
-   "length": 20480
+   "length": 98304
+  },
+  {
+   "name": "CCMRAM",
+   "origin": 268435456,
+   "length": 32768
   }
  ],
  "sections": [
@@ -22,42 +27,49 @@ window.MCU_DATA = window.MCU_DATA || {};
    "name": ".isr_vector",
    "vma": 134234112,
    "lma": 134234112,
-   "size": 236,
+   "size": 472,
    "load": true
   },
   {
    "name": ".text",
-   "vma": 134234348,
-   "lma": 134234348,
-   "size": 1848,
+   "vma": 134234584,
+   "lma": 134234584,
+   "size": 3172,
+   "load": true
+  },
+  {
+   "name": ".ARM.exidx",
+   "vma": 134237756,
+   "lma": 134237756,
+   "size": 8,
    "load": true
   },
   {
    "name": ".data",
    "vma": 536870912,
-   "lma": 134236196,
+   "lma": 134237764,
    "size": 4,
    "load": true
   },
   {
    "name": ".bss",
    "vma": 536870916,
-   "lma": 134236200,
+   "lma": 134237768,
    "size": 4,
    "load": false
   },
   {
    "name": ".noinit",
    "vma": 536870920,
-   "lma": 134236204,
+   "lma": 134237772,
    "size": 0,
    "load": false
   },
   {
    "name": "._user_heap_stack",
    "vma": 536870920,
-   "lma": 134236200,
-   "size": 1024,
+   "lma": 536870920,
+   "size": 2048,
    "load": false
   }
  ],
@@ -68,19 +80,19 @@ window.MCU_DATA = window.MCU_DATA || {};
   },
   {
    "name": "Reset_Handler",
-   "value": 134234348
+   "value": 134234636
   },
   {
    "name": "main",
-   "value": 134234712
+   "value": 134235040
   },
   {
    "name": "_etext",
-   "value": 134236196
+   "value": 134237756
   },
   {
    "name": "_sidata",
-   "value": 134236196
+   "value": 134237764
   },
   {
    "name": "SystemCoreClock",
@@ -104,49 +116,49 @@ window.MCU_DATA = window.MCU_DATA || {};
   },
   {
    "name": "_estack",
-   "value": 536891392
+   "value": 536969216
   }
  ],
  "largest_functions": [
   {
+   "name": "__udivmoddi4",
+   "value": 134236784,
+   "size": 800
+  },
+  {
+   "name": "clock_init_170mhz",
+   "value": 134235256,
+   "size": 264
+  },
+  {
    "name": "SystemCoreClockUpdate",
-   "value": 134234500,
-   "size": 168
-  },
-  {
-   "name": "clock_init_72mhz",
-   "value": 134234928,
-   "size": 164
-  },
-  {
-   "name": "main",
-   "value": 134234712,
-   "size": 148
-  },
-  {
-   "name": "uart_put_dec",
-   "value": 134235796,
-   "size": 120
-  },
-  {
-   "name": "Reset_Handler",
-   "value": 134234348,
-   "size": 104
+   "value": 134234820,
+   "size": 176
   },
   {
    "name": "uart_log_init",
-   "value": 134235576,
-   "size": 92
+   "value": 134236248,
+   "size": 176
   },
   {
-   "name": "__NVIC_SetPriority",
-   "value": 134235296,
-   "size": 84
+   "name": "main",
+   "value": 134235040,
+   "size": 148
   },
   {
-   "name": "uart_put_hex",
-   "value": 134235916,
-   "size": 72
+   "name": "Reset_Handler",
+   "value": 134234636,
+   "size": 136
+  },
+  {
+   "name": "uart_put_dec",
+   "value": 134236552,
+   "size": 120
+  },
+  {
+   "name": "gpio_af",
+   "value": 134235768,
+   "size": 94
   }
  ]
 };

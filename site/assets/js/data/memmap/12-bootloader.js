@@ -9,12 +9,17 @@ window.MCU_DATA = window.MCU_DATA || {};
   {
    "name": "FLASH",
    "origin": 134217728,
-   "length": 15360
+   "length": 12288
   },
   {
    "name": "RAM",
    "origin": 536870912,
-   "length": 20480
+   "length": 98304
+  },
+  {
+   "name": "CCMRAM",
+   "origin": 268435456,
+   "length": 32768
   }
  ],
  "sections": [
@@ -22,42 +27,49 @@ window.MCU_DATA = window.MCU_DATA || {};
    "name": ".isr_vector",
    "vma": 134217728,
    "lma": 134217728,
-   "size": 236,
+   "size": 472,
    "load": true
   },
   {
    "name": ".text",
-   "vma": 134217964,
-   "lma": 134217964,
-   "size": 3372,
+   "vma": 134218200,
+   "lma": 134218200,
+   "size": 4840,
+   "load": true
+  },
+  {
+   "name": ".ARM.exidx",
+   "vma": 134223040,
+   "lma": 134223040,
+   "size": 8,
    "load": true
   },
   {
    "name": ".data",
    "vma": 536870912,
-   "lma": 134221336,
+   "lma": 134223048,
    "size": 4,
    "load": true
   },
   {
    "name": ".bss",
    "vma": 536870916,
-   "lma": 134221340,
+   "lma": 134223052,
    "size": 4,
    "load": false
   },
   {
    "name": ".noinit",
    "vma": 536870920,
-   "lma": 134221344,
+   "lma": 134223056,
    "size": 0,
    "load": false
   },
   {
    "name": "._user_heap_stack",
    "vma": 536870920,
-   "lma": 134221340,
-   "size": 1024,
+   "lma": 536870920,
+   "size": 2048,
    "load": false
   }
  ],
@@ -68,19 +80,19 @@ window.MCU_DATA = window.MCU_DATA || {};
   },
   {
    "name": "Reset_Handler",
-   "value": 134217964
+   "value": 134218252
   },
   {
    "name": "main",
-   "value": 134219164
+   "value": 134219488
   },
   {
    "name": "_etext",
-   "value": 134221336
+   "value": 134223040
   },
   {
    "name": "_sidata",
-   "value": 134221336
+   "value": 134223048
   },
   {
    "name": "SystemCoreClock",
@@ -104,49 +116,49 @@ window.MCU_DATA = window.MCU_DATA || {};
   },
   {
    "name": "_estack",
-   "value": 536891392
+   "value": 536969216
   }
  ],
  "largest_functions": [
   {
+   "name": "__udivmoddi4",
+   "value": 134222156,
+   "size": 800
+  },
+  {
    "name": "handle",
-   "value": 134218740,
+   "value": 134219064,
    "size": 424
   },
   {
    "name": "proto_feed",
-   "value": 134219718,
+   "value": 134220042,
    "size": 358
   },
   {
    "name": "main",
-   "value": 134219164,
+   "value": 134219488,
    "size": 352
   },
   {
+   "name": "flash_program",
+   "value": 134220804,
+   "size": 280
+  },
+  {
    "name": "app_valid",
-   "value": 134218212,
+   "value": 134218508,
    "size": 216
   },
   {
    "name": "jump_to_app",
-   "value": 134218428,
-   "size": 192
+   "value": 134218724,
+   "size": 212
   },
   {
-   "name": "flash_program",
-   "value": 134220332,
-   "size": 176
-  },
-  {
-   "name": "crc32_update",
-   "value": 134219516,
-   "size": 112
-  },
-  {
-   "name": "Reset_Handler",
-   "value": 134217964,
-   "size": 104
+   "name": "flash_erase_page",
+   "value": 134220604,
+   "size": 200
   }
  ]
 };

@@ -263,11 +263,13 @@
       "base": "mcu",
       "files": [
         "STM32G474R(B-C-E)Tx.xml",
+        "STM32G474V(B-C-E)Tx.xml",
         "IP/GPIO-STM32G47x_gpio_v1_0_Modes.xml"
       ],
       "dest": ".",
       "sha256": {
         "STM32G474R(B-C-E)Tx.xml": "8866d1f3b9bcaff91c0b8d9fe1efe489ad5da34769ec5c60ccdca18a8a7cfa3b",
+        "STM32G474V(B-C-E)Tx.xml": "4144d2569c7798ab86c5086aa636ab8cbb62cd4ba99bfff4021606965ff98525",
         "IP/GPIO-STM32G47x_gpio_v1_0_Modes.xml": "201aef96428b57635e88f896660549f59424d1ebed353ee2f9c101fefb906eab"
       }
     }

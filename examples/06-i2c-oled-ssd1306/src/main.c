@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * Example 06: an SSD1306 OLED on I2C1 (PB8 SCL = D15, PB9 SDA = D14). Shows text and a moving bar, and
+ * Example 06: an SSD1306 OLED on I2C2 (PA9 SCL = D8, PA8 SDA = D7). Shows text and a moving bar, and
  * reports the I2C result codes on the UART so a missing display is obvious.
  */
 #include <stdint.h>
@@ -42,7 +42,7 @@ int main(void)
     (void)clock_init_170mhz();
     systick_init_1ms();
     uart_log_init(115200U);
-    uart_puts("Example 06: SSD1306 on I2C1 (PB8/PB9 = D15/D14, 400 kHz)\n");
+    uart_puts("Example 06: SSD1306 on I2C2 (PA9/PA8 = D8/D7, 400 kHz)\n");
     put_status("i2c init: ", i2c_init());
 
     // [region:main]
@@ -63,7 +63,7 @@ int main(void)
         char num[11];
         gfx_clear(&s_fb);
         (void)gfx_text(&s_fb, 0U, 0U, "MCU ACADEMY");
-        (void)gfx_text(&s_fb, 0U, 2U, "I2C1 400 KHZ 0X3C");
+        (void)gfx_text(&s_fb, 0U, 2U, "I2C2 400 KHZ 0X3C");
         u32_to_str(now / 1000U, num);
         const uint32_t x = gfx_text(&s_fb, 0U, 4U, "UPTIME ");
         (void)gfx_text(&s_fb, gfx_text(&s_fb, x, 4U, num), 4U, " S");

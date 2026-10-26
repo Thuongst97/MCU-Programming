@@ -1,4 +1,4 @@
-Example 06: SSD1306 on I2C1 (PB8/PB9 = D15/D14, 400 kHz)
+Example 06: SSD1306 on I2C2 (PA9/PA8 = D8/D7, 400 kHz)
 i2c init: OK
 probe 0x3C: OK
 ssd1306 init: OK

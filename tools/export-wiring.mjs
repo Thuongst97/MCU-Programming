@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const Pinout = require(join(ROOT, "site/assets/js/engines/pinout.js"));
-const board = require(join(ROOT, "site/assets/js/data/bluepill-pins.js"));
+const board = require(join(ROOT, "site/assets/js/data/nucleo-pins.js"));
 const wiring = require(join(ROOT, "site/assets/js/data/wiring.js"));
 const check = process.argv.includes("--check");
 const folders = readdirSync(join(ROOT, "examples")).filter((d) => /^\d\d-/.test(d));

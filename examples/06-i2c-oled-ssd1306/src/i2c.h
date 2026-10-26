@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * Polling I2C master on I2C1 (PB8 = SCL = Arduino D15, PB9 = SDA = D14), fast mode 400 kHz.
+ * Polling I2C master on I2C2 (PA9 = SCL = Arduino D8, PA8 = SDA = D7), fast mode 400 kHz.
  * RM0440 "I2C". */
 #ifndef I2C_H
 #define I2C_H
