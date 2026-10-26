@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
-   Module 08 · USART: Frames, Interrupts and a Command Shell. */
+   Module 08 · USART and LPUART: Frames, Interrupts and a Command Shell. */
 (function () {
   "use strict";
   const { $, esc, renderCodeExplorer, embedded, Register, Waveform, Wave, Calc, SequenceDiagram, Checklist } = window.MCU;
@@ -18,16 +18,16 @@
   drawFrame();
 
   /* ---------------------------------------------------------------- baud */
-  Calc.widget($("#calc-brr"), "brr", { defaults: { pclk: 72000000, baud: 115200 } });
-  Register($("#reg-brr"), { reg: "USART_BRR", value: 0x271 });
-  Register($("#reg-sr"), { reg: "USART_SR", value: 0x000000c0 });
+  Calc.widget($("#calc-brr"), "brr", { defaults: { clk: 170000000, baud: 115200 } });
+  Register($("#reg-brr"), { reg: "LPUART_BRR", value: 0x5c3b2 });
+  Register($("#reg-sr"), { reg: "USART_ISR", value: 0x006000c0 });
 
   /* ---------------------------------------------------------------- interrupts */
   const N04 = {
-    1: ["Receive interrupt only", "<code>RXNEIE</code> on from the start: every received byte raises an interrupt. The transmit interrupt stays off until there is something to send."],
+    1: ["Receive interrupt only", "<code>RXNEIE</code> (named <code>RXNEIE_RXFNEIE</code> in the header) on from the start: every received byte raises an interrupt. The transmit interrupt stays off until there is something to send."],
     2: ["Priority before enable", "Below the timers that must not jitter, above the main loop. 6 out of 0–15."],
-    3: ["Received a byte (or lost one)", "<code>RXNE</code> and <code>ORE</code> both mean \"read DR\". Reading <code>DR</code> after reading <code>SR</code> clears both."],
-    4: ["Only if we asked", "<code>TXE</code> is set whenever the data register is empty, which is most of the time. Check <code>TXEIE</code> too, or the handler would react to TXE while receiving."],
+    3: ["Overrun", "<code>ORE</code>: a byte was lost because the previous one was still in <code>RDR</code>. On the G4 it is cleared by writing <code>ICR.ORECF</code>, and until then nothing new is received. The handler counts the loss and goes on."],
+    4: ["Only if we asked", "<code>TXE</code> is set whenever the transmit data register is empty, which is most of the time. Check <code>TXEIE</code> too, or the handler would react to TXE while receiving."],
     5: ["Nothing left to send", "Turn <code>TXEIE</code> off, otherwise the empty data register would re-trigger the interrupt forever."],
     6: ["Bounded wait for space", "When the buffer is full, wait for the ISR to drain it, with an upper limit."],
     7: ["CR1 is shared", "Both <code>main()</code> and the ISR change <code>CR1</code>, so the read-modify-write here runs with interrupts masked for three instructions."],
@@ -40,16 +40,16 @@
     ariaLabel: "A received byte from the RX pin to the shell",
     laneW: 160,
     lanes: [
-      { title: "RX pin", sub: "PA10", tone: "hw" },
-      { title: "USART1", sub: "shift register, DR", tone: "hw" },
-      { title: "ISR", sub: "USART1_IRQHandler", tone: "mcal" },
+      { title: "RX pin", sub: "PA3 (from the ST-LINK)", tone: "hw" },
+      { title: "LPUART1", sub: "shift register, RDR", tone: "hw" },
+      { title: "ISR", sub: "LPUART1_IRQHandler", tone: "mcal" },
       { title: "Ring buffer", sub: "s_rx", tone: "tool" },
       { title: "main()", sub: "shell_feed()", tone: "asw" },
     ],
     steps: [
-      { from: 0, to: 1, kind: "bus", label: "10 bit times", title: "A frame arrives", detail: "<p>Start bit, 8 data bits, stop bit: about 87 µs at 115 200 baud. The USART samples each bit and shifts it in.</p>" },
-      { from: 1, to: 2, kind: "irq", label: "RXNE → IRQ 37", title: "Byte complete", detail: "<p>The byte moves to <code>DR</code>, <code>RXNE</code> is set and, with <code>RXNEIE</code>, the interrupt fires. From now on the next byte has 87 µs before it overwrites this one (overrun).</p>" },
-      { from: 2, to: 3, kind: "call", label: "ringbuf_put()", title: "Queue it", detail: "<p>The ISR reads <code>DR</code> (clearing <code>RXNE</code>), stores the byte and returns: a few hundred nanoseconds of work.</p>", analogy: "A receptionist who takes the parcel, puts it on the shelf and goes back to the desk, instead of opening it." },
+      { from: 0, to: 1, kind: "bus", label: "10 bit times", title: "A frame arrives", detail: "<p>Start bit, 8 data bits, stop bit: about 87 µs at 115 200 baud. The ST-LINK turns your keystroke into this frame on PA3; LPUART1 samples each bit and shifts it in.</p>" },
+      { from: 1, to: 2, kind: "irq", label: "RXNE → IRQ 91", title: "Byte complete", detail: "<p>The byte moves to <code>RDR</code>, <code>RXNE</code> is set and, with <code>RXNEIE</code>, the interrupt fires. From now on the next byte has 87 µs before it overwrites this one (overrun).</p>" },
+      { from: 2, to: 3, kind: "call", label: "ringbuf_put()", title: "Queue it", detail: "<p>The ISR reads <code>RDR</code> (clearing <code>RXNE</code>), stores the byte and returns: a few hundred nanoseconds of work.</p>", analogy: "A receptionist who takes the parcel, puts it on the shelf and goes back to the desk, instead of opening it." },
       { from: 3, to: 4, kind: "ret", label: "ringbuf_get()", title: "Main loop picks it up", detail: "<p>Whenever <code>main()</code> wakes up, it takes every queued byte and gives it to the shell. If it is busy for a while, bytes wait in the buffer instead of being lost.</p>" },
     ],
   });
@@ -140,8 +140,8 @@
   drawLin();
 
   Checklist($("#ck-uart"), [
-    "You can draw the 8N1 frame of any byte and compute BRR for any clock and baud rate.",
-    "Example 04 answers <code>help</code>, <code>clock</code> and <code>led on</code> in your terminal.",
+    "You can draw the 8N1 frame of any byte and compute BRR for a USART and for the LPUART.",
+    "Example 04 answers <code>help</code>, <code>clock</code> and <code>led on</code> on the ST-LINK's virtual COM port.",
     "You can explain why the ring buffer needs no lock, and when it would.",
     "You know what the LIN break and the protected identifier are for.",
   ], { key: "uart" });

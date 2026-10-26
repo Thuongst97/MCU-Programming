@@ -31,15 +31,15 @@
 
         <section class="doc-section" id="sar" data-title="How a SAR ADC works">
           <div class="sec-head"><h2><span class="sec-num">9.1</span>How a SAR ADC works</h2></div>
-          <p>The STM32F103 has two 12-bit <b>successive-approximation</b> (SAR) ADCs (DS5319). A SAR ADC finds the input voltage by binary search: a sample-and-hold capacitor freezes the input, then for each bit from the most significant down, an internal DAC produces a trial voltage and a comparator says "higher" or "lower". Twelve comparisons give twelve bits. Move the slider:</p>
+          <p>The STM32G474 has five 12-bit <b>successive-approximation</b> (SAR) ADCs (DS12288). A SAR ADC finds the input voltage by binary search: a sample-and-hold capacitor freezes the input, then for each bit from the most significant down, an internal DAC produces a trial voltage and a comparator says "higher" or "lower". Twelve comparisons give twelve bits. Move the slider:</p>
           <div id="sar-viz" class="hd-wrap"></div>
-          <p>A conversion takes the <b>sampling time</b> you choose plus 12.5 ADC clock cycles. At the maximum ADC clock of 14 MHz and the shortest sampling time (1.5 cycles), that is 1 µs per conversion (RM0008 §11.6). The Blue Pill's 72 MHz setup gives 12 MHz (PCLK2 ÷ 6).</p>
+          <p>A 12-bit conversion takes the <b>sampling time</b> you choose plus 12.5 ADC clock cycles (RM0440, ADC). The course clocks ADC1 synchronously from HCLK ÷ 4 = 42.5 MHz (<code>ADC12_COMMON-&gt;CCR.CKMODE = 11</code>), so even the shortest sampling time (2.5 cycles) gives about 0.35 µs per conversion; DS12288 gives the maximum ADC clock and sampling rate.</p>
           <div class="callout analogy"><div class="ci">🎭</div><div><span class="ct">Analogy</span><p>Guessing a number between 0 and 4095 with "higher or lower" answers: start at 2048, then 1024 or 3072, and so on. Twelve questions always find it. The sampling time is how long you let a photograph develop before you start asking: too short and the picture is blurred.</p></div></div>
         </section>
 
-        <section class="doc-section" id="config" data-title="Configuring ADC1">
-          <div class="sec-head"><h2><span class="sec-num">9.2</span>Configuring ADC1</h2></div>
-          <p>Setting up ADC1 takes four things: a clock within limits, an analog pin, a sampling time, and a calibration.</p>
+        <section class="doc-section" id="config" data-title="Bringing up ADC1">
+          <div class="sec-head"><h2><span class="sec-num">9.2</span>Bringing up ADC1</h2></div>
+          <p>The G4 ADC wakes up in <b>deep power-down</b> and must be brought up in a fixed order (RM0440, ADC): leave deep power-down (<code>DEEPPWD = 0</code>), start its internal voltage regulator (<code>ADVREGEN = 1</code>) and wait for it, calibrate (<code>ADCAL</code>), then enable (<code>ADEN</code>) and wait for <code>ADRDY</code>. Skip or reorder a step and you get no conversions or wrong ones, with no error flag to tell you why.</p>
           <script type="text/plain" id="src-05-init" data-src="examples/05-adc-pot-dma/src/main.c" data-region="init" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="39" data-end="62" data-sha="acedf8b27e42">
 static bool adc_init(void)
 {
@@ -71,12 +71,12 @@ static bool adc_init(void)
           <div class="table-wrap"><table class="t">
             <thead><tr><th><code>SMPx</code></th><th>Cycles</th><th>Use</th></tr></thead>
             <tbody>
-              <tr><td>000</td><td>1.5</td><td>Low-impedance sources (an op-amp output)</td></tr>
-              <tr><td>011</td><td>28.5</td><td>Typical sensors with a buffer</td></tr>
-              <tr><td>111</td><td>239.5</td><td>High-impedance sources like a 10 kΩ pot, and the internal temperature sensor (needs ≥ 17.1 µs, DS5319)</td></tr>
+              <tr><td>000</td><td>2.5</td><td>Low-impedance sources (an op-amp output, the G4's internal op-amps)</td></tr>
+              <tr><td>011</td><td>24.5</td><td>Typical sensors with a buffer</td></tr>
+              <tr><td>111</td><td>640.5</td><td>High-impedance sources like a 10 kΩ pot, Vrefint and the internal temperature sensor (DS12288 gives their minimum sampling times)</td></tr>
             </tbody>
           </table></div>
-          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">ADC pins are not 5 V tolerant</span><p>PA0–PA7, PB0 and PB1 carry the ADC inputs and none of them tolerates 5 V. The input range is 0 V to VREF+, which is 3.3 V on the Blue Pill (VREF+ is tied to VDDA inside the 48-pin package).</p></div></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">0 V to VREF+, never more</span><p>An input in analog mode must stay between 0 V and VREF+ (3.3 V on the NUCLEO, where VREF+ follows VDDA). A pin that is 5 V tolerant as a digital input is <b>not</b> in analog mode. The <a href="board.html#pinout">pinout</a> lists each pin&#39;s ADC channels; PA1 is <code>ADC1_IN2</code>.</p></div></div>
         </section>
 
         <section class="doc-section" id="single" data-title="Single conversion, polling">
@@ -99,7 +99,7 @@ static uint32_t adc_read(uint32_t channel)
 }
 </script>
           <div id="ex-single"></div>
-          <p>The raw number means nothing until it is scaled. Example 05 also measures the internal reference <b>Vrefint</b> (about 1.20 V, channel 17), which lets it compute the real supply voltage instead of assuming exactly 3.3 V:</p>
+          <p>The raw number means nothing until it is scaled. Example 05 also measures the internal reference <b>Vrefint</b> (ADC1 channel 18, enabled with <code>ADC12_COMMON-&gt;CCR.VREFEN</code>). ST measures it in production at VDDA = 3.0 V and stores the result, <code>VREFINT_CAL</code>, in system memory (<code>*VREFINT_CAL_ADDR</code> in the CMSIS header). Comparing today&#39;s reading with that value gives the real supply voltage instead of assuming exactly 3.3 V:</p>
           <script type="text/plain" id="src-05-math" data-src="examples/05-adc-pot-dma/src/adcmath.c" data-region="math" data-lang="c" data-file="examples/05-adc-pot-dma/src/adcmath.c" data-start="5" data-end="35" data-sha="9069a6dcc9f4">
 uint32_t adc_vdda_mv(uint32_t vrefint_raw, uint32_t vrefint_cal)
 {
@@ -137,22 +137,24 @@ uint32_t adc_mean(const volatile uint16_t *buf, uint32_t len, uint32_t first, ui
           <div id="po-adc"></div>
         </section>
 
-        <section class="doc-section" id="dma" data-title="DMA basics">
-          <div class="sec-head"><h2><span class="sec-num">9.4</span>DMA basics</h2></div>
-          <p>The <b>DMA controller</b> is a second bus master that copies data between peripherals and memory. DMA1 has 7 channels; each peripheral request is wired to a fixed channel (RM0008 §13.3.7): ADC1 uses channel 1, SPI1 RX and TX channels 2 and 3, USART1 TX and RX channels 4 and 5, and so on. Per channel you set:</p>
+        <section class="doc-section" id="dma" data-title="DMA and DMAMUX">
+          <div class="sec-head"><h2><span class="sec-num">9.4</span>DMA and DMAMUX</h2></div>
+          <p>The <b>DMA controller</b> is a second bus master that copies data between peripherals and memory. The G474 has two of them, DMA1 and DMA2, with 8 channels each. On the G4 no peripheral is wired to a fixed channel: the <b>DMAMUX</b> sits in between and forwards the request you choose to the channel you choose (RM0440, DMA and DMAMUX). DMAMUX channel 0 feeds DMA1 channel 1, DMAMUX channel 1 feeds DMA1 channel 2, and so on. The request numbers (ADC1 = 5, SPI2_RX = 12, …) are listed in the DMAMUX chapter of RM0440. Per DMA channel you set:</p>
           <ul>
             <li><code>CPAR</code>: the peripheral address (for example <code>&amp;ADC1-&gt;DR</code>),</li>
             <li><code>CMAR</code>: the memory address (your buffer),</li>
             <li><code>CNDTR</code>: how many items to move,</li>
             <li><code>CCR</code>: direction, sizes, increments, circular mode, priority, interrupts, enable.</li>
           </ul>
+          <div id="reg-dmamux"></div>
           <div id="reg-dmaccr"></div>
+          <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">Two classic silent failures</span><p><b>No DMAMUX request:</b> the DMA channel is enabled, configured perfectly, and never moves a byte, because nothing asks it to. <b>Buffer in CCM SRAM:</b> the DMA controllers cannot reach the 32 KB CCM SRAM at <code>0x10000000</code>, so a buffer placed there never fills. Keep DMA buffers in SRAM1/SRAM2, which is where the course&#39;s linker script puts every ordinary variable.</p></div></div>
           <div id="seq-dma"></div>
         </section>
 
         <section class="doc-section" id="adc-dma" data-title="Scan + DMA circular">
           <div class="sec-head"><h2><span class="sec-num">9.5</span>Scan + DMA circular</h2></div>
-          <p>In <b>scan mode</b> the ADC converts a list of channels in sequence (<code>SQR1</code>–<code>SQR3</code>); in <b>continuous mode</b> it starts over by itself; with <code>ADC_CR2.DMA</code> set it asks for a DMA transfer after each conversion. With DMA in <b>circular</b> mode the buffer fills forever, and the CPU just reads it when it wants a value.</p>
+          <p>The ADC converts a <b>sequence</b> of channels (<code>ADC_SQR1</code>–<code>SQR4</code>, length in <code>SQR1.L</code>); in <b>continuous mode</b> (<code>CFGR.CONT</code>) it starts over by itself; with <code>CFGR.DMAEN</code> it asks for a DMA transfer after each conversion, and <code>DMACFG = 1</code> keeps asking forever, for a circular DMA buffer. With DMA in <b>circular</b> mode the buffer fills forever, and the CPU just reads it when it wants a value.</p>
           <script type="text/plain" id="src-05-dma" data-src="examples/05-adc-pot-dma/src/main.c" data-region="dma" data-lang="c" data-file="examples/05-adc-pot-dma/src/main.c" data-start="83" data-end="102" data-sha="acedf8b27e42">
 static void adc_dma_start(void)
 {
@@ -198,7 +200,7 @@ for (;;)
 </script>
           <div id="ex-main"></div>
           <div class="callout tip"><div class="ci">💡</div><div><span class="ct">Half-transfer: double buffering for free</span><p>Enable <code>HTIE</code> and <code>TCIE</code>: the half-transfer interrupt says "the first half is complete, process it while I fill the second", and transfer-complete says the opposite. Your code never reads a half that DMA is writing.</p></div></div>
-          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">Simulation fidelity (example 05)</span><p>✅ Power-up, calibration handshake and single conversions run in Renode on the course's ADC model; the Robot test "turns the pot" by setting the simulated input. ❌ The model raises no DMA requests, so part 2 reports "no DMA transfers" in simulation. ❌ No noise or sampling-time effects. Not tested on a Blue Pill yet.</p></div></div>
+          <div class="callout note"><div class="ci">🧪</div><div><span class="ct">How this was verified (example 05)</span><p>✅ Builds in CI; the VDDA and millivolt maths pass their host tests. ⚠️ The Vrefint channel (18), the DMAMUX request ID (5) and the calibration address come from ST's CMSIS header and HAL/LL sources; their RM0440 sections are still to be checked (docs/verification.md). ❌ Not run on a NUCLEO-G474RE by the course yet.</p></div></div>
         </section>
 
         <section class="doc-section" id="noise" data-title="Noise, averaging and Vrefint">
@@ -209,7 +211,7 @@ for (;;)
             <li><b>Averaging:</b> the mean of N samples reduces random noise by about √N. Example 05 averages 32 samples from its DMA buffer.</li>
             <li><b>Hardware:</b> a 100 nF capacitor from the ADC pin to GND, short wires, and a quiet supply.</li>
           </ol>
-          <p>The internal <b>temperature sensor</b> (channel 16, enabled with <code>TSVREFE</code>) changes about 4.3 mV per °C, but its offset varies so much from chip to chip that it is only useful for detecting temperature <i>changes</i>, not for absolute measurements (RM0008 §11.10).</p>
+          <p>The internal <b>temperature sensor</b> (ADC1 channel 16, enabled with <code>ADC12_COMMON-&gt;CCR.VSENSESEL</code>) comes with two factory calibration points stored in system memory, taken at 30 °C and 130 °C (<code>TEMPSENSOR_CAL1/2</code> in ST&#39;s LL driver). Interpolating between them gives a usable absolute die temperature, which is still not the air temperature around the board.</p>
           <div class="callout warn"><div class="ci">⚠️</div><div><span class="ct">The supply is your reference</span><p>Every reading is relative to VDDA. If the 3.3 V rail sags while a radio transmits, all readings rise, even though the sensor did not change. Measuring Vrefint alongside, as example 05 does, corrects for that.</p></div></div>
           <div id="ck-adc"></div>
         </section>
@@ -225,9 +227,9 @@ for (;;)
   <script src="assets/js/glossary-data.js?v=__BUILD__"></script>
   <script src="assets/js/core.js?v=__BUILD__"></script>
   <script src="assets/js/diagrams.js?v=__BUILD__"></script>
-  <script src="assets/js/data/bluepill-pins.js?v=__BUILD__"></script>
+  <script src="assets/js/data/nucleo-pins.js?v=__BUILD__"></script>
   <script src="assets/js/data/wiring.js?v=__BUILD__"></script>
-  <script src="assets/js/data/regs-stm32f103.js?v=__BUILD__"></script>
+  <script src="assets/js/data/regs-stm32g474.js?v=__BUILD__"></script>
   <script src="assets/js/engines/pinout.js?v=__BUILD__"></script>
   <script src="assets/js/engines/register.js?v=__BUILD__"></script>
   <script src="assets/js/engines/checklist.js?v=__BUILD__"></script>
